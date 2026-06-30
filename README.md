@@ -7,9 +7,9 @@ HUSAI-OS coordinates thirteen specialist agents to handle setup, development, de
 ## Quick Start
 
 1. **Read the orchestration guide:** [`HUSAI_AGENT.md`](./HUSAI_AGENT.md)
-2. **Review operating rules:** [`docs/operating-rules.md`](./docs/operating-rules.md)
+2. **Connect platforms (browser OAuth, no gh CLI):** [`docs/platform-connect.md`](./docs/platform-connect.md)
 3. **Check project status:** [`docs/memory.md`](./docs/memory.md)
-4. **Pick a project** from [`projects/`](./projects/) and tell the agent to execute the pending task queue
+4. **Run platform check:** `node scripts/check-platform.js`
 
 ## Architecture
 
