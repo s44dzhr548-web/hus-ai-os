@@ -1,9 +1,11 @@
 # Trading AI
 
-## Status: Architecture Phase
+## Status: Live (Production)
 **Priority:** P1  
 **Owner:** CEO Agent + Research Agent  
-**Last Updated:** 2026-06-30
+**Last Updated:** 2026-06-30  
+**Production:** https://trading-ai-beta.vercel.app  
+**Local:** `cd trading-ai && npm run dev` (port 3001)
 
 ## Overview
 AI-assisted trading analysis platform. Ingests market data, runs signal models, paper-trades strategies, and provides risk-managed insights. **Not financial advice — research and paper trading only for MVP.**
@@ -30,11 +32,11 @@ AI-assisted trading analysis platform. Ingests market data, runs signal models, 
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| GitHub | ⬜ Not created | — |
-| Deployment | ⬜ Not configured | — |
-| Database | ⬜ Not configured | Time-series schema TBD |
-| APIs | ⬜ Researching | Alpaca vs IBKR vs Polygon |
-| Pending Work | Research brief, compliance review | Critical path |
+| GitHub | 🟢 Connected | Monorepo: s44dzhr548-web/hus-ai-os |
+| Deployment | 🟢 Live | trading-ai-beta.vercel.app |
+| Database | 🟢 Connected | husai-core Supabase |
+| APIs | 🟡 Mock mode | Alpaca keys optional |
+| Pending Work | Live broker integration | Requires payment gate |
 
 ## Pending Work
 1. **Research Agent**: Broker API comparison (Alpaca paper trading first)

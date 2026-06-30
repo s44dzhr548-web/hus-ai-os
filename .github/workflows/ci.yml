@@ -16,9 +16,25 @@ jobs:
           test -f README.md
           test -f HUSAI_AGENT.md
           test -f docs/memory.md
+          test -f projects/registry.json
           test -d agents
-          test -d projects
-          test -d docs
+          test -d husai-dashboard
+
+  husai-dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: husai-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: husai-dashboard/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
 
   restaurant-os:
     runs-on: ubuntu-latest
@@ -70,5 +86,6 @@ jobs:
           cache: npm
           cache-dependency-path: dropshipping-research/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm test
       - run: npm run build

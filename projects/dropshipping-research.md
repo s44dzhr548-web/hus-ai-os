@@ -1,9 +1,11 @@
 # Dropshipping Research
 
-## Status: Research Phase
+## Status: Live (Production)
 **Priority:** P2  
 **Owner:** Research Agent → CEO Agent  
-**Last Updated:** 2026-06-30
+**Last Updated:** 2026-06-30  
+**Production:** https://husai-dropshipping-research.vercel.app  
+**Local:** `cd dropshipping-research && npm run dev` (port 3002)
 
 ## Overview
 Automated dropshipping market research platform. Identifies profitable niches, analyzes suppliers, and tracks competitor pricing using AI agents.
@@ -28,11 +30,11 @@ Automated dropshipping market research platform. Identifies profitable niches, a
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| GitHub | ⬜ Not created | Pending repo init |
-| Deployment | ⬜ Not configured | — |
-| Database | ⬜ Not configured | — |
-| APIs | ⬜ Researching | Supplier APIs under evaluation |
-| Pending Work | Research brief, competitor map | See below |
+| GitHub | 🟢 Connected | Monorepo: s44dzhr548-web/hus-ai-os |
+| Deployment | 🟢 Live | husai-dropshipping-research.vercel.app |
+| Database | 🟢 Connected | husai-core Supabase |
+| APIs | 🟡 Sample data | CJ Dropshipping API pending |
+| Pending Work | Supplier API integration | Research complete |
 
 ## Pending Work
 1. **Research Agent**: Complete supplier API comparison (Spocket vs CJ vs Zendrop)

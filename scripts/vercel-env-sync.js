@@ -18,7 +18,7 @@ const vars = fs
 
 for (const line of vars) {
   const [name, ...rest] = line.split("=");
-  const value = rest.join("=");
+  const value = rest.join("=").trim();
   try {
     execSync(`npx vercel env rm ${name} production --yes`, { stdio: "ignore" });
   } catch {}

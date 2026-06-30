@@ -1,24 +1,30 @@
-# Dropshipping Research — Niche Scoring Module
+# HUSAI Dropshipping Research
 
-MVP niche scoring engine for HUSAI-OS. Full Next.js app scaffold pending; core logic implemented.
+Niche scoring and market analysis for dropshipping opportunities.
 
-## Usage
-
-```typescript
-import { rankNiches, DEMO_NICHES } from "./src/lib/niche-scoring";
-const report = rankNiches(DEMO_NICHES);
-```
-
-## Tests
+## Development
 
 ```bash
-npx vitest run
+npm install
+npm run dev
 ```
+
+Runs on http://localhost:3002
+
+## Features
+
+- Niche scoring engine (`src/lib/niche-scoring.ts`)
+- Weekly niche report UI
+- Vitest unit tests
+
+## Environment
+
+Copy `.env.example` to `.env.local` or run `node ../scripts/auto-connect-supabase.js`.
+
+## Production
+
+https://husai-dropshipping-research.vercel.app
 
 ## Spec
 
-[../projects/dropshipping-research.md](../projects/dropshipping-research.md)
-
-## Legal
-
-See [../docs/research/dropshipping-legal-scan.md](../docs/research/dropshipping-legal-scan.md)
+See [../projects/dropshipping-research.md](../projects/dropshipping-research.md)

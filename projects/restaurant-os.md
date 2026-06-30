@@ -1,9 +1,11 @@
 # Restaurant OS
 
-## Status: Core MVP Built — Awaiting Platform Connect
+## Status: Live (Production)
 **Priority:** P1  
 **Owner:** CEO Agent  
-**Last Updated:** 2026-06-30
+**Last Updated:** 2026-06-30  
+**Production:** https://restaurant-os-nine.vercel.app  
+**Local:** `cd restaurant-os && npm run dev` (port 3000)
 
 ## Overview
 All-in-one operating system for restaurants: menu management, orders, kitchen display, inventory, staff scheduling, and basic analytics.
@@ -30,11 +32,11 @@ All-in-one operating system for restaurants: menu management, orders, kitchen di
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| GitHub | 🟡 Local only | Scaffold at `/restaurant-os`; remote repo pending OAuth |
-| Deployment | ⬜ Not configured | CI workflow ready; Vercel link pending |
-| Database | ⬜ Not configured | `.env.example` prepared |
-| APIs | ⬜ Partial | Stripe sandbox planned |
-| Pending Work | Supabase + Vercel connect → schema → auth | See below |
+| GitHub | 🟢 Connected | Monorepo: s44dzhr548-web/hus-ai-os |
+| Deployment | 🟢 Live | restaurant-os-nine.vercel.app |
+| Database | 🟢 Connected | husai-core Supabase |
+| APIs | 🟡 Partial | Stripe sandbox planned |
+| Pending Work | Auth redirect URLs, Stripe live keys | Payment gate |
 
 ## Data Model (Draft)
 ```

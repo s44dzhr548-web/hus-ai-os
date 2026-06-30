@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-30T18:00:00.000Z",
+  "github": {
+    "remote": "https://github.com/s44dzhr548-web/hus-ai-os",
+    "branch": "main"
+  },
+  "supabase": {
+    "project": "husai-core",
+    "ref": "eilqwbaeeqcxqysohmsk",
+    "region": "ap-south-1",
+    "status": "connected"
+  },
+  "dashboard": {
+    "localPath": "husai-dashboard",
+    "vercelProject": "husai-dashboard",
+    "productionUrl": "https://husai-dashboard.vercel.app",
+    "devPort": 3003
+  },
+  "projects": [
+    {
+      "slug": "husai-dashboard",
+      "name": "HUSAI-OS Dashboard",
+      "description": "Central control plane — project registry, deploy status, platform health",
+      "priority": "P0",
+      "stack": ["Next.js", "Tailwind"],
+      "localPath": "husai-dashboard",
+      "githubPath": "husai-dashboard",
+      "vercelProject": "husai-dashboard",
+      "productionUrl": "https://husai-dashboard.vercel.app",
+      "healthPath": "/api/health",
+      "devPort": 3003,
+      "supabase": false,
+      "status": "live"
+    },
+    {
+      "slug": "restaurant-os",
+      "name": "Restaurant OS",
+      "description": "Menus, orders, kitchen display, and restaurant analytics",
+      "priority": "P1",
+      "stack": ["Next.js", "Supabase", "Tailwind"],
+      "localPath": "restaurant-os",
+      "githubPath": "restaurant-os",
+      "vercelProject": "restaurant-os",
+      "productionUrl": "https://restaurant-os-nine.vercel.app",
+      "healthPath": "/api/health",
+      "devPort": 3000,
+      "supabase": true,
+      "status": "live"
+    },
+    {
+      "slug": "trading-ai",
+      "name": "Trading AI",
+      "description": "Paper trading, SMA signals, and backtest engine",
+      "priority": "P1",
+      "stack": ["Next.js", "Supabase", "Vitest"],
+      "localPath": "trading-ai",
+      "githubPath": "trading-ai",
+      "vercelProject": "trading-ai",
+      "productionUrl": "https://trading-ai-beta.vercel.app",
+      "healthPath": "/api/health",
+      "devPort": 3001,
+      "supabase": true,
+      "status": "live"
+    },
+    {
+      "slug": "dropshipping-research",
+      "name": "HUSAI Dropshipping Research",
+      "description": "Niche scoring, product research, and market analysis",
+      "priority": "P2",
+      "stack": ["Next.js", "Tailwind", "Vitest"],
+      "localPath": "dropshipping-research",
+      "githubPath": "dropshipping-research",
+      "vercelProject": "husai-dropshipping-research",
+      "productionUrl": "https://husai-dropshipping-research.vercel.app",
+      "healthPath": "/api/health",
+      "devPort": 3002,
+      "supabase": true,
+      "status": "live"
+    }
+  ]
+}

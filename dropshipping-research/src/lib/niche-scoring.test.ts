@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rankNiches, scoreNiche, DEMO_NICHES } from "./niche-scoring";
+import { rankNiches, scoreNiche, SAMPLE_NICHES } from "./niche-scoring";
 
 describe("niche scoring", () => {
   it("scores higher for high demand low competition", () => {
@@ -21,7 +21,7 @@ describe("niche scoring", () => {
   });
 
   it("ranks demo niches", () => {
-    const ranked = rankNiches(DEMO_NICHES);
+    const ranked = rankNiches(SAMPLE_NICHES);
     expect(ranked.length).toBe(5);
     expect(ranked[0].score).toBeGreaterThanOrEqual(ranked[1].score);
   });

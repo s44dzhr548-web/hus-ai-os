@@ -1,57 +1,53 @@
-# HUSAI-OS Project Registry Dashboard
+# HUSAI-OS Registry Dashboard
 
-> Auto-synced from `memory.md`. Last updated: 2026-06-30
+> **Note:** The live dashboard is at [husai-dashboard](../husai-dashboard/) (web UI).  
+> This file is a static reference. See [memory.md](./memory.md) for current status.
 
-## System Status
+## Production URLs
 
-| Metric | Value |
-|--------|-------|
-| Active projects | 3 |
-| Production deploys | 0 (awaiting OAuth) |
-| Test suites passing | 3/3 locally |
-| Human gates open | GitHub, Supabase, Vercel |
+| App | URL | Health |
+|-----|-----|--------|
+| HUSAI Dashboard | https://husai-dashboard.vercel.app | `/api/health` |
+| Restaurant OS | https://restaurant-os-nine.vercel.app | `/api/health` |
+| Trading AI | https://trading-ai-beta.vercel.app | `/api/health` |
+| Dropshipping | https://husai-dropshipping-research.vercel.app | `/api/health` |
 
-## Projects
+## Platform
 
-### Restaurant OS — P1 🟡
-- **Local:** ✅ Core MVP built
-- **GitHub:** ⬜ No remote
-- **Vercel:** ⬜ Not deployed
-- **Supabase:** ⬜ Migration ready, not applied
-- **Features:** Auth, menu, orders, KDS, settings, public menu
-- **Tests:** 2 passing
+| Service | Status | Details |
+|---------|--------|---------|
+| GitHub | Connected | https://github.com/s44dzhr548-web/hus-ai-os |
+| Supabase | Connected | husai-core · ap-south-1 |
+| Vercel | Connected | Team: hus707002h-7024s-projects |
 
-### Trading AI — P1 🟡
-- **Local:** ✅ App scaffold + backtest engine
-- **GitHub:** ⬜ No remote
-- **Features:** SMA signals, backtest API, dashboard, disclaimer
-- **Tests:** 4 passing
-- **Blocked:** Alpaca API keys (optional — mock mode works)
+## Local Development
 
-### Dropshipping Research — P2 🟡
-- **Local:** ✅ Niche scoring module
-- **Features:** Score/rank algorithm, demo data, legal scan
-- **Tests:** 2 passing
-- **Next:** Full Next.js app + CJ API
+```bash
+# Dashboard (port 3003)
+cd husai-dashboard && npm run dev
 
-## Agent Activity Queue
-
-1. **Setup Agent** — waiting on Supabase + GitHub OAuth
-2. **Deployment Agent** — waiting on Vercel OAuth
-3. **Developer Agent** — continue feature work locally ✅
-4. **Research Agent** — legal scan complete ✅
-
-## Quick Commands
-
-```powershell
-# Restaurant OS
+# Restaurant OS (port 3000)
 cd restaurant-os && npm run dev
 
-# Trading AI
+# Trading AI (port 3001)
 cd trading-ai && npm run dev
 
-# Run all tests
-cd restaurant-os && npm test
-cd trading-ai && npm test
-cd dropshipping-research && npm test
+# Dropshipping (port 3002)
+cd dropshipping-research && npm run dev
 ```
+
+## Verification
+
+```bash
+npm run check
+npm run test:all
+npm run build:all
+```
+
+## Create New Project
+
+```bash
+node scripts/create-project.js --slug my-app --name "My App" --supabase
+```
+
+See [dashboard.md](./dashboard.md) for full documentation.

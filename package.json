@@ -1,17 +1,22 @@
 {
   "name": "hus-ai-os",
   "version": "1.0.0",
-  "description": "**An AI Operating System that autonomously manages all your software projects.**",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "description": "HUSAI-OS — AI Operating System for autonomous project management",
+  "private": true,
   "scripts": {
     "connect": "node scripts/connect-husai-core.js",
     "connect:supabase": "node scripts/auto-connect-supabase.js",
-    "check": "node scripts/check-platform.js"
+    "check": "node scripts/check-platform.js",
+    "check:all": "node scripts/check-all.js",
+    "create:project": "node scripts/create-project.js",
+    "build:all": "npm run build:dashboard && npm run build:restaurant && npm run build:trading && npm run build:dropshipping",
+    "build:dashboard": "cd husai-dashboard && npm run build",
+    "build:restaurant": "cd restaurant-os && npm run build",
+    "build:trading": "cd trading-ai && npm run build",
+    "build:dropshipping": "cd dropshipping-research && npm run build",
+    "test:all": "npm run test --prefix restaurant-os && npm run test --prefix trading-ai && npm run test --prefix dropshipping-research"
   },
-  "keywords": [],
+  "keywords": ["husai", "monorepo", "ai-os"],
   "author": "",
   "license": "ISC",
   "type": "commonjs",

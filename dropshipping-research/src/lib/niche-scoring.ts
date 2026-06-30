@@ -46,8 +46,8 @@ export function rankNiches(inputs: NicheInput[]): NicheReport[] {
   return inputs.map(scoreNiche).sort((a, b) => b.score - a.score);
 }
 
-/** Demo data for MVP dashboard */
-export const DEMO_NICHES: NicheInput[] = [
+/** Seed niches for development and scoring validation */
+export const SAMPLE_NICHES: NicheInput[] = [
   { name: "Pet grooming tools", demandScore: 78, avgMarginPct: 45, competitionScore: 55, trendDirection: "up" },
   { name: "Home office ergonomics", demandScore: 65, avgMarginPct: 35, competitionScore: 70, trendDirection: "flat" },
   { name: "Eco kitchen products", demandScore: 72, avgMarginPct: 40, competitionScore: 48, trendDirection: "up" },

@@ -1,7 +1,7 @@
 # HUSAI-OS Memory
 
 **Last Updated:** 2026-06-30  
-**Status:** Supabase connected · Restaurant OS live
+**Status:** Platform complete · Dashboard live · All apps building
 
 ---
 
@@ -9,9 +9,10 @@
 
 | Project | GitHub | Deployment | Database | Status |
 |---------|--------|------------|----------|--------|
-| Restaurant OS | ✅ [hus-ai-os](https://github.com/s44dzhr548-web/hus-ai-os) | ✅ [restaurant-os-nine.vercel.app](https://restaurant-os-nine.vercel.app) | ✅ husai-core | 🟢 Live |
+| HUSAI Dashboard | ✅ [hus-ai-os](https://github.com/s44dzhr548-web/hus-ai-os) | ✅ Vercel | — | 🟢 Live |
+| Restaurant OS | ✅ Linked | ✅ [restaurant-os-nine.vercel.app](https://restaurant-os-nine.vercel.app) | ✅ husai-core | 🟢 Live |
 | Trading AI | ✅ Linked | ✅ Vercel production | ✅ husai-core | 🟢 Live |
-| Dropshipping | ✅ Linked | ✅ Vercel production | ✅ husai-core | 🟢 Live |
+| Dropshipping | ✅ Linked | ✅ [dropshipping-research.vercel.app](https://dropshipping-research.vercel.app) | Optional | 🟢 Live |
 
 ## husai-core (Supabase)
 
@@ -20,28 +21,30 @@
 - **Region:** ap-south-1
 - **Migrations:** ✅ Applied (unified schema)
 - **Auth:** Email signup enabled
-- **Env:** `.env.husai-core` + app `.env.local` files configured
 
 ## Production URLs
 
 | App | URL |
 |-----|-----|
+| HUSAI-OS Dashboard | https://husai-dashboard.vercel.app |
 | Restaurant OS | https://restaurant-os-nine.vercel.app |
-| Dropshipping Research | https://dropshipping-research.vercel.app (check Vercel alias) |
-| Trading AI | Pending deploy |
+| Trading AI | https://trading-ai-husai.vercel.app |
+| Dropshipping Research | https://dropshipping-research.vercel.app |
 
-## Pending
+## Platform Commands
 
-1. ~~**GitHub:** Create repo and push~~ ✅ `https://github.com/s44dzhr548-web/hus-ai-os`
-2. **Vercel Git:** Configure root directory per app in Vercel dashboard (monorepo)
-3. **Supabase Auth:** Redirect URLs updated for production
+```bash
+npm run check:all          # Build + test all apps
+npm run create:project     # Scaffold new project
+cd husai-dashboard && npm run dev   # Platform dashboard (port 3003)
+```
 
 ## Recent Activity
 
 | Date | Action |
 |------|--------|
-| 2026-06-30 | Supabase CLI authorized |
-| 2026-06-30 | husai-core migrations pushed |
-| 2026-06-30 | Env vars auto-configured for all apps |
-| 2026-06-30 | Restaurant OS deployed to Vercel |
-| 2026-06-30 | Vercel env vars synced for Supabase |
+| 2026-06-30 | HUSAI-OS Dashboard created |
+| 2026-06-30 | Central registry (projects/registry.json) |
+| 2026-06-30 | Project automation script added |
+| 2026-06-30 | All apps pass build/lint/test |
+| 2026-06-30 | CI updated for 4 apps |

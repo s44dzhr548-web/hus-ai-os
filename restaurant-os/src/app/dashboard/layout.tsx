@@ -45,7 +45,7 @@ export default async function DashboardLayout({
             Restaurant OS
           </p>
           <h2 className="mt-1 truncate text-lg font-semibold">
-            {restaurant?.name ?? "Demo Mode"}
+            {restaurant.name}
           </h2>
         </div>
         <nav className="flex flex-1 flex-col gap-1">

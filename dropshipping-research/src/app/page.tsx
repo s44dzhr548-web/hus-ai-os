@@ -1,7 +1,7 @@
-import { rankNiches, DEMO_NICHES } from "@/lib/niche-scoring";
+import { rankNiches, SAMPLE_NICHES } from "@/lib/niche-scoring";
 
 export default function Home() {
-  const report = rankNiches(DEMO_NICHES);
+  const report = rankNiches(SAMPLE_NICHES);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50">
@@ -11,7 +11,7 @@ export default function Home() {
         </p>
         <h1 className="mt-2 text-3xl font-semibold">Weekly Niche Report</h1>
         <p className="mt-2 text-zinc-400">
-          Demo data · CJ API integration pending
+          Sample report · CJ API integration pending
         </p>
       </header>
       <main className="mx-auto max-w-3xl px-6 py-10">
