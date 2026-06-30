@@ -69,6 +69,7 @@ async function main() {
   const apps = [
     ["restaurant-os", "NEXT_PUBLIC_APP_URL=http://localhost:3000"],
     ["trading-ai", "NEXT_PUBLIC_APP_URL=http://localhost:3001\nALPACA_API_KEY=\nALPACA_API_SECRET="],
+    ["dropshipping-research", "NEXT_PUBLIC_APP_URL=http://localhost:3002"],
   ];
 
   for (const [app, extra] of apps) {

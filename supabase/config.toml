@@ -14,10 +14,11 @@ major_version = 15
 
 [auth]
 enabled = true
-site_url = "http://localhost:3000"
+site_url = "https://restaurant-os-nine.vercel.app"
 additional_redirect_urls = [
   "http://localhost:3000/auth/callback",
   "http://localhost:3001/auth/callback",
+  "https://restaurant-os-nine.vercel.app/auth/callback",
   "https://*.vercel.app/auth/callback"
 ]
 jwt_expiry = 3600
