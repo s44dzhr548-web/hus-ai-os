@@ -37,5 +37,8 @@ npm-debug.log*
 # TypeScript
 *.tsbuildinfo
 
+# Supabase CLI local state
+supabase/.temp/
+
 # Nested app git (managed separately until monorepo merge)
 restaurant-os/.git/
