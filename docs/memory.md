@@ -9,9 +9,9 @@
 
 | Project | GitHub | Deployment | Database | Status |
 |---------|--------|------------|----------|--------|
-| Restaurant OS | 🔴 Repo not created | ✅ [restaurant-os-nine.vercel.app](https://restaurant-os-nine.vercel.app) | ✅ husai-core | 🟢 Live |
-| Trading AI | 🔴 Pending | 🟡 Deploy pending | ✅ husai-core | 🟡 Env ready |
-| Dropshipping | 🔴 Pending | ✅ Vercel deployed | ✅ husai-core | 🟢 Live |
+| Restaurant OS | ✅ [hus-ai-os](https://github.com/s44dzhr548-web/hus-ai-os) | ✅ [restaurant-os-nine.vercel.app](https://restaurant-os-nine.vercel.app) | ✅ husai-core | 🟢 Live |
+| Trading AI | ✅ Linked | ✅ Vercel production | ✅ husai-core | 🟢 Live |
+| Dropshipping | ✅ Linked | ✅ Vercel production | ✅ husai-core | 🟢 Live |
 
 ## husai-core (Supabase)
 
@@ -32,9 +32,9 @@
 
 ## Pending
 
-1. **GitHub:** Create `hus-ai-os` repo → push (browser OAuth on push)
-2. **Trading AI:** Vercel production deploy
-3. **Supabase Auth:** Add redirect URL `https://restaurant-os-nine.vercel.app/auth/callback`
+1. ~~**GitHub:** Create repo and push~~ ✅ `https://github.com/s44dzhr548-web/hus-ai-os`
+2. **Vercel Git:** Configure root directory per app in Vercel dashboard (monorepo)
+3. **Supabase Auth:** Redirect URLs updated for production
 
 ## Recent Activity
 
