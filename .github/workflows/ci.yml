@@ -71,3 +71,4 @@ jobs:
           cache-dependency-path: dropshipping-research/package-lock.json
       - run: npm ci
       - run: npm test
+      - run: npm run build
