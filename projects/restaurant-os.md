@@ -1,6 +1,6 @@
 # Restaurant OS
 
-## Status: Spec Complete — Ready for Setup
+## Status: Core MVP Built — Awaiting Platform Connect
 **Priority:** P1  
 **Owner:** CEO Agent  
 **Last Updated:** 2026-06-30
