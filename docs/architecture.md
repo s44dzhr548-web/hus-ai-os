@@ -1,147 +1,128 @@
-# HUSAI-OS Architecture
+# HUSAI-OS 2.0 Architecture
 
 ## Vision
-HUSAI-OS is an AI Operating System that autonomously manages software projects through a modular multi-agent architecture. Human involvement is limited to OTP, payment approval, KYC, and legally required consent.
+
+**HUSAI-OS 2.0** is an Autonomous AI Company. The user states goals; agents execute everything. Human involvement is limited to five approval types: OAuth, OTP, payment, KYC, legal.
 
 ## System Diagram
 
 ```mermaid
 flowchart TB
-    Owner[Account Owner]
+    User[Account Owner]
+    HAG[Human Approval Gateway]
+    
     CEO[CEO Agent]
+    ORCH[Orchestrator Agent]
+    
+    subgraph Leadership[Leadership]
+        CTO[CTO Agent]
+        PM[Product Manager]
+        ARCH[Architect Agent]
+    end
+    
+    subgraph Factory[Project Factory]
+        PF[Analyze · Spec · Scaffold · Connect · Build · Test · Deploy · Verify]
+    end
     
     subgraph Specialists[Specialist Agents]
-        Setup[Setup Agent]
-        Dev[Developer Agent]
-        DB[Database Agent]
-        API[API Agent]
-        Deploy[Deployment Agent]
-        DevOps[DevOps Agent]
-        QA[QA Agent]
-        Sec[Security Agent]
-        Fin[Finance Agent]
-        Mkt[Marketing Agent]
-        Res[Research Agent]
-        Doc[Documentation Agent]
+        FE[Frontend]
+        BE[Backend]
+        DB[Database]
+        API[API Integration]
+        QA[QA]
+        DEVOPS[DevOps]
+        SEC[Security]
+        DEP[Deployment]
+        MKT[Marketing]
+        FIN[Finance]
+        SUP[Customer Support]
     end
     
-    subgraph External[External Platforms]
-        GH[GitHub]
-        VC[Vercel]
-        DBCloud[(Database)]
-        Svc[Third-Party APIs]
+    subgraph Memory[AI Memory]
+        REG[Projects]
+        CRED[Credentials Status]
+        TASKS[Tasks & Activity]
+        ERR[Errors & Fixes]
+        COST[Costs]
+        APR[Pending Approvals]
     end
     
-    subgraph State[Shared State]
-        Registry[Project Registry]
-        Memory[Memory Log]
-        Docs[Documentation]
-    end
-    
-    Owner -->|OTP / Payment / KYC / Legal| CEO
-    CEO --> Specialists
-    Specialists --> External
-    Specialists --> State
-    CEO --> State
+    User -->|Goals only| CEO
+    CEO --> ORCH
+    ORCH --> Leadership
+    ORCH --> Factory
+    ORCH --> Specialists
+    ORCH --> Memory
+    ORCH -->|Blocked| HAG
+    HAG --> User
+    HAG -->|Approved| ORCH
 ```
 
-## Layers
+## Core Components
 
-### 1. Orchestration Layer
-- **CEO Agent** — single entry point for prioritization, assignment, and reporting
-- Reads/writes **Project Registry** in `/docs/memory.md`
-- Enforces **Operating Rules** — only four human interrupt types
+### CEO Agent
+Receives goals → business + technical tasks → priorities → final reports.
 
-### 2. Execution Layer
-Thirteen specialist agents with non-overlapping primary ownership:
+### Orchestrator Agent
+Runs all workflows, assigns specialists, retries failures, escalates only via Human Approval Gateway.
 
-| Agent | Domain |
-|-------|--------|
-| Setup | Bootstrap, integrations |
-| Developer | Application code |
-| Database | Schemas, migrations |
-| API | External services |
-| Deployment | GitHub, Vercel, releases |
+### Specialist Agents (2.0)
+
+| Agent | Role |
+|-------|------|
+| CTO Agent | Technical leadership, stack approval |
+| Product Manager | Requirements, acceptance criteria |
+| Architect | System design, schemas, API contracts |
+| Frontend | UI and client logic |
+| Backend | API routes, server logic |
+| Database | Migrations, RLS, performance |
+| API Integration | Third-party services |
+| QA | Tests and quality gates |
 | DevOps | CI/CD, monitoring |
-| QA | Testing, quality gates |
-| Security | Secrets, audits |
-| Finance | Cost tracking |
+| Security | Audits, secret scanning |
+| Deployment | Vercel, releases, rollbacks |
 | Marketing | Launches, analytics |
-| Research | Tech/API analysis |
-| Documentation | Doc sync |
+| Finance | Cost tracking |
+| Customer Support | Incident triage, recovery coordination |
+| Setup | Platform connection, env files |
 
-### 3. Project Layer
-Each project defined in `/projects/*.md` with:
-- Goals and tech stack
-- Registry status (GitHub, Deploy, DB, APIs)
-- Pending work queue
-- Human gates anticipated
+### Human Approval Gateway
+Unified approval system. Allowed stops: **OAuth · OTP · payment · KYC · legal**.
 
-### 4. Platform Layer
-Standard external services synchronized per project:
-- **GitHub** — source of truth, CI, secrets
-- **Vercel** — hosting, preview deploys, env vars
-- **Database** — Supabase default (Postgres)
-- **APIs** — per project requirements
+### Project Factory
+Full pipeline: analyze → spec → folder → GitHub → Vercel → Supabase → env → frontend → backend → schema → tests → fix → deploy → verify → URL.
 
-### 5. Knowledge Layer
-- `/docs/standards.md` — coding and ops conventions
-- `/docs/operating-rules.md` — autonomy boundaries
-- `/docs/memory.md` — living registry and decision log
-- `/docs/roadmap.md` — strategic timeline
+### Autonomous Recovery
+Detect → diagnose → fix → retry (3×) → escalate to Gateway if blocked.
 
-## Communication Model
+Scripts: `scripts/health-check.js`, `scripts/autonomous-recovery.js`
 
-Agents do not run as separate processes in v1. They are **role definitions** invoked by the Cursor agent (or future SDK agents) following `HUSAI_AGENT.md` orchestration rules.
+### AI Memory
+Store: `projects/ai-memory.json` — projects, platforms, credentials status, tasks, activity, errors, fixes, costs, deployments, pending approvals.
 
-### Task Flow
-```
-1. CEO reads memory.md + project specs
-2. CEO assigns task to specialist (documented in memory)
-3. Specialist executes within autonomy rules
-4. Specialist updates memory + notifies downstream agents
-5. Documentation Agent syncs artifacts
-6. CEO reports aggregate status
-```
+Dashboard bundle: `husai-dashboard/src/data/ai-memory.json`
 
 ## Data Flow
 
 ```
-Project Spec → Setup → GitHub + Vercel + DB
-                    ↓
-              Developer (features)
-                    ↓
-         QA ← → Security (gates)
-                    ↓
-              Deployment (prod)
-                    ↓
-         Marketing + Finance (post-launch)
+Goal → CEO → Orchestrator → [Product Manager → Architect → CTO]
+  → Project Factory → Specialists → QA + Security → Deployment
+  → AI Memory update → CEO final report
 ```
-
-## Security Architecture
-- Secrets only in GitHub Secrets / Vercel Env — never in repo
-- Security Agent scans every PR
-- RLS on all multi-tenant databases
-- Fail-closed auth on all production routes
-
-## Scalability Path
-
-| Phase | Capability |
-|-------|------------|
-| v1 (now) | Markdown agent defs + Cursor orchestration |
-| v2 | Cursor SDK agents per role |
-| v3 | Scheduled automations (cron agents) |
-| v4 | Multi-repo federation under CEO |
 
 ## Repository Structure
 
 ```
 hus-ai-os/
-├── README.md
-├── HUSAI_AGENT.md
-├── agents/           # 13 agent role definitions
-├── projects/         # Project specs + registry links
-└── docs/             # Architecture, rules, living memory
+├── agents/              # 20+ agent definitions
+├── projects/
+│   ├── registry.json    # Project registry
+│   └── ai-memory.json   # AI Memory (v2)
+├── scripts/
+│   ├── health-check.js
+│   ├── autonomous-recovery.js
+│   ├── create-project.js
+│   └── sync-dashboard-data.js
+├── husai-dashboard/     # 2.0 control plane UI
+└── docs/
 ```
-
-Project application code lives in **separate GitHub repos** linked from the registry—not in this meta-repo.

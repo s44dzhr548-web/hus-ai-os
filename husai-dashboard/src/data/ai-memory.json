@@ -1,0 +1,198 @@
+{
+  "version": 2,
+  "updatedAt": "2026-06-30T17:09:32.226Z",
+  "platform": {
+    "name": "HUSAI-OS",
+    "release": "2.0.0",
+    "principle": "zero_manual_work"
+  },
+  "platforms": {
+    "github": {
+      "remote": "https://github.com/s44dzhr548-web/hus-ai-os",
+      "branch": "main",
+      "status": "connected",
+      "lastSync": "2026-06-30T16:00:00.000Z"
+    },
+    "vercel": {
+      "team": "hus707002h-7024s-projects",
+      "status": "connected",
+      "projects": 4
+    },
+    "supabase": {
+      "project": "husai-core",
+      "ref": "eilqwbaeeqcxqysohmsk",
+      "region": "ap-south-1",
+      "status": "connected"
+    }
+  },
+  "credentials": {
+    "github": {
+      "status": "connected",
+      "required": true
+    },
+    "vercel": {
+      "status": "connected",
+      "required": true
+    },
+    "supabase": {
+      "status": "connected",
+      "required": true
+    },
+    "stripe": {
+      "status": "not_required",
+      "required": false
+    },
+    "alpaca": {
+      "status": "optional",
+      "required": false
+    }
+  },
+  "pendingApprovals": [],
+  "currentTasks": [
+    {
+      "id": "task-001",
+      "title": "Platform stable — awaiting next user goal",
+      "agent": "ceo",
+      "status": "idle",
+      "priority": "P3",
+      "startedAt": "2026-06-30T20:00:00.000Z"
+    }
+  ],
+  "agentActivity": [
+    {
+      "id": "act-1782839372234",
+      "agent": "orchestrator",
+      "action": "Health check: 33 passed, 0 failed",
+      "project": null,
+      "timestamp": "2026-06-30T17:09:32.234Z"
+    },
+    {
+      "id": "act-001",
+      "agent": "orchestrator",
+      "action": "Health sweep completed — all projects healthy",
+      "project": null,
+      "timestamp": "2026-06-30T20:00:00.000Z"
+    },
+    {
+      "id": "act-002",
+      "agent": "deployment",
+      "action": "Production v1.0.0 verified across 4 apps",
+      "project": "husai-dashboard",
+      "timestamp": "2026-06-30T16:34:00.000Z"
+    },
+    {
+      "id": "act-003",
+      "agent": "setup",
+      "action": "Supabase husai-core connected via CLI",
+      "project": null,
+      "timestamp": "2026-06-30T12:00:00.000Z"
+    }
+  ],
+  "errors": [],
+  "fixes": [],
+  "costs": {
+    "monthlyUsd": 0,
+    "breakdown": [
+      {
+        "service": "GitHub",
+        "usd": 0,
+        "tier": "Free"
+      },
+      {
+        "service": "Vercel",
+        "usd": 0,
+        "tier": "Hobby/Team"
+      },
+      {
+        "service": "Supabase",
+        "usd": 0,
+        "tier": "Free"
+      }
+    ],
+    "updatedAt": "2026-06-30T20:00:00.000Z"
+  },
+  "deployments": [
+    {
+      "id": "dep-dashboard",
+      "project": "husai-dashboard",
+      "environment": "production",
+      "url": "https://husai-dashboard.vercel.app",
+      "status": "success",
+      "deployedAt": "2026-06-30T16:00:00.000Z"
+    },
+    {
+      "id": "dep-restaurant",
+      "project": "restaurant-os",
+      "environment": "production",
+      "url": "https://restaurant-os-nine.vercel.app",
+      "status": "success",
+      "deployedAt": "2026-06-30T16:34:00.000Z"
+    },
+    {
+      "id": "dep-trading",
+      "project": "trading-ai",
+      "environment": "production",
+      "url": "https://trading-ai-beta.vercel.app",
+      "status": "success",
+      "deployedAt": "2026-06-30T12:00:00.000Z"
+    },
+    {
+      "id": "dep-dropshipping",
+      "project": "dropshipping-research",
+      "environment": "production",
+      "url": "https://husai-dropshipping-research.vercel.app",
+      "status": "success",
+      "deployedAt": "2026-06-30T16:00:00.000Z"
+    }
+  ],
+  "projects": [
+    {
+      "slug": "husai-dashboard",
+      "name": "HUSAI-OS Dashboard",
+      "status": "live",
+      "health": "ok",
+      "productionUrl": "https://husai-dashboard.vercel.app",
+      "github": "connected",
+      "vercel": "connected",
+      "supabase": "not_required",
+      "lastDeploy": "2026-06-30T16:00:00.000Z",
+      "monthlyCostUsd": 0
+    },
+    {
+      "slug": "restaurant-os",
+      "name": "Restaurant OS",
+      "status": "live",
+      "health": "ok",
+      "productionUrl": "https://restaurant-os-nine.vercel.app",
+      "github": "connected",
+      "vercel": "connected",
+      "supabase": "connected",
+      "lastDeploy": "2026-06-30T16:34:00.000Z",
+      "monthlyCostUsd": 0
+    },
+    {
+      "slug": "trading-ai",
+      "name": "Trading AI",
+      "status": "live",
+      "health": "ok",
+      "productionUrl": "https://trading-ai-beta.vercel.app",
+      "github": "connected",
+      "vercel": "connected",
+      "supabase": "connected",
+      "lastDeploy": "2026-06-30T12:00:00.000Z",
+      "monthlyCostUsd": 0
+    },
+    {
+      "slug": "dropshipping-research",
+      "name": "Dropshipping Research",
+      "status": "live",
+      "health": "ok",
+      "productionUrl": "https://husai-dropshipping-research.vercel.app",
+      "github": "connected",
+      "vercel": "connected",
+      "supabase": "connected",
+      "lastDeploy": "2026-06-30T16:00:00.000Z",
+      "monthlyCostUsd": 0
+    }
+  ]
+}

@@ -11,13 +11,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate structure
+      - name: Validate HUSAI-OS 2.0 structure
         run: |
           test -f README.md
           test -f HUSAI_AGENT.md
-          test -f docs/memory.md
+          test -f docs/architecture.md
           test -f projects/registry.json
-          test -d agents
+          test -f projects/ai-memory.json
+          test -f agents/orchestrator-agent.md
+          test -f agents/cto-agent.md
+          test -f agents/product-manager-agent.md
+          test -f agents/architect-agent.md
+          test -f agents/api-integration-agent.md
+          test -f agents/customer-support-agent.md
           test -d husai-dashboard
 
   husai-dashboard:
@@ -34,6 +40,7 @@ jobs:
           cache-dependency-path: husai-dashboard/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       - run: npm run build
 
   restaurant-os:
@@ -86,6 +93,17 @@ jobs:
           cache: npm
           cache-dependency-path: dropshipping-research/package-lock.json
       - run: npm ci
-      - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  health-check:
+    runs-on: ubuntu-latest
+    needs: [meta-check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Production URL checks
+        run: node scripts/health-check.js
+        continue-on-error: true

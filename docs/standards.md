@@ -1,5 +1,9 @@
 # HUSAI-OS Standards
 
+## Operating Principle
+
+**Zero manual work.** All setup, deploy, and configuration is performed by agents. Users only complete Human Approval Gateway actions (payment, OTP, OAuth, KYC, legal).
+
 ## Code Standards
 
 ### Language & Framework
@@ -120,7 +124,8 @@ SUPABASE_SERVICE_ROLE_KEY=  # server only, never NEXT_PUBLIC_
 - Rollback procedure documented per project
 
 ## Agent Execution Standards
-- Log decisions in `/docs/memory.md`
-- Update project registry after milestone
-- Stop only for OTP, payment, KYC, legal gates
+- CEO receives goals; Orchestrator runs workflow without user input
+- Log decisions in Project Memory (`docs/memory.md`)
+- Stop only for Human Approval Gateway (payment, OTP, OAuth, KYC, legal)
+- Never ask user to run commands or copy credentials
 - Never fabricate credentials

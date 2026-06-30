@@ -1,89 +1,64 @@
-# HUSAI-OS
+# HUSAI-OS 2.0
 
-**An AI Operating System that autonomously manages all your software projects.**
+**Autonomous AI Company · Zero Manual Work**
 
-HUSAI-OS coordinates thirteen specialist agents to handle setup, development, deployment, security, QA, finance, marketing, research, and documentation.
+You state goals. Agents run the company: product, engineering, deployment, support, finance.
 
-## Quick Start
+## You Only Approve
 
-```bash
-# Platform dashboard (port 3003)
-cd husai-dashboard && npm install && npm run dev
+| Gate | When |
+|------|------|
+| OAuth | Platform login consent |
+| OTP | Verification codes |
+| Payment | Paid tiers |
+| KYC | Identity verification |
+| Legal | Terms acceptance |
 
-# Run all apps
-cd restaurant-os && npm run dev    # port 3000
-cd trading-ai && npm run dev         # port 3001
-cd dropshipping-research && npm run dev  # port 3002
+## Architecture
 
-# Full platform audit
-npm run check:all
+| Layer | Components |
+|-------|------------|
+| Leadership | CEO · Orchestrator · CTO · Product Manager · Architect |
+| Execution | Frontend · Backend · Database · API · QA · DevOps · Security · Deployment |
+| Business | Marketing · Finance · Customer Support |
+| Systems | Project Factory · Autonomous Recovery · AI Memory · Human Approval Gateway |
 
-# Create new project
-npm run create:project "My App" "Description"
-```
+## Dashboard
 
-## Production URLs
+https://husai-dashboard.vercel.app
+
+- All projects & health
+- Agent activity & current tasks
+- Pending approvals
+- Deployments & errors
+- Cost tracking
+- Create New Project
+
+## Production Apps
 
 | App | URL |
 |-----|-----|
-| **HUSAI Dashboard** | https://husai-dashboard.vercel.app |
+| HUSAI Dashboard | https://husai-dashboard.vercel.app |
 | Restaurant OS | https://restaurant-os-nine.vercel.app |
-| Trading AI | https://trading-ai-husai.vercel.app |
-| Dropshipping Research | https://dropshipping-research.vercel.app |
+| Trading AI | https://trading-ai-beta.vercel.app |
+| Dropshipping | https://husai-dropshipping-research.vercel.app |
 
-**GitHub:** https://github.com/s44dzhr548-web/hus-ai-os
+## Agent Commands (Internal)
 
-## Monorepo Structure
-
+```bash
+npm run orchestrate   # Health check + autonomous recovery
+npm run health        # Full platform verification
+npm run sync          # Sync AI Memory to dashboard
 ```
-hus-ai-os/
-├── husai-dashboard/     ← Platform control plane
-├── restaurant-os/       ← Restaurant management (Supabase)
-├── trading-ai/          ← Paper trading & backtests
-├── dropshipping-research/ ← Niche scoring
-├── projects/registry.json ← Central project registry
-├── supabase/            ← husai-core migrations
-├── agents/              ← 13 specialist agent definitions
-└── scripts/             ← Automation & platform tools
-```
-
-## Vercel Deployment (Monorepo)
-
-Each app is a separate Vercel project with **Root Directory** set:
-
-| Vercel Project | Root Directory |
-|----------------|----------------|
-| husai-dashboard | `husai-dashboard` |
-| restaurant-os | `restaurant-os` |
-| trading-ai | `trading-ai` |
-| dropshipping-research | `dropshipping-research` |
-
-## Agents
-
-| Agent | Role |
-|-------|------|
-| [CEO](./agents/ceo-agent.md) | Orchestration, prioritization |
-| [Setup](./agents/setup-agent.md) | Project bootstrap |
-| [Developer](./agents/developer-agent.md) | Code & bug fixes |
-| [Database](./agents/database-agent.md) | Schemas & migrations |
-| [Deployment](./agents/deployment-agent.md) | GitHub, Vercel |
-| [QA](./agents/qa-agent.md) | Testing |
-| [Security](./agents/security-agent.md) | Secrets & audits |
-
-Full list in [`agents/`](./agents/).
 
 ## Documentation
 
-| Doc | Purpose |
-|-----|---------|
-| [Architecture](./docs/architecture.md) | System design |
-| [Memory](./docs/memory.md) | Living registry |
-| [Roadmap](./docs/roadmap.md) | Timeline |
-| [Registry Dashboard](./docs/registry-dashboard.md) | Dashboard spec |
-
-## Human Gates
-
-Only these require human approval: OTP, payment, KYC, legal consent.
+- [Architecture 2.0](./docs/architecture.md)
+- [AI Memory](./docs/project-memory.md)
+- [Project Factory](./docs/project-factory.md)
+- [Human Approval Gateway](./docs/human-approval-gateway.md)
+- [HUSAI_AGENT.md](./HUSAI_AGENT.md)
+- [2.0 Report](./docs/HUSAI_OS_2.0_REPORT.md)
 
 ## License
 

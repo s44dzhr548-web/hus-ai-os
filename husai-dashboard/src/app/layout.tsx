@@ -6,8 +6,8 @@ import "./globals.css";
 const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "HUSAI-OS Dashboard",
-  description: "Unified control plane for HUSAI-OS projects and platform integrations",
+  title: "HUSAI-OS 2.0 Dashboard",
+  description: "Autonomous AI Company control plane — zero manual work. Agents, approvals, deployments, costs.",
 };
 
 export default function RootLayout({

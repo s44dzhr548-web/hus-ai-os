@@ -1,50 +1,87 @@
-# HUSAI-OS Memory
+# HUSAI-OS Memory (Project Memory)
 
 **Last Updated:** 2026-06-30  
-**Status:** Platform complete · Dashboard live · All apps building
+**Principle:** Zero manual work — agents maintain this file  
+**Release:** Production v1.0.0
+
+---
+
+## Pending Approvals (Human Gateway)
+
+| Date | Gate | Project | Action Required | Status |
+|------|------|---------|-----------------|--------|
+| — | — | — | No open approvals | ✅ Clear |
 
 ---
 
 ## Project Registry
 
-| Project | GitHub | Deployment | Database | Status |
-|---------|--------|------------|----------|--------|
-| HUSAI Dashboard | ✅ [hus-ai-os](https://github.com/s44dzhr548-web/hus-ai-os) | ✅ Vercel | — | 🟢 Live |
-| Restaurant OS | ✅ Linked | ✅ [restaurant-os-nine.vercel.app](https://restaurant-os-nine.vercel.app) | ✅ husai-core | 🟢 Live |
-| Trading AI | ✅ Linked | ✅ Vercel production | ✅ husai-core | 🟢 Live |
-| Dropshipping | ✅ Linked | ✅ [dropshipping-research.vercel.app](https://dropshipping-research.vercel.app) | Optional | 🟢 Live |
+| Project | GitHub | Vercel | Database | Health | Status |
+|---------|--------|--------|----------|--------|--------|
+| HUSAI Dashboard | ✅ connected | ✅ live | — | ok | 🟢 Live |
+| Restaurant OS | ✅ connected | ✅ live | ✅ husai-core | ok | 🟢 Live |
+| Trading AI | ✅ connected | ✅ live | ✅ husai-core | ok | 🟢 Live |
+| Dropshipping | ✅ connected | ✅ live | ✅ husai-core | ok | 🟢 Live |
 
-## husai-core (Supabase)
+---
 
-- **Project:** husai-core
-- **Ref:** `eilqwbaeeqcxqysohmsk`
-- **Region:** ap-south-1
-- **Migrations:** ✅ Applied (unified schema)
-- **Auth:** Email signup enabled
+## Platform Credentials (Status Only — No Secrets)
 
-## Production URLs
+| Service | Status | Notes |
+|---------|--------|-------|
+| GitHub `s44dzhr548-web/hus-ai-os` | connected | OAuth session active |
+| Vercel `hus707002h-7024s-projects` | connected | 4 projects deployed |
+| Supabase `husai-core` | connected | ref `eilqwbaeeqcxqysohmsk` |
 
-| App | URL |
-|-----|-----|
-| HUSAI-OS Dashboard | https://husai-dashboard.vercel.app |
-| Restaurant OS | https://restaurant-os-nine.vercel.app |
-| Trading AI | https://trading-ai-husai.vercel.app |
-| Dropshipping Research | https://dropshipping-research.vercel.app |
+---
 
-## Platform Commands
+## Deployments
 
-```bash
-npm run check:all          # Build + test all apps
-npm run create:project     # Scaffold new project
-cd husai-dashboard && npm run dev   # Platform dashboard (port 3003)
-```
+| App | URL | Last Verified |
+|-----|-----|---------------|
+| Dashboard | https://husai-dashboard.vercel.app | 2026-06-30 |
+| Restaurant OS | https://restaurant-os-nine.vercel.app | 2026-06-30 |
+| Trading AI | https://trading-ai-beta.vercel.app | 2026-06-30 |
+| Dropshipping | https://husai-dropshipping-research.vercel.app | 2026-06-30 |
 
-## Recent Activity
+---
 
-| Date | Action |
-|------|--------|
-| 2026-06-30 | HUSAI-OS Dashboard created |
-| 2026-06-30 | Central registry (projects/registry.json) |
-| 2026-06-30 | Project automation script added |
-| 2026-06-30 | All apps pass build/lint/test |
-| 2026-06-30 | CI updated for 4 apps |
+## Active Errors
+
+| Project | Error | Agent | Retries | Status |
+|---------|-------|-------|---------|--------|
+| — | — | — | — | None |
+
+---
+
+## Costs (Monthly)
+
+| Service | USD | Tier |
+|---------|-----|------|
+| GitHub | 0 | Free |
+| Vercel | 0 | Hobby/Team |
+| Supabase | 0 | Free |
+| **Total** | **0** | |
+
+---
+
+## Orchestrator Queue
+
+| Priority | Task | Agent | Status |
+|----------|------|-------|--------|
+| — | Platform stable — awaiting next user goal | CEO | idle |
+
+---
+
+## Activity Log
+
+| Date | Agent | Action |
+|------|-------|--------|
+| 2026-06-30 | CEO | Zero Manual Work architecture adopted |
+| 2026-06-30 | Orchestrator | Project Factory + Gateway documented |
+| 2026-06-30 | Deployment | Production v1.0.0 tagged |
+| 2026-06-30 | Setup | All platform credentials connected |
+
+---
+
+See [`project-memory.md`](./project-memory.md) for schema details.

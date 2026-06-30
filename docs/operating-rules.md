@@ -1,99 +1,104 @@
 # HUSAI-OS Operating Rules
 
-## Core Principle
-**Act autonomously on all technical work.** Stop only when platform policy or law requires the account owner's direct action.
+## Core Principle: Zero Manual Work
 
-## Human Interrupt Gates (Only Four)
+**The user never performs technical work.**
 
-| Gate | When to Stop | What to Provide Owner |
-|------|--------------|------------------------|
-| **OTP** | One-time password, 2FA code, SMS verification | Service name, why it's needed, link to action |
-| **Payment** | New charge, subscription upgrade, domain purchase | Amount, recurring vs one-time, purpose, alternative if any |
-| **KYC** | Identity or business verification | Provider, what's required, deadline if any |
-| **Legal** | Terms acceptance requiring account owner consent | Summary of terms, link, consequence of declining |
+HUSAI-OS exists so the account owner states goals and approves only what platforms legally require. Agents execute everything else — folders, repos, deployments, env vars, tests, fixes, documentation.
 
-### Never Interrupt For
-- Code implementation choices
-- Refactoring decisions
-- Test failures (fix autonomously)
-- Dependency updates (non-breaking)
-- Documentation updates
-- Staging deployments
-- Git commits and PRs
-- Schema design (non-destructive prod)
-- Rollbacks after failed deploys
+### User Is Allowed To Do Only Four Things
+
+| # | Action | When |
+|---|--------|------|
+| 1 | **Approve payment** | Subscription, domain, paid API tier |
+| 2 | **Enter OTP / verification code** | 2FA, SMS, email verification |
+| 3 | **Approve OAuth / login** | GitHub, Vercel, Supabase, broker consent screens |
+| 4 | **Complete KYC or legal confirmation** | Identity verification, ToS acceptance |
+
+### Never Ask The User To
+
+- Run terminal commands
+- Copy/paste API keys or env vars
+- Configure Vercel root directories manually
+- Create GitHub repos or push code
+- Run migrations in SQL editors
+- Fix build errors, tests, or deployments
+- Choose stack details unless blocked by a human gate
+- Confirm reversible technical decisions ("should I continue?")
+
+When OAuth is required, **open the provider URL and pause** — do not instruct the user to perform follow-up technical steps after login. Agents resume automatically when the session is authorized.
+
+---
+
+## Human Approval Gateway
+
+The **Human Approval Gateway** is the only intentional interruption surface. All escalations route through it.
+
+See [`human-approval-gateway.md`](./human-approval-gateway.md).
+
+---
 
 ## Autonomy Matrix
 
 | Action | Autonomous? | Notes |
 |--------|-------------|-------|
-| Write/edit code | ✅ | Follow standards |
-| Create GitHub repo | ✅ | After project spec exists |
-| Push to feature branch | ✅ | — |
-| Merge to main | ✅ | If CI + QA pass |
-| Deploy staging | ✅ | — |
-| Deploy production | ✅ | If QA signed off |
-| Rollback production | ✅ | On failure detection |
-| Add free-tier service | ✅ | Document in registry |
+| Write/edit code | ✅ | Frontend, Backend, Database agents |
+| Create folders & project structure | ✅ | Setup Agent + Project Factory |
+| Create GitHub repo | ✅ | After spec exists; OAuth gate at login only |
+| Connect Vercel / Supabase / Neon | ✅ | OAuth gate at login only |
+| Generate & sync env files | ✅ | Never expose secrets in chat |
+| Run tests, lint, build | ✅ | QA Agent |
+| Deploy staging / production | ✅ | Deployment Agent |
+| Rollback failed deploy | ✅ | Orchestrator retries first |
+| Retry failed tasks | ✅ | Orchestrator (max 3 attempts) |
 | Add paid subscription | ❌ | Payment gate |
-| Store API key in vault | ✅ | Never in repo |
-| Rotate compromised key | ✅ | Notify in memory log |
 | Accept legal ToS | ❌ | Legal gate |
-| OAuth login | ⏸️ | OTP gate at login |
-| Live payment keys (Stripe) | ❌ | Payment + legal gate |
-| Live trading enable | ❌ | Legal + KYC gate |
+| Live payment / trading keys | ❌ | Payment + legal gate |
 
-## Credential Rules
-1. **Never fabricate** credentials, tokens, or account access
-2. **Never bypass** security requirements or CAPTCHAs
-3. **Never commit** secrets to git
-4. **Never share** secrets in chat logs or docs
-5. Use `.env.example` for documentation only
-6. Rotate immediately if exposure detected
+---
 
-## Synchronization Rules
-Every active project must stay synchronized across:
-- **GitHub** — code, CI, branch protection
-- **Vercel** — deployment, env vars, domains
-- **Database** — schema matches migrations in repo
-- **APIs** — integrations documented and health-checked
+## Agent Hierarchy
 
-Update `/docs/memory.md` registry after any sync change.
-
-## Project Registry Rules
-- One row per project with status columns: GitHub, Deployment, Database, APIs
-- Status values: ✅ Active | 🟡 In Progress | ⬜ Not Started | 🔴 Blocked
-- Blocked requires: blocker description + gate type if human action needed
-- Pending work list kept current (max 10 items visible; rest in project file)
-
-## Agent Collaboration Rules
-1. CEO assigns one primary owner per task
-2. Agents hand off explicitly in memory log
-3. Security Agent can block any PR
-4. QA Agent can block any production deploy
-5. Finance Agent flags any action with cost before execution
-6. Documentation Agent updates run in parallel, not as afterthought
-
-## Escalation Format
-When human gate required, log:
-
-```markdown
-## ESCALATION — [GATE TYPE]
-**Project:** name
-**Agent:** role
-**Action blocked:** description
-**Owner action:** exact steps
-**Deadline:** if applicable
-**Workaround:** if any (e.g., continue on free tier)
+```
+User Goal
+    ↓
+CEO Agent (prioritize, assign)
+    ↓
+Orchestrator Agent (workflow, retries, escalation)
+    ↓
+Specialist Agents (Setup, Frontend, Backend, Database, API, QA, Deployment, Security, …)
+    ↓
+Human Approval Gateway (OTP | Payment | OAuth | KYC | Legal) — only when blocked
 ```
 
-## Incident Rules
-- Production down: DevOps + Deployment respond immediately; CEO notified in memory
-- Security exposure: Security Agent leads; rotate keys before postmortem
-- Failed deploy: auto-rollback; no owner notification unless rollback fails
+---
+
+## Escalation Format
+
+```markdown
+## APPROVAL REQUIRED — [GATE TYPE]
+**Project:** name
+**Blocked step:** one sentence
+**Your action:** single action (e.g., approve OAuth at link)
+**Agents resume:** automatically after approval
+```
+
+Do **not** include technical follow-up steps for the user.
+
+---
+
+## Credential Rules
+
+1. Never fabricate credentials
+2. Never commit secrets
+3. Track credential **status** in Project Memory (connected / pending OAuth / missing) — never store secret values in docs
+4. Agents use CLI + browser OAuth; user only completes provider login when session expired
+
+---
 
 ## Continuous Operation
-- Work queues processed without "should I proceed?" prompts
-- Prefer reversible decisions made quickly over delayed confirmation
-- Document decisions for audit, not for approval
-- Resume blocked work automatically when gate clears (owner provides OTP/payment/etc.)
+
+- Orchestrator selects the next step without user input
+- Failed tasks retry before escalation
+- Work resumes automatically when a gate clears
+- Project Memory updated after every state change

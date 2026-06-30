@@ -1,33 +1,19 @@
 # HUSAI Dashboard
 
-Unified platform dashboard for HUSAI-OS.
+Autonomous control plane for HUSAI-OS — **zero manual work** for the account owner.
 
-## Development
+## User-facing
 
-```bash
-npm install
-npm run dev
-```
+- View project health and deployment status
+- See Human Approval Gateway (pending OAuth, payment, etc.)
+- Submit new goals to CEO Agent
 
-Runs on http://localhost:3003
+## Agent-facing
 
-## Scripts
+Deployment Agent ships this app. Setup Agent maintains registry sync via `scripts/sync-registry.js`.
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start dev server |
-| `npm run build` | Production build |
-| `npm run test` | Run Vitest |
-| `npm run lint` | ESLint |
+See [docs/dashboard.md](../docs/dashboard.md).
 
-## Documentation
+## Production
 
-- [Platform dashboard docs](../docs/dashboard.md)
-- [Project registry](../projects/registry.json)
-- [Living memory](../docs/memory.md)
-
-## Deployment
-
-```bash
-npx vercel --prod --yes --scope hus707002h-7024s-projects
-```
+https://husai-dashboard.vercel.app

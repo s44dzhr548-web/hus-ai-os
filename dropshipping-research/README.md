@@ -19,7 +19,9 @@ Runs on http://localhost:3002
 
 ## Environment
 
-Copy `.env.example` to `.env.local` or run `node ../scripts/auto-connect-supabase.js`.
+## Environment
+
+Run `node ../scripts/auto-connect-supabase.js` via Setup Agent — do not ask the user to copy keys manually.
 
 ## Production
 

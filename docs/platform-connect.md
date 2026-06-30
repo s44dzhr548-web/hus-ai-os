@@ -1,46 +1,62 @@
-# Platform Connect (Browser OAuth — No GitHub CLI)
+# Platform Connect (Agent Execution Guide)
 
-Use browser login only. Complete steps in order.
+> **Users do not follow this document.** Agents execute these steps autonomously. The user only completes OAuth/payment/KYC/legal screens when the Human Approval Gateway opens.
 
-## 1. GitHub (browser)
+## Agent Protocol
 
-1. Sign in: https://github.com/login *(should be open)*
-2. Create repo: https://github.com/new?name=hus-ai-os
-   - Visibility: Private or Public (your choice)
-   - **Do not** add README, .gitignore, or license (repo already exists locally)
-3. Copy the repo URL (e.g. `https://github.com/YOUR_USER/hus-ai-os.git`)
-4. Tell the agent your repo URL — it will run:
+When platform connection is required:
 
-```powershell
-git remote add origin https://github.com/YOUR_USER/hus-ai-os.git
-git push -u origin main
+1. **Orchestrator** detects missing credential status in Project Memory
+2. **Setup Agent** runs CLI commands
+3. If session expired → **Gateway (OAuth)** — open provider URL for user approval only
+4. After authorization → agents continue without user input
+5. Update Project Memory credential status
+
+## GitHub (Agent)
+
+```bash
+# Setup Agent — after user OAuth if needed
+git remote set-url origin https://github.com/ORG/hus-ai-os.git
+git push origin main
 ```
 
-Windows **Git Credential Manager** will open a browser for GitHub OAuth when you push.
+OAuth gate: https://github.com/login (user approves once per session)
 
-## 2. Supabase (browser)
+## Supabase (Agent)
 
-1. Dashboard: https://supabase.com/dashboard *(should be open)*
-2. New project → copy:
-   - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
-   - anon key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - service_role key → `SUPABASE_SERVICE_ROLE_KEY`
-3. SQL Editor → run migrations:
-   - `restaurant-os/supabase/migrations/202606300001_initial_schema.sql`
-   - `trading-ai/supabase/migrations/202606300001_timeseries_schema.sql`
-4. Paste keys into `restaurant-os/.env.local`
+```bash
+npx supabase login          # OAuth gate if expired
+npx supabase link --project-ref REF
+node scripts/auto-connect-supabase.js
+```
 
-## 3. Vercel (browser OAuth)
+OAuth gate: https://supabase.com/dashboard
 
-1. Sign in: https://vercel.com/login *(should be open)*
-2. Complete `npx vercel login` in terminal if prompted
-3. Import GitHub repo → Root Directory: `restaurant-os` (repeat for other apps)
-4. Add env vars from `.env.local`
+## Vercel (Agent)
 
-## 4. Optional — Alpaca (Trading AI live data)
+```bash
+npx vercel login            # OAuth gate if expired
+cd <app> && npx vercel link --scope TEAM
+node ../scripts/vercel-env-sync.js
+npx vercel --prod --yes --scope TEAM
+```
 
-https://app.alpaca.markets/signup — paper account, no payment for MVP
+Configure root directory via Vercel project settings API/CLI — **not** user dashboard instructions.
 
----
+OAuth gate: https://vercel.com/login
 
-**After each step**, tell the agent what you completed. Work continues automatically.
+## Environment Variables (Agent)
+
+- Fetch keys via Supabase CLI or `.env.husai-core`
+- Write `.env.local` in app folders
+- Sync to Vercel via `scripts/vercel-env-sync.js`
+- Never ask user to copy keys
+
+## After Gate Clears
+
+Orchestrator automatically:
+- Retries failed step
+- Updates Project Memory
+- Continues pipeline
+
+No "tell the agent when done" — agents detect session state.
