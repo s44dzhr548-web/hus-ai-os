@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prebuild": "node ../scripts/sync-registry.js",
+    "prebuild": "node -e \"const fs=require('fs');const p='../scripts/sync-registry.js';if(fs.existsSync(p))require('child_process').execSync('node '+p,{stdio:'inherit'})\"",
     "dev": "node ../scripts/sync-registry.js && next dev -p 3003",
     "build": "next build",
     "start": "next start -p 3003",

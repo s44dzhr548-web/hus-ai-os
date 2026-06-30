@@ -8,7 +8,11 @@ const src = path.join(root, "projects", "registry.json");
 const dest = path.join(root, "husai-dashboard", "src", "data", "registry.json");
 
 if (!fs.existsSync(src)) {
-  console.error("Missing projects/registry.json");
+  if (fs.existsSync(dest)) {
+    console.log("Using bundled registry (monorepo source not available)");
+    process.exit(0);
+  }
+  console.error("Missing projects/registry.json and bundled registry");
   process.exit(1);
 }
 

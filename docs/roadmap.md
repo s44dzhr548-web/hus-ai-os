@@ -58,7 +58,7 @@
 **Target:** 2026-Q4
 
 - [ ] Cursor SDK agent per role (automated scheduling)
-- [ ] Unified dashboard for project registry
+- [x] Unified dashboard for project registry
 - [ ] Automated monthly finance reports
 - [ ] Security audit automation across all repos
 - [ ] Template generator for new projects (Setup Agent CLI)
