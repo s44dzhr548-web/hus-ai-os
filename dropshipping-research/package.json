@@ -1,0 +1,12 @@
+{
+  "name": "dropshipping-research",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vitest": "^4.1.9"
+  }
+}

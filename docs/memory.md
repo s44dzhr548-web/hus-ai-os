@@ -1,9 +1,9 @@
 # HUSAI-OS Memory
 
-> Living project registry and decision log. Updated by all agents after milestones, escalations, and status changes.
+> Living project registry and decision log.
 
 **Last Updated:** 2026-06-30  
-**Updated By:** CEO Agent + Setup + Database + Developer + Documentation Agents
+**Updated By:** CEO + Developer + Database + Research + QA Agents
 
 ---
 
@@ -11,102 +11,76 @@
 
 | Project | Priority | GitHub | Deployment | Database | APIs | Status |
 |---------|----------|--------|------------|----------|------|--------|
-| [Restaurant OS](../projects/restaurant-os.md) | P1 | 🟡 Local git | ⬜ Pending OAuth | 🟡 Schema ready | 🟡 Routes built | 🟡 Awaiting Supabase |
-| [Trading AI](../projects/trading-ai.md) | P1 | ⬜ Not started | ⬜ Not started | ⬜ Not started | 🟡 Research done | 🟡 Research complete |
-| [Dropshipping Research](../projects/dropshipping-research.md) | P2 | ⬜ Not started | ⬜ Not started | ⬜ Not started | 🟡 Research done | 🟡 Research complete |
-
-### Legend
-- ✅ Active / connected / healthy
-- 🟡 In progress or partial
-- ⬜ Not started
-- 🔴 Blocked
+| [Restaurant OS](../projects/restaurant-os.md) | P1 | 🟡 Local git | ⬜ OAuth | 🟡 Schema ready | 🟡 Built | 🟡 Awaiting Supabase |
+| [Trading AI](../projects/trading-ai.md) | P1 | 🟡 Local git | ⬜ OAuth | 🟡 Schema ready | 🟡 Mock+Alpaca | 🟡 MVP built |
+| [Dropshipping Research](../projects/dropshipping-research.md) | P2 | 🟡 Local module | ⬜ — | ⬜ — | 🟡 Scoring lib | 🟡 Core logic done |
 
 ---
 
 ## Active Task Queue
 
-### P1 — Restaurant OS
-| ID | Task | Agent | Status |
-|----|------|-------|--------|
-| T-001 | Scaffold Next.js app | Setup | ✅ Complete |
-| T-005 | Multi-tenant schema + RLS SQL | Database | ✅ Complete |
-| T-006 | Auth (login/signup/callback) | Developer | ✅ Complete |
-| T-007 | Onboarding flow | Developer | ✅ Complete |
-| T-008 | REST APIs (restaurants, menus, orders) | API | ✅ Complete |
-| T-009 | Owner dashboard + menu + orders + KDS | Developer | ✅ Complete |
-| T-010 | Public menu page | Developer | ✅ Complete |
-| T-002 | Push to GitHub remote | Setup | 🔴 Blocked — OAuth (gh CLI not installed) |
-| T-003 | Create Supabase project + env vars | Setup | 🔴 Blocked — OAuth OTP |
-| T-004 | Deploy to Vercel | Deployment | 🔴 Blocked on T-002, T-003 |
+### Restaurant OS
+| ID | Task | Status |
+|----|------|--------|
+| T-011 | Settings page + Vitest tests | ✅ Complete |
+| T-002 | GitHub push | 🔴 OAuth |
+| T-003 | Supabase connect | 🔴 OTP |
+| T-004 | Vercel deploy | 🔴 OAuth |
 
-### P1 — Trading AI
-| ID | Task | Agent | Status |
-|----|------|-------|--------|
-| T-101 | Broker API comparison brief | Research | ✅ Complete |
-| T-102 | Regulatory disclaimer requirements | Research | ✅ Complete |
-| T-103 | Time-series schema design | Database | Pending |
+### Trading AI
+| ID | Task | Status |
+|----|------|--------|
+| T-103 | Time-series schema | ✅ Complete |
+| T-104 | Backtest engine + tests | ✅ Complete |
+| T-105 | Signals API + dashboard | ✅ Complete |
+| T-106 | Alpaca live data | 🔴 API keys optional |
 
-### P2 — Dropshipping Research
-| ID | Task | Agent | Status |
-|----|------|-------|--------|
-| T-201 | Supplier API comparison | Research | ✅ Complete |
-| T-202 | Scraping policy legal scan | Research | Pending |
+### Dropshipping
+| ID | Task | Status |
+|----|------|--------|
+| T-202 | Legal scan | ✅ Complete |
+| T-203 | Niche scoring module + tests | ✅ Complete |
+| T-204 | Full Next.js app | Pending |
 
 ---
 
-## Milestones Completed (2026-06-30)
+## Milestones (2026-06-30)
 
-### M1 — HUSAI-OS Foundation
-- 13 agent definitions, docs, projects, orchestration guide
+### M4 — Trading AI MVP (local)
+- Time-series Supabase migration
+- SMA crossover strategy + backtest engine (4 tests)
+- `/api/signals`, `/api/backtest`, dashboard with disclaimer
+- Mock Alpaca fallback
 
-### M2 — Restaurant OS Core
-- Supabase migration (profiles, restaurants, menus, orders, RLS)
-- Auth pages + middleware
-- REST API layer with Zod validation
-- Dashboard: overview, menu manager, orders, KDS
-- Public menu at `/menu/[slug]`
-- CI workflow + Vercel config
-- Build verified ✅
-
-### M3 — Research Layer
-- Trading AI: Alpaca recommended, compliance brief
-- Dropshipping: CJ Dropshipping recommended for MVP
+### M5 — Dropshipping + QA
+- Niche scoring algorithm (2 tests)
+- Legal policy scan documented
+- Restaurant OS: settings page, validator tests
 
 ---
 
 ## Escalations
 
-### ESCALATION — OTP / OAuth
-**Project:** Restaurant OS + HUSAI-OS meta repo  
-**Agent:** Setup + Deployment  
-**Action blocked:** GitHub push, Supabase connect, Vercel deploy  
+### OPEN — Platform OAuth (unchanged)
+**Blocked:** GitHub push, Supabase, Vercel deploy  
 **Owner action:**
-1. Create GitHub repo `hus-ai-os` (or approve repo name)
-2. Provide Supabase project URL + anon key + service role key
-3. Log in to Vercel and link repo (or install `gh` + `vercel` CLI)
-**Workaround:** All code ready locally; runs with `npm run dev` after `.env.local`
+1. Create GitHub repo + share URL (or `gh auth login`)
+2. Supabase: URL + anon key + service role key
+3. Vercel: `npx vercel login` or dashboard import
+
+### OPTIONAL — Alpaca Paper API
+**Blocked:** Live market data (mock works without keys)  
+**Owner action:** Alpaca paper account → `ALPACA_API_KEY` + `ALPACA_API_SECRET` in `.env.local`
 
 ---
 
-## Subscriptions & Costs
+## Test Status (local)
 
-| Service | Project | Tier | Monthly Cost | Renewal |
-|---------|---------|------|--------------|---------|
-| — | — | Free tiers only | $0 | — |
-
----
-
-## Decision Log
-
-### 2026-06-30 — Restaurant OS MVP Feature Set
-**Agent:** CEO + Developer  
-**Decision:** Ship auth, onboarding, menu CRUD, orders, KDS, public menu in one milestone.  
-**Rationale:** Core restaurant loop complete without Stripe (deferred).
-
-### 2026-06-30 — Alpaca for Trading AI
-**Agent:** Research  
-**Decision:** Paper trading via Alpaca Markets API.  
-**See:** [docs/research/trading-ai-broker-apis.md](./research/trading-ai-broker-apis.md)
+| Project | Tests | Build |
+|---------|-------|-------|
+| restaurant-os | 2 ✅ | ✅ |
+| trading-ai | 4 ✅ | ✅ |
+| dropshipping-research | 2 ✅ | N/A (module) |
 
 ---
 
@@ -114,15 +88,8 @@
 
 | Date | Agent | Action |
 |------|-------|--------|
-| 2026-06-30 | Database | Published Supabase migration with RLS |
-| 2026-06-30 | Developer | Built dashboard, auth, APIs |
-| 2026-06-30 | Research | Completed 3 research briefs |
-| 2026-06-30 | DevOps | Root + app CI workflows |
-| 2026-06-30 | Documentation | API docs, memory sync |
-
----
-
-## Notes for Next Session
-1. Owner provides Supabase credentials → apply migration → app goes live
-2. Push both repos to GitHub → connect Vercel
-3. Trading AI: begin time-series schema + Alpaca ingestion
+| 2026-06-30 | Developer | Trading AI full MVP scaffold |
+| 2026-06-30 | Database | Trading AI timeseries migration |
+| 2026-06-30 | Research | Dropshipping legal scan |
+| 2026-06-30 | QA | 8 tests across 3 projects |
+| 2026-06-30 | Developer | Restaurant OS settings page |
