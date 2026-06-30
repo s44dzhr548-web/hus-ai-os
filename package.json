@@ -8,6 +8,7 @@
   },
   "scripts": {
     "connect": "node scripts/connect-husai-core.js",
+    "connect:supabase": "node scripts/auto-connect-supabase.js",
     "check": "node scripts/check-platform.js"
   },
   "keywords": [],
