@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol")?.toUpperCase();
   const scan = searchParams.get("scan");
+  const lang = searchParams.get("lang") === "en" ? "en" : "ar";
 
   if (scan === "1") {
     const symbols = (searchParams.get("symbols") ?? DEFAULT_WATCHLIST.join(","))
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "symbol required" }, { status: 400 });
   }
 
-  const analysis = runAIAnalysis(symbol);
+  const analysis = runAIAnalysis(symbol, lang);
   recordPrediction(
     symbol,
     analysis.recommendation,

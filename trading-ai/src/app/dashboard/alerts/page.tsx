@@ -1,13 +1,15 @@
+"use client";
+
 import { AlertsClient } from "@/components/alerts-client";
+import { PageHeader } from "@/components/trading-shell";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function AlertsPage() {
+  const { t } = useI18n();
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Alerts</h1>
-      <p className="mt-1 text-sm text-zinc-500">Dashboard · Email-ready · WhatsApp-ready structure</p>
-      <div className="mt-8">
-        <AlertsClient />
-      </div>
+      <PageHeader title={t.alerts.title} subtitle={t.alerts.subtitle} />
+      <AlertsClient />
     </div>
   );
 }

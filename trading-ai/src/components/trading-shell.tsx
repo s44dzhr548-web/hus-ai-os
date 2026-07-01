@@ -2,36 +2,44 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LanguageSwitcher } from "./language-switcher";
+import { useI18n, useRecommendationLabel, useRiskLabel } from "@/lib/i18n/context";
 
-const NAV = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/watchlist", label: "Watchlist" },
-  { href: "/dashboard/analysis", label: "AI Analysis" },
-  { href: "/dashboard/backtest", label: "Backtest" },
-  { href: "/dashboard/risk", label: "Risk" },
-  { href: "/dashboard/learning", label: "Learning" },
-  { href: "/dashboard/alerts", label: "Alerts" },
+const NAV_KEYS = [
+  { href: "/dashboard", key: "overview" as const },
+  { href: "/dashboard/watchlist", key: "watchlist" as const },
+  { href: "/dashboard/analysis", key: "analysis" as const },
+  { href: "/dashboard/backtest", key: "backtest" as const },
+  { href: "/dashboard/risk", key: "risk" as const },
+  { href: "/dashboard/learning", key: "learning" as const },
+  { href: "/dashboard/alerts", key: "alerts" as const },
+  { href: "/dashboard/reports", key: "reports" as const },
+  { href: "/dashboard/settings", key: "settings" as const },
 ];
 
 export function TradingShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
+  const { t, dir } = useI18n();
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50">
+    <div className="min-h-screen bg-zinc-950 text-zinc-50" dir={dir}>
       <header className="border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4">
-          <div>
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4">
+          <div className="text-start">
             <Link href="/" className="text-xs uppercase tracking-widest text-emerald-400">
-              HUSAI-OS · Trading AI
+              {t.brand}
             </Link>
-            <p className="text-sm text-zinc-500">Paper trading · Mock data · No real execution</p>
+            <p className="text-sm text-zinc-500">{t.tagline}</p>
           </div>
-          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-300">
-            DEMO MODE
-          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <LanguageSwitcher />
+            <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-300">
+              {t.demoMode}
+            </span>
+          </div>
         </div>
         <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-3">
-          {NAV.map((item) => (
+          {NAV_KEYS.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -41,7 +49,7 @@ export function TradingShell({ children }: { children: React.ReactNode }) {
                   : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
               }`}
             >
-              {item.label}
+              {t.nav[item.key]}
             </Link>
           ))}
         </nav>
@@ -53,7 +61,7 @@ export function TradingShell({ children }: { children: React.ReactNode }) {
 
 export function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-start">
       <p className="text-xs text-zinc-500">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
       {sub && <p className="mt-1 text-xs text-zinc-500">{sub}</p>}
@@ -76,15 +84,26 @@ export function Badge({
     risk: "bg-orange-500/20 text-orange-300",
   };
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs uppercase ${colors[tone]}`}>{children}</span>
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colors[tone]}`}>{children}</span>
   );
 }
 
 export function RecommendationBadge({ rec }: { rec: string }) {
+  const label = useRecommendationLabel(rec);
   const tone = rec === "buy" ? "buy" : rec === "sell" ? "sell" : "hold";
-  return <Badge tone={tone}>{rec}</Badge>;
+  return <Badge tone={tone}>{label}</Badge>;
 }
 
 export function RiskBadge({ level }: { level: string }) {
-  return <Badge tone="risk">{level}</Badge>;
+  const label = useRiskLabel(level);
+  return <Badge tone="risk">{label}</Badge>;
+}
+
+export function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="mb-8 text-start">
+      <h1 className="text-2xl font-semibold">{title}</h1>
+      <p className="mt-1 text-sm text-zinc-500">{subtitle}</p>
+    </div>
+  );
 }

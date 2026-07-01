@@ -4,11 +4,16 @@ import { generateMockBars } from "@/lib/data/mock-market";
 
 describe("AI analysis engine", () => {
   it("produces full analysis with recommendation", () => {
-    const analysis = runAIAnalysis("AAPL");
+    const analysis = runAIAnalysis("AAPL", "en");
     expect(analysis.symbol).toBe("AAPL");
     expect(["buy", "hold", "sell"]).toContain(analysis.recommendation);
     expect(analysis.explanation.length).toBeGreaterThan(3);
     expect(analysis.complianceNote).toContain("financial advice");
+  });
+
+  it("returns Arabic compliance by default", () => {
+    const analysis = runAIAnalysis("AAPL", "ar");
+    expect(analysis.complianceNote).toContain("نصيحة مالية");
   });
 
   it("computes signal score with confidence", () => {

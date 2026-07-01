@@ -1,13 +1,15 @@
+"use client";
+
 import { RiskClient } from "@/components/risk-client";
+import { PageHeader } from "@/components/trading-shell";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function RiskPage() {
+  const { t } = useI18n();
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Risk Management</h1>
-      <p className="mt-1 text-sm text-zinc-500">Stop loss · Take profit · Position sizing · Capital protection</p>
-      <div className="mt-8">
-        <RiskClient />
-      </div>
+      <PageHeader title={t.risk.title} subtitle={t.risk.subtitle} />
+      <RiskClient />
     </div>
   );
 }

@@ -97,7 +97,7 @@ export function computeSignalScore(symbol: string, bars: MarketBar[]): AISignalS
   };
 }
 
-export function runAIAnalysis(symbol: string): AIAnalysis {
+export function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"): AIAnalysis {
   const bars = generateMockBars(symbol, 90);
   const technical = computeTechnical(bars);
   const signal = computeSignalScore(symbol, bars);
@@ -119,14 +119,28 @@ export function runAIAnalysis(symbol: string): AIAnalysis {
     { index: "Oil (Brent)", correlation: meta?.assetClass === "saudi" ? 0.72 : 0.25 },
   ];
 
-  const explanation: string[] = [
+  const explanationEn: string[] = [
     `Technical: ${technical.summary}. Support at ${technical.support}, resistance at ${technical.resistance}.`,
     `News sentiment is ${newsSentiment > 0 ? "positive" : newsSentiment < 0 ? "negative" : "neutral"} based on ${newsImpact.length} recent headlines.`,
     `${sectorImpact.sector} sector ${sectorImpact.summary}`,
-    `Market correlation with SPY: ${(correlations[0].correlation * 100).toFixed(0)}%. Oil impact factor: ${(oilImpact * 100).toFixed(0)}%. Rates sensitivity: ${(Math.abs(ratesImpact) * 100).toFixed(0)}%.`,
+    `Market correlation with SPY: ${(correlations[0].correlation * 100).toFixed(0)}%. Oil impact: ${(oilImpact * 100).toFixed(0)}%. Rates sensitivity: ${(Math.abs(ratesImpact) * 100).toFixed(0)}%.`,
     `Upcoming macro: ${economicEvents[0].title} (${economicEvents[0].impact} impact).`,
-    `AI signal score ${signal.score}/100 → ${signal.recommendation.toUpperCase()} with ${(signal.confidence * 100).toFixed(0)}% confidence.`,
+    `AI signal ${signal.score}/100 → ${signal.recommendation.toUpperCase()} with ${(signal.confidence * 100).toFixed(0)}% confidence. Paper trading only — no real orders.`,
   ];
+
+  const recAr =
+    signal.recommendation === "buy" ? "شراء" : signal.recommendation === "sell" ? "بيع" : "احتفاظ";
+  const explanationAr: string[] = [
+    `فني: ${technical.summary}. الدعم عند ${technical.support}، المقاومة عند ${technical.resistance}.`,
+    `مزاج الأخبار ${newsSentiment > 0 ? "إيجابي" : newsSentiment < 0 ? "سلبي" : "محايد"} بناءً على ${newsImpact.length} عنواناً.`,
+    `قطاع ${sectorImpact.sector}: ${sectorImpact.summary}`,
+    `ارتباط SPY: ${(correlations[0].correlation * 100).toFixed(0)}%. تأثير النفط: ${(oilImpact * 100).toFixed(0)}%. حساسية الفائدة: ${(Math.abs(ratesImpact) * 100).toFixed(0)}%.`,
+    `حدث ماكرو قادم: ${economicEvents[0].title}.`,
+    `درجة الإشارة ${signal.score}/100 → ${recAr} بثقة ${(signal.confidence * 100).toFixed(0)}%. تداول ورقي فقط — بدون أوامر حقيقية.`,
+  ];
+
+  const complianceNoteAr =
+    "هذه المنصة للتحليل التعليمي ومحاكاة التداول الورقي فقط. لا تُعد نصيحة مالية أو توصية استثمارية.";
 
   return {
     symbol,
@@ -141,8 +155,13 @@ export function runAIAnalysis(symbol: string): AIAnalysis {
     sectorImpact,
     marketCorrelation: correlations,
     macroFactors: { oilImpact, ratesImpact, economicEvents },
-    explanation,
-    complianceNote: COMPLIANCE_CONFIG.financialAdviceDisclaimer,
+    explanation: locale === "ar" ? explanationAr : explanationEn,
+    explanationAr,
+    complianceNote:
+      locale === "ar"
+        ? complianceNoteAr
+        : COMPLIANCE_CONFIG.financialAdviceDisclaimer,
+    complianceNoteAr,
   };
 }
 

@@ -1,13 +1,15 @@
+"use client";
+
 import { BacktestClient } from "@/components/backtest-client";
+import { PageHeader } from "@/components/trading-shell";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function BacktestPage() {
+  const { t } = useI18n();
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Backtesting</h1>
-      <p className="mt-1 text-sm text-zinc-500">Historical strategy simulation · Win rate · Drawdown · Strategy comparison</p>
-      <div className="mt-8">
-        <BacktestClient />
-      </div>
+      <PageHeader title={t.backtest.title} subtitle={t.backtest.subtitle} />
+      <BacktestClient />
     </div>
   );
 }

@@ -133,7 +133,9 @@ export interface AIAnalysis {
     economicEvents: EconomicEvent[];
   };
   explanation: string[];
+  explanationAr?: string[];
   complianceNote: string;
+  complianceNoteAr?: string;
 }
 
 export interface RiskSettings {

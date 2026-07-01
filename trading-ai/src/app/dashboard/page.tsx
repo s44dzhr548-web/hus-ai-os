@@ -1,13 +1,15 @@
+"use client";
+
 import { OverviewClient } from "@/components/overview-client";
+import { PageHeader } from "@/components/trading-shell";
+import { useI18n } from "@/lib/i18n/context";
 
 export default function DashboardPage() {
+  const { t } = useI18n();
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Trading Dashboard</h1>
-      <p className="mt-1 text-sm text-zinc-500">AI-powered market overview · Mock data · Paper trading only</p>
-      <div className="mt-8">
-        <OverviewClient />
-      </div>
+      <PageHeader title={t.overview.title} subtitle={t.overview.subtitle} />
+      <OverviewClient />
     </div>
   );
 }
