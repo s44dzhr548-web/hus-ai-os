@@ -98,7 +98,7 @@ No other stops are permitted. Agents must retry, fix, or escalate through the Ga
 | App | URL | Status |
 |-----|-----|--------|
 | HUSAI Dashboard | https://husai-dashboard.vercel.app | Live |
-| Restaurant OS | https://restaurant-os-nine.vercel.app | Live |
+| Restaurant OS | https://restaurant-os-nine.vercel.app | Live ✅ `/api/health` 200 |
 | Trading AI | https://trading-ai-beta.vercel.app | Live |
 | Dropshipping Research | https://husai-dropshipping-research.vercel.app | Live |
 
@@ -143,6 +143,8 @@ No other stops are permitted. Agents must retry, fix, or escalate through the Ga
 ## System Health
 
 Run: `npm run health`
+
+**Last verified:** 2026-07-01 — **33/33 checks passed**
 
 Checks:
 - Build (all 4 apps)
