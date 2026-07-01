@@ -28,7 +28,7 @@ const { token } = JSON.parse(fs.readFileSync(authPath, "utf8"));
 const teamId = "team_22KVyDhzM2nxPmThaTLMnIwQ";
 const projectIds = {
   "restaurant-os": "prj_ADOeyWvg6wuSXXYreN6vtmWYlKle",
-  "trading-ai": null,
+  "trading-ai": "prj_ySTMavWJmLlDPd7eCI6stnfkpaIk",
   "husai-dropshipping-research": null,
   "husai-dashboard": null,
 };
