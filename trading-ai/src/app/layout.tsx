@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Trading AI | HUSAI-OS",
-  description: "Paper trading research platform with SMA signals and backtests",
+  description: "Professional AI trading analysis — mock data, paper trading, backtesting, risk management",
 };
 
 export default function RootLayout({

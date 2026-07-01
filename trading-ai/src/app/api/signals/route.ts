@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 import { fetchBars } from "@/lib/alpaca/client";
+import { scanAllSignals } from "@/lib/ai/analysis-engine";
+import { DEFAULT_WATCHLIST } from "@/lib/data/mock-market";
 import { scanSymbols } from "@/lib/strategies/sma-crossover";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const symbolsParam = searchParams.get("symbols") ?? "AAPL,MSFT,GOOGL";
+  const symbolsParam = searchParams.get("symbols") ?? DEFAULT_WATCHLIST.join(",");
   const symbols = symbolsParam.split(",").map((s) => s.trim().toUpperCase());
+  const format = searchParams.get("format");
+
+  if (format === "ai") {
+    return NextResponse.json({
+      symbols,
+      mode: process.env.ALPACA_API_KEY ? "live" : "mock",
+      signals: scanAllSignals(symbols),
+    });
+  }
 
   const data: Record<string, Awaited<ReturnType<typeof fetchBars>>> = {};
   await Promise.all(

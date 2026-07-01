@@ -51,7 +51,7 @@
     {
       "slug": "trading-ai",
       "name": "Trading AI",
-      "description": "Paper trading, SMA signals, and backtest engine",
+      "description": "AI trading analysis platform — mock data, paper trading, backtesting, risk management",
       "priority": "P1",
       "stack": ["Next.js", "Supabase", "Vitest"],
       "localPath": "trading-ai",

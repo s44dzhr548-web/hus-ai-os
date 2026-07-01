@@ -1,20 +1,29 @@
-import type { BacktestResult, MarketBar } from "@/types/trading";
+import type { BacktestResult, MarketBar, Signal } from "@/types/trading";
 import { smaCrossoverStrategy } from "@/lib/strategies/sma-crossover";
+import { rsiStrategy } from "@/lib/strategies/rsi-strategy";
+
+export type StrategyFn = (bars: MarketBar[]) => Signal | null;
 
 export function runBacktest(
   bars: MarketBar[],
-  initialCapital = 100_000
+  initialCapital = 100_000,
+  strategy: StrategyFn = smaCrossoverStrategy
 ): BacktestResult {
   let cash = initialCapital;
   let shares = 0;
   let peak = initialCapital;
   let maxDrawdown = 0;
   let trades = 0;
+  let winningTrades = 0;
+  let losingTrades = 0;
+  let totalProfit = 0;
+  let totalLoss = 0;
+  let entryPrice = 0;
   const equityCurve: { date: string; equity: number }[] = [];
 
   for (let i = 20; i < bars.length; i++) {
     const slice = bars.slice(0, i + 1);
-    const signal = smaCrossoverStrategy(slice);
+    const signal = strategy(slice);
     const bar = bars[i];
     const equity = cash + shares * bar.close;
 
@@ -24,9 +33,18 @@ export function runBacktest(
 
     if (signal?.direction === "long" && shares === 0 && cash > 0) {
       shares = Math.floor(cash / bar.close);
+      entryPrice = bar.close;
       cash -= shares * bar.close;
       trades++;
     } else if (signal?.direction === "short" && shares > 0) {
+      const pnl = shares * (bar.close - entryPrice);
+      if (pnl >= 0) {
+        winningTrades++;
+        totalProfit += pnl;
+      } else {
+        losingTrades++;
+        totalLoss += Math.abs(pnl);
+      }
       cash += shares * bar.close;
       shares = 0;
       trades++;
@@ -43,22 +61,44 @@ export function runBacktest(
     initialCapital > 0
       ? Number((((finalEquity - initialCapital) / initialCapital) * 100).toFixed(6))
       : 0;
+  const closedTrades = winningTrades + losingTrades;
+  const winRate = closedTrades > 0 ? Number(((winningTrades / closedTrades) * 100).toFixed(2)) : 0;
+  const profitLoss = Number((finalEquity - initialCapital).toFixed(2));
+  const riskRewardRatio =
+    totalLoss > 0 ? Number((totalProfit / totalLoss).toFixed(2)) : totalProfit > 0 ? 999 : 0;
 
   return {
     finalEquity: Number(finalEquity.toFixed(2)),
     totalReturnPct,
     maxDrawdownPct: Number((maxDrawdown * 100).toFixed(6)),
     trades,
+    winRate,
+    profitLoss,
+    riskRewardRatio,
+    winningTrades,
+    losingTrades,
     equityCurve,
   };
 }
 
-/** Verify reproducibility to 6 decimal places */
 export function hashBacktestResult(result: BacktestResult): string {
   return [
     result.finalEquity.toFixed(6),
     result.totalReturnPct.toFixed(6),
     result.maxDrawdownPct.toFixed(6),
     result.trades,
+    result.winRate.toFixed(2),
   ].join("|");
+}
+
+export const STRATEGIES: Record<string, StrategyFn> = {
+  "sma-crossover": smaCrossoverStrategy,
+  rsi: rsiStrategy,
+};
+
+export function compareStrategies(bars: MarketBar[], initialCapital = 100_000) {
+  return Object.entries(STRATEGIES).map(([name, fn]) => {
+    const result = runBacktest(bars, initialCapital, fn);
+    return { strategy: name, result, reproducibilityHash: hashBacktestResult(result) };
+  });
 }
