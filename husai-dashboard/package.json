@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prebuild": "node ../scripts/sync-dashboard-data.js",
+    "prebuild": "node scripts/prebuild.js",
     "dev": "node ../scripts/sync-registry.js && next dev -p 3003",
     "build": "next build",
     "start": "next start -p 3003",
