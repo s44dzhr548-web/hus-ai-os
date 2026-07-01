@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-07-01T01:23:12.763Z",
+  "updatedAt": "2026-07-01T19:47:50.316Z",
   "platform": {
     "name": "HUSAI-OS",
     "release": "2.0.0",
@@ -60,6 +60,13 @@
   ],
   "agentActivity": [
     {
+      "id": "act-1782935270334",
+      "agent": "orchestrator",
+      "action": "Health check: 31 passed, 2 failed",
+      "project": null,
+      "timestamp": "2026-07-01T19:47:50.335Z"
+    },
+    {
       "id": "act-1782868992765",
       "agent": "orchestrator",
       "action": "Health check: 33 passed, 0 failed",
@@ -109,6 +116,20 @@
       "message": "restaurant-os HTTP 404",
       "status": "detected",
       "detectedAt": "2026-07-01T01:01:56.475Z"
+    },
+    {
+      "id": "err-1782935270338-build",
+      "type": "build",
+      "message": "husai-dashboard",
+      "status": "detected",
+      "detectedAt": "2026-07-01T19:47:50.338Z"
+    },
+    {
+      "id": "err-1782935270338-build",
+      "type": "build",
+      "message": "restaurant-os",
+      "status": "detected",
+      "detectedAt": "2026-07-01T19:47:50.338Z"
     }
   ],
   "fixes": [],

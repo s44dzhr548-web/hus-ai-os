@@ -12,6 +12,7 @@
     "sync": "node scripts/sync-dashboard-data.js",
     "orchestrate": "node scripts/health-check.js && node scripts/autonomous-recovery.js",
     "create:project": "node scripts/create-project.js",
+    "factory": "node scripts/project-factory.js",
     "build:all": "npm run build:dashboard && npm run build:restaurant && npm run build:trading && npm run build:dropshipping",
     "build:dashboard": "cd husai-dashboard && npm run build",
     "build:restaurant": "cd restaurant-os && npm run build",

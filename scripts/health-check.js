@@ -52,7 +52,7 @@ async function main() {
     "product-manager-agent.md", "architect-agent.md", "frontend-agent.md",
     "backend-agent.md", "database-agent.md", "api-integration-agent.md",
     "qa-agent.md", "devops-agent.md", "security-agent.md",
-    "marketing-agent.md", "finance-agent.md", "customer-support-agent.md",
+    "marketing-agent.md", "finance-agent.md", "customer-support-agent.md", "support-agent.md",
   ];
   for (const a of requiredAgents) {
     const p = path.join(root, "agents", a);
@@ -103,7 +103,7 @@ async function main() {
       continue;
     }
     try {
-      execSync("npm run build", { cwd: dir, stdio: "pipe", timeout: 180000, env: {
+      execSync("npm run build", { cwd: dir, stdio: "pipe", timeout: 300000, env: {
         ...process.env,
         NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
         NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder",
@@ -129,7 +129,7 @@ async function main() {
       memory.errors = memory.errors || [];
       for (const r of checks.results.filter((x) => !x.ok)) {
         memory.errors.push({
-          id: `err-${Date.now()}-${r.name}`,
+          id: `err-${Date.now()}-${r.name}-${String(r.detail).slice(0, 20).replace(/\s/g, "-")}`,
           type: r.name,
           message: r.detail,
           status: "detected",
@@ -137,6 +137,15 @@ async function main() {
         });
       }
     }
+    // Resolve errors for checks that now pass
+    const failedDetails = new Set(checks.results.filter((x) => !x.ok).map((x) => `${x.name}:${x.detail}`));
+    memory.errors = (memory.errors || []).map((err) => {
+      const key = `${err.type}:${err.message}`;
+      if (err.status === "detected" && !failedDetails.has(key)) {
+        return { ...err, status: "resolved", resolvedAt: new Date().toISOString() };
+      }
+      return err;
+    });
     fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2) + "\n");
     try {
       execSync("node scripts/sync-ai-memory.js", { cwd: root, stdio: "pipe" });

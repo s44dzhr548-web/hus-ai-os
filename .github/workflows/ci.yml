@@ -24,6 +24,7 @@ jobs:
           test -f agents/architect-agent.md
           test -f agents/api-integration-agent.md
           test -f agents/customer-support-agent.md
+  test -f agents/support-agent.md
           test -d husai-dashboard
 
   husai-dashboard:

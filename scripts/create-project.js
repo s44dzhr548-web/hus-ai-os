@@ -200,5 +200,6 @@ console.log(`Created project: ${slug}`);
 console.log(`Folder: ${projectDir}`);
 console.log(`Dev port: ${port}`);
 console.log(`Registry updated: projects/registry.json`);
-console.log(`Next: cd ${slug} && npm install && npm run dev`);
-console.log(`Manual: Create Vercel project with root directory "${slug}"`);
+console.log(`Spec: projects/${slug}.md`);
+console.log(`[Orchestrator] Setup Agent will create GitHub repo + Vercel project (rootDirectory: ${slug})`);
+console.log(`[Orchestrator] Run: node scripts/set-vercel-root.js ${slug} ${slug} after Vercel project exists`);
