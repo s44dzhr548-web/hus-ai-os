@@ -1,0 +1,646 @@
+// Menu OS — Production SaaS Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum StaffRole {
+  OWNER
+  ADMIN
+  MANAGER
+  CASHIER
+  KITCHEN
+  WAITER
+}
+
+enum OrderStatus {
+  NEW
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  MOYASAR
+  TAP
+  STRIPE
+  CASH
+  OTHER
+}
+
+enum PaymentMethodType {
+  MADA
+  APPLE_PAY
+  VISA
+  MASTERCARD
+  CASH
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  STARTER
+  PRO
+  BUSINESS
+  ENTERPRISE
+}
+
+enum BillingPaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum BillingPaymentType {
+  SUBSCRIPTION
+  RENEWAL
+  UPGRADE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+  SUSPENDED
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED
+  FREE_ITEM
+}
+
+enum TableRequestType {
+  CALL_WAITER
+  REQUEST_BILL
+  CLEAN_TABLE
+  HELP
+}
+
+enum TableRequestStatus {
+  NEW
+  SEEN
+  DONE
+}
+
+enum OptionGroupType {
+  SIZE
+  ADDON
+  REQUIRED
+  OPTIONAL
+}
+
+enum CategoryLayout {
+  GRID
+  LIST
+  CARDS
+  IMAGE_FIRST
+  VIDEO_FIRST
+  COMPACT
+}
+
+enum CategoryMediaType {
+  IMAGE
+  VIDEO
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String?
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  isPlatformAdmin Boolean @default(false) @map("is_platform_admin")
+  totpSecret      String?  @map("totp_secret")
+  totpEnabled     Boolean  @default(false) @map("totp_enabled")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts    Account[]
+  sessions    Session[]
+  staff       Staff[]
+  restaurants Restaurant[] @relation("RestaurantOwner")
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Restaurant {
+  id          String   @id @default(cuid())
+  ownerId     String   @map("owner_id")
+  name        String
+  nameAr      String?  @map("name_ar")
+  nameEn      String?  @map("name_en")
+  slug        String   @unique
+  customDomain String? @unique @map("custom_domain")
+  description String?
+  descriptionEn String? @map("description_en")
+  logoUrl     String?  @map("logo_url")
+  coverUrl    String?  @map("cover_url")
+  primaryColor    String? @default("#047857") @map("primary_color")
+  secondaryColor  String? @default("#065f46") @map("secondary_color")
+  backgroundColor String? @default("#f9fafb") @map("background_color")
+  buttonColor     String? @default("#047857") @map("button_color")
+  textColor       String? @default("#111827") @map("text_color")
+  categoryColor   String? @default("#047857") @map("category_color")
+  fontFamily      String? @default("cairo") @map("font_family")
+  qrCode      String?  @map("qr_code")
+  phone       String?
+  email       String?
+  address     String?
+  addressAr   String?  @map("address_ar")
+  workingHours Json?   @map("working_hours")
+  taxNumber   String?  @map("tax_number")
+  currency    String   @default("SAR")
+  timezone    String   @default("Asia/Riyadh")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  defaultPaymentProvider PaymentProvider @default(MOYASAR) @map("default_payment_provider")
+  moyasarPublishableKey  String? @map("moyasar_publishable_key")
+  moyasarSecretKey       String? @map("moyasar_secret_key")
+  tapPublishableKey      String? @map("tap_publishable_key")
+  tapSecretKey           String? @map("tap_secret_key")
+  stripePublishableKey   String? @map("stripe_publishable_key")
+  stripeSecretKey        String? @map("stripe_secret_key")
+  paymentTestMode        Boolean @default(true) @map("payment_test_mode")
+  whatsappNumber         String? @map("whatsapp_number")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner          User           @relation("RestaurantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  branches       Branch[]
+  staff          Staff[]
+  menuCategories MenuCategory[]
+  customers      Customer[]
+  coupons        Coupon[]
+  reviews        Review[]
+  subscription   Subscription?
+  billingPayments SubscriptionBillingPayment[]
+  favorites      CustomerFavorite[]
+  tableRequests  TableRequest[]
+  optionGroups   MenuItemOptionGroup[]
+  auditLogs      AuditLog[]
+
+  @@index([ownerId])
+  @@map("restaurants")
+}
+
+model Branch {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  name         String
+  nameAr       String?  @map("name_ar")
+  nameEn       String?  @map("name_en")
+  address      String?
+  addressAr    String?  @map("address_ar")
+  city         String?
+  phone        String?
+  qrCode       String?  @map("qr_code")
+  workingHours Json?    @map("working_hours")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tables     DiningTable[]
+  orders     Order[]
+  staff      Staff[]
+
+  @@index([restaurantId])
+  @@map("branches")
+}
+
+model Staff {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  restaurantId String    @map("restaurant_id")
+  branchId     String?   @map("branch_id")
+  role         StaffRole @default(WAITER)
+  name         String
+  phone        String?
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch     Branch?    @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, restaurantId])
+  @@index([restaurantId, role])
+  @@map("staff")
+}
+
+model DiningTable {
+  id        String   @id @default(cuid())
+  branchId  String   @map("branch_id")
+  number    Int
+  tableCode String?  @unique @map("table_code")
+  label     String?
+  capacity  Int      @default(4)
+  qrCode    String?  @map("qr_code")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  branch Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@unique([branchId, number])
+  @@index([branchId])
+  @@map("dining_tables")
+}
+
+model MenuCategory {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  parentId     String?  @map("parent_id")
+  name         String
+  nameAr       String?  @map("name_ar")
+  nameEn       String?  @map("name_en")
+  description  String?
+  descriptionEn String? @map("description_en")
+  color       String?  @default("#047857")
+  icon        String?
+  imageUrl    String?  @map("image_url")
+  videoUrl    String?  @map("video_url")
+  mediaType   CategoryMediaType @default(IMAGE) @map("media_type")
+  previewUrl  String?  @map("preview_url")
+  layout      CategoryLayout @default(CARDS)
+  sortOrder    Int      @default(0) @map("sort_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  parent     MenuCategory?    @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children   MenuCategory[]   @relation("CategoryTree")
+  items      MenuItem[]
+
+  @@index([restaurantId, sortOrder])
+  @@index([parentId])
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id            String   @id @default(cuid())
+  categoryId    String   @map("category_id")
+  name          String
+  nameAr        String?  @map("name_ar")
+  nameEn        String?  @map("name_en")
+  description   String?
+  descriptionAr String?  @map("description_ar")
+  descriptionEn String?  @map("description_en")
+  price         Decimal
+  discountPrice Decimal? @map("discount_price")
+  imageUrl      String?  @map("image_url")
+  videoUrl      String?  @map("video_url")
+  mediaType     CategoryMediaType @default(IMAGE) @map("media_type")
+  previewUrl    String?  @map("preview_url")
+  galleryUrls   Json?    @map("gallery_urls")
+  calories      Int?     @map("calories")
+  prepTimeMinutes Int?   @map("prep_time_minutes")
+  isAvailable   Boolean  @default(true) @map("is_available")
+  isFeatured    Boolean  @default(false) @map("is_featured")
+  viewCount     Int      @default(0) @map("view_count")
+  orderCount    Int      @default(0) @map("order_count")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  category   MenuCategory       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  favorites  CustomerFavorite[]
+  optionGroups MenuItemOptionGroup[]
+
+  @@index([categoryId, sortOrder])
+  @@map("menu_items")
+}
+
+model Order {
+  id           String      @id @default(cuid())
+  branchId     String      @map("branch_id")
+  tableId      String?     @map("table_id")
+  customerId   String?     @map("customer_id")
+  orderNumber  Int         @map("order_number")
+  status       OrderStatus @default(NEW)
+  subtotal     Decimal     @default(0)
+  tipAmount    Decimal     @default(0) @map("tip_amount")
+  discountAmount Decimal   @default(0) @map("discount_amount")
+  totalAmount  Decimal     @default(0) @map("total_amount")
+  couponCode   String?     @map("coupon_code")
+  notes        String?
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  completedAt  DateTime?   @map("completed_at")
+
+  branch   Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  table    DiningTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  customer Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items    OrderItem[]
+  payments Payment[]
+
+  @@unique([branchId, orderNumber])
+  @@index([branchId, status, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  orderId    String   @map("order_id")
+  menuItemId String   @map("menu_item_id")
+  name       String
+  nameAr     String?  @map("name_ar")
+  quantity   Int      @default(1)
+  unitPrice  Decimal  @map("unit_price")
+  totalPrice Decimal  @map("total_price")
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Payment {
+  id              String            @id @default(cuid())
+  orderId         String            @map("order_id")
+  amount          Decimal
+  status          PaymentStatus     @default(PENDING)
+  provider        PaymentProvider   @default(MOYASAR)
+  method          PaymentMethodType @default(VISA)
+  externalId      String?           @map("external_id")
+  externalMetadata Json?            @map("external_metadata")
+  processedAt     DateTime?         @map("processed_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@map("payments")
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  name         String?
+  phone        String?
+  email        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant    Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders        Order[]
+  loyaltyPoints LoyaltyPoint[]
+  reviews       Review[]
+  favorites     CustomerFavorite[]
+
+  @@index([restaurantId, phone])
+  @@map("customers")
+}
+
+model CustomerFavorite {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  menuItemId   String   @map("menu_item_id")
+  customerId   String?  @map("customer_id")
+  guestToken   String?  @map("guest_token")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  customer   Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([guestToken, menuItemId])
+  @@index([restaurantId])
+  @@map("customer_favorites")
+}
+
+model LoyaltyPoint {
+  id          String   @id @default(cuid())
+  customerId  String   @map("customer_id")
+  points      Int      @default(0)
+  description String?
+  orderId     String?  @map("order_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("loyalty_points")
+}
+
+model Coupon {
+  id           String     @id @default(cuid())
+  restaurantId String     @map("restaurant_id")
+  code         String
+  type         CouponType @default(PERCENTAGE)
+  value        Decimal
+  minOrder     Decimal?   @map("min_order")
+  maxUses      Int?       @map("max_uses")
+  usedCount    Int        @default(0) @map("used_count")
+  isActive     Boolean    @default(true) @map("is_active")
+  expiresAt    DateTime?  @map("expires_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, code])
+  @@map("coupons")
+}
+
+model Review {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  customerId   String?  @map("customer_id")
+  rating       Int
+  comment      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customer   Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@map("reviews")
+}
+
+model Subscription {
+  id             String             @id @default(cuid())
+  restaurantId   String             @unique @map("restaurant_id")
+  plan           SubscriptionPlan   @default(FREE)
+  status         SubscriptionStatus @default(TRIAL)
+  startDate      DateTime           @default(now()) @map("start_date")
+  endDate        DateTime?          @map("end_date")
+  autoRenew      Boolean            @default(true) @map("auto_renew")
+  moyasarToken   String?            @map("moyasar_token")
+  limitOverrides Json?              @map("limit_overrides")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  restaurant      Restaurant                   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  billingPayments SubscriptionBillingPayment[]
+
+  @@map("subscriptions")
+}
+
+model SubscriptionBillingPayment {
+  id               String               @id @default(cuid())
+  restaurantId     String               @map("restaurant_id")
+  subscriptionId   String?              @map("subscription_id")
+  plan             SubscriptionPlan
+  type             BillingPaymentType   @default(SUBSCRIPTION)
+  amount           Decimal
+  currency         String               @default("SAR")
+  status           BillingPaymentStatus @default(PENDING)
+  moyasarPaymentId String?              @unique @map("moyasar_payment_id")
+  paymentMethod    PaymentMethodType?   @map("payment_method")
+  periodStart      DateTime?            @map("period_start")
+  periodEnd        DateTime?            @map("period_end")
+  invoiceNumber    String               @unique @map("invoice_number")
+  metadata         Json?
+  processedAt      DateTime?            @map("processed_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, createdAt])
+  @@index([status])
+  @@map("subscription_billing_payments")
+}
+
+model MenuItemOptionGroup {
+  id           String          @id @default(cuid())
+  restaurantId String          @map("restaurant_id")
+  menuItemId   String?         @map("menu_item_id")
+  name         String
+  nameAr       String?         @map("name_ar")
+  nameEn       String?         @map("name_en")
+  type         OptionGroupType @default(OPTIONAL)
+  isRequired   Boolean         @default(false) @map("is_required")
+  minSelect    Int             @default(0) @map("min_select")
+  maxSelect    Int             @default(1) @map("max_select")
+  sortOrder    Int             @default(0) @map("sort_order")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem?        @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  options    MenuItemOption[]
+
+  @@index([menuItemId])
+  @@map("menu_item_option_groups")
+}
+
+model MenuItemOption {
+  id        String   @id @default(cuid())
+  groupId   String   @map("group_id")
+  name      String
+  nameAr    String?  @map("name_ar")
+  nameEn    String?  @map("name_en")
+  price     Decimal  @default(0)
+  isDefault Boolean  @default(false) @map("is_default")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group MenuItemOptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@map("menu_item_options")
+}
+
+model TableRequest {
+  id           String             @id @default(cuid())
+  restaurantId String             @map("restaurant_id")
+  branchId     String             @map("branch_id")
+  tableId      String             @map("table_id")
+  type         TableRequestType
+  status       TableRequestStatus @default(NEW)
+  notes        String?
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, status, createdAt])
+  @@map("table_requests")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  restaurantId String?  @map("restaurant_id")
+  userId       String?  @map("user_id")
+  action       String
+  entity       String?
+  entityId     String?  @map("entity_id")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, createdAt])
+  @@map("audit_logs")
+}

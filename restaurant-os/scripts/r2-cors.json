@@ -1,0 +1,13 @@
+[
+  {
+    "AllowedOrigins": [
+      "http://localhost:3005",
+      "https://restaurant-os-nine.vercel.app",
+      "https://*.vercel.app"
+    ],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag", "Content-Length", "Content-Type", "Accept-Ranges"],
+    "MaxAgeSeconds": 3600
+  }
+]

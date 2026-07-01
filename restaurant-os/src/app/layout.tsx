@@ -1,33 +1,43 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Providers } from "./providers";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "Restaurant OS | HUSAI-OS",
-  description: "All-in-one restaurant management — menus, orders, kitchen display.",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3005"
+  ),
+  title: {
+    default: "Menu OS — نظام القائمة الرقمية للمطاعm",
+    template: "%s | Menu OS",
+  },
+  description:
+    "منصة القائمة الرقمية للمطاعm — QR، طلبات، دفع مباشر، مطبخ، وتحليلات",
+  keywords: ["قائمة رقمية", "مطعm", "QR", "طلبات", "Menu OS", "SaaS"],
+  openGraph: {
+    type: "website",
+    locale: "ar_SA",
+    siteName: "Menu OS",
+    title: "Menu OS — نظام القائمة الرقمية",
+    description: "أنشئ قائمتك الرقمية واستقبل الطلبات مباشرة",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Menu OS",
+    description: "نظام القائمة الرقمية للمطاعm",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="ar" dir="rtl">
+      <body className="min-h-screen antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

@@ -1,0 +1,4 @@
+DO $$ BEGIN
+  ALTER TYPE "StaffRole" ADD VALUE IF NOT EXISTS 'OWNER';
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;

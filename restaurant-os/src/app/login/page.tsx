@@ -1,95 +1,100 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
+import Link from "next/link";
+import { Button, Card, Input } from "@/components/ui";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState("admin@menuos.sa");
+  const [password, setPassword] = useState("admin123456");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setLoading(true);
+    setError("");
 
-    if (!isSupabaseConfigured()) {
-      setError("Supabase is not configured. Add credentials to .env.local");
+    try {
+      const result = await signIn("credentials", {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false,
+        callbackUrl: "/dashboard",
+      });
+
+      if (result?.error) {
+        if (result.error === "database_timeout") {
+          setError("قاعدة البيانات غير متصلة. شغّل PostgreSQL ثم npm run db:seed");
+        } else {
+          setError("البريد أو كلمة المرور غير صحيحة");
+        }
+        setLoading(false);
+        return;
+      }
+
+      if (result?.ok) {
+        const sessionRes = await fetch("/api/auth/session");
+        const sess = await sessionRes.json();
+        const target = sess?.user?.isPlatformAdmin ? "/dashboard/platform" : "/dashboard";
+        window.location.href = target;
+        return;
+      }
+
+      setError("حدث خطأ أثناء تسجيل الدخول");
+    } catch {
+      setError("تعذر الاتصال بالخادم. تحقق من قاعدة البيانات.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError) {
-      setError(authError.message);
-      setLoading(false);
-      return;
-    }
-
-    router.push("/dashboard");
-    router.refresh();
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4">
-      <div className="w-full max-w-md space-y-8 rounded-2xl border border-zinc-800 bg-zinc-900 p-8">
-        <div className="space-y-2 text-center">
-          <p className="text-sm uppercase tracking-widest text-amber-400">
-            Restaurant OS
-          </p>
-          <h1 className="text-2xl font-semibold text-zinc-50">Sign in</h1>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-900 to-emerald-700 p-4">
+      <Card className="w-full max-w-md">
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-bold text-gray-900">Menu OS</h1>
+          <p className="mt-2 text-sm text-gray-500">تسجيل الدخول إلى لوحة التحكم</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <label className="block space-y-2">
-            <span className="text-sm text-zinc-400">Email</span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-50 outline-none focus:border-amber-400"
-            />
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm text-zinc-400">Password</span>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-50 outline-none focus:border-amber-400"
-            />
-          </label>
+          <Input
+            label="البريد الإلكتروني"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            dir="ltr"
+            autoComplete="email"
+          />
+          <Input
+            label="كلمة المرور"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            dir="ltr"
+            autoComplete="current-password"
+          />
           {error && (
-            <p className="text-sm text-red-400">{error}</p>
+            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p>
           )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-amber-400 py-2.5 font-medium text-zinc-950 hover:bg-amber-300 disabled:opacity-50"
-          >
-            {loading ? "Signing in…" : "Sign in"}
-          </button>
+          <Button type="submit" className="w-full" loading={loading}>
+            دخول
+          </Button>
         </form>
 
-        <p className="text-center text-sm text-zinc-500">
-          No account?{" "}
-          <Link href="/signup" className="text-amber-400 hover:underline">
-            Sign up
+        <p className="mt-6 text-center text-sm text-gray-500">
+          <Link href="/register" className="text-emerald-600 hover:underline">
+            إنشاء حساب جديد
+          </Link>
+          {" · "}
+          <Link href="/" className="text-emerald-600 hover:underline">
+            العودة للرئيسية
           </Link>
         </p>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: menuos
+      POSTGRES_PASSWORD: menuos_secret
+      POSTGRES_DB: menuos
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U menuos"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3005:3000"
+    environment:
+      DATABASE_URL: postgresql://menuos:menuos_secret@postgres:5432/menuos
+      NEXTAUTH_URL: http://localhost:3005
+      NEXTAUTH_SECRET: change-me-in-production
+      NEXT_PUBLIC_APP_URL: http://localhost:3005
+      STORAGE_PROVIDER: local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/public/uploads
+
+volumes:
+  pgdata:
+  uploads:

@@ -1,78 +1,86 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createRestaurantSchema } from "@/lib/validators";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, requireRestaurant, requireRestaurantRole } from "@/lib/api-auth";
+import prisma from "@/lib/prisma";
+import { slugify } from "@/lib/utils";
+import { assertFeature } from "@/lib/permissions-engine";
 
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { session, error } = await requireAuth();
+  if (error) return error;
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data, error } = await supabase
-    .from("restaurants")
-    .select("*, locations(*)")
-    .eq("owner_id", user.id)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ restaurants: data });
-}
-
-export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await request.json();
-  const parsed = createRestaurantSchema.safeParse(body);
-
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
-      { status: 400 }
-    );
-  }
-
-  const { name, slug, locationName, address } = parsed.data;
-
-  const { data: restaurant, error: restaurantError } = await supabase
-    .from("restaurants")
-    .insert({
-      owner_id: user.id,
-      name,
-      slug,
-    })
-    .select()
-    .single();
-
-  if (restaurantError) {
-    return NextResponse.json(
-      { error: restaurantError.message },
-      { status: 400 }
-    );
-  }
-
-  const { error: locationError } = await supabase.from("locations").insert({
-    restaurant_id: restaurant.id,
-    name: locationName,
-    address: address ?? null,
+  const restaurants = await prisma.restaurant.findMany({
+    where: { ownerId: session!.user.id },
+    include: {
+      branches: { where: { isActive: true } },
+      subscription: true,
+      _count: { select: { staff: true, menuCategories: true } },
+    },
   });
 
-  if (locationError) {
-    return NextResponse.json({ error: locationError.message }, { status: 500 });
+  return NextResponse.json(restaurants);
+}
+
+export async function POST(req: NextRequest) {
+  const { session, error } = await requireAuth();
+  if (error) return error;
+
+  const body = await req.json();
+  const { name, nameAr, description, phone, email, taxNumber } = body;
+
+  if (!name) {
+    return NextResponse.json({ error: "اسم المطعم مطلوب" }, { status: 400 });
   }
 
-  return NextResponse.json({ restaurant }, { status: 201 });
+  const slug = slugify(name) + "-" + Date.now().toString(36);
+
+  const restaurant = await prisma.restaurant.create({
+    data: {
+      ownerId: session!.user.id,
+      name,
+      nameAr,
+      slug,
+      description,
+      phone,
+      email,
+      taxNumber,
+      subscription: {
+        create: { plan: "FREE", status: "TRIAL" },
+      },
+    },
+  });
+
+  return NextResponse.json(restaurant, { status: 201 });
+}
+
+export async function PUT(req: NextRequest) {
+  const { restaurantId, error } = await requireRestaurantRole(["OWNER", "ADMIN"]);
+  if (error) return error;
+
+  const body = await req.json();
+
+  if (body.customDomain !== undefined) {
+    const domainCheck = await assertFeature(restaurantId!, "customDomain");
+    if (domainCheck) return domainCheck;
+  }
+
+  const restaurant = await prisma.restaurant.update({
+    where: { id: restaurantId! },
+    data: {
+      name: body.name,
+      nameAr: body.nameAr,
+      description: body.description,
+      phone: body.phone,
+      email: body.email,
+      taxNumber: body.taxNumber,
+      logoUrl: body.logoUrl,
+      address: body.address,
+      addressAr: body.addressAr,
+      workingHours: body.workingHours,
+      customDomain: body.customDomain,
+      timezone: body.timezone,
+      currency: body.currency,
+    },
+  });
+
+  return NextResponse.json(restaurant);
 }

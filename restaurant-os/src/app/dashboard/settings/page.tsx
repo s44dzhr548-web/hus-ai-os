@@ -1,60 +1,156 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+"use client";
 
-export default async function SettingsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+import { useEffect, useState } from "react";
+import {
+  PageHeader,
+  Card,
+  Input,
+  Button,
+  LoadingSpinner,
+} from "@/components/ui";
+import { getPlatformDomain } from "@/lib/domains";
 
-  const { data: restaurants } = await supabase
-    .from("restaurants")
-    .select("id, name, slug, timezone, currency")
-    .eq("owner_id", user.id)
-    .limit(1);
+interface SettingsForm {
+  nameAr: string;
+  email: string;
+  phone: string;
+  logoUrl: string;
+  customDomain: string;
+  timezone: string;
+  currency: string;
+}
 
-  const restaurant = restaurants?.[0];
-  if (!restaurant) redirect("/onboarding");
+export default function OwnerSettingsPage() {
+  const [form, setForm] = useState<SettingsForm>({
+    nameAr: "",
+    email: "",
+    phone: "",
+    logoUrl: "",
+    customDomain: "",
+    timezone: "Asia/Riyadh",
+    currency: "SAR",
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    fetch("/api/restaurants")
+      .then((r) => r.json())
+      .then((data) => {
+        const r = Array.isArray(data) ? data[0] : data;
+        if (r) {
+          setForm({
+            nameAr: r.nameAr || r.name || "",
+            email: r.email || "",
+            phone: r.phone || "",
+            logoUrl: r.logoUrl || "",
+            customDomain: r.customDomain || "",
+            timezone: r.timezone || "Asia/Riyadh",
+            currency: r.currency || "SAR",
+          });
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setMessage("");
+    const res = await fetch("/api/restaurants", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nameAr: form.nameAr,
+        name: form.nameAr,
+        email: form.email,
+        phone: form.phone,
+        logoUrl: form.logoUrl,
+        customDomain: form.customDomain || null,
+        timezone: form.timezone,
+        currency: form.currency,
+      }),
+    });
+    setSaving(false);
+    setMessage(res.ok ? "تم الحفظ" : "فشل الحفظ");
+  }
+
+  if (loading) return <LoadingSpinner />;
+
+  const platformDomain = getPlatformDomain();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold">Settings</h1>
-        <p className="mt-2 text-zinc-400">Restaurant configuration</p>
-      </div>
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-        <div>
-          <p className="text-sm text-zinc-500">Name</p>
-          <p className="font-medium">{restaurant.name}</p>
-        </div>
-        <div>
-          <p className="text-sm text-zinc-500">Slug</p>
-          <p className="font-medium">{restaurant.slug}</p>
-        </div>
-        <div>
-          <p className="text-sm text-zinc-500">Timezone</p>
-          <p className="font-medium">{restaurant.timezone}</p>
-        </div>
-        <div>
-          <p className="text-sm text-zinc-500">Currency</p>
-          <p className="font-medium">{restaurant.currency}</p>
-        </div>
-        <div>
-          <p className="text-sm text-zinc-500">Public menu</p>
-          <a href={`/menu/${restaurant.slug}`} className="text-amber-400 hover:underline">
-            /menu/{restaurant.slug}
-          </a>
-        </div>
-      </div>
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-        <h2 className="font-medium">Coming soon</h2>
-        <ul className="mt-3 space-y-1 text-sm text-zinc-500">
-          <li>Inventory alerts</li>
-          <li>Staff management</li>
-          <li>Stripe Connect payments</li>
-        </ul>
-      </div>
+    <div>
+      <PageHeader
+        title="إعدادات المالك"
+        description="إعدادات الحساب والنطاق المخصص"
+      />
+
+      <Card className="max-w-2xl">
+        <form onSubmit={handleSave} className="space-y-4">
+          <Input
+            label="اسم المطعm"
+            value={form.nameAr}
+            onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
+          />
+          <Input
+            label="البريد"
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            dir="ltr"
+          />
+          <Input
+            label="الجوال"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            dir="ltr"
+          />
+          <Input
+            label="رابط الشعار"
+            value={form.logoUrl}
+            onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
+            dir="ltr"
+          />
+          <Input
+            label="المنطقة الزمنية"
+            value={form.timezone}
+            onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+            dir="ltr"
+          />
+          <Input
+            label="العملة"
+            value={form.currency}
+            onChange={(e) => setForm({ ...form, currency: e.target.value })}
+            dir="ltr"
+          />
+
+          <div className="rounded-lg border border-gray-200 p-4">
+            <Input
+              label="نطاق مخصص (Custom Domain)"
+              value={form.customDomain}
+              onChange={(e) =>
+                setForm({ ...form, customDomain: e.target.value })
+              }
+              placeholder="menu.yourrestaurant.com"
+              dir="ltr"
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              أضف CNAME يشير إلى {platformDomain} ثم أدخل النطاق هنا.
+              مثال: menu.example.com
+            </p>
+          </div>
+
+          {message && (
+            <p className="text-sm text-emerald-600">{message}</p>
+          )}
+
+          <Button type="submit" loading={saving}>
+            حفظ الإعدادات
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }

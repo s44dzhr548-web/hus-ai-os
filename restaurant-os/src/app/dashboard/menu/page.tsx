@@ -1,54 +1,37 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { MenuManager } from "@/components/menu-manager";
+"use client";
 
-export default async function MenuPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+import Link from "next/link";
+import { PageHeader, Card, Button } from "@/components/ui";
+import { FolderOpen, List } from "lucide-react";
 
-  const { data: restaurants } = await supabase
-    .from("restaurants")
-    .select("id, name, currency")
-    .eq("owner_id", user.id)
-    .limit(1);
-
-  const restaurant = restaurants?.[0];
-  if (!restaurant) redirect("/onboarding");
-
-  const [{ data: categories }, { data: items }] = await Promise.all([
-    supabase
-      .from("menu_categories")
-      .select("*")
-      .eq("restaurant_id", restaurant.id)
-      .order("sort_order"),
-    supabase
-      .from("menu_items")
-      .select("*")
-      .eq("restaurant_id", restaurant.id)
-      .order("name"),
-  ]);
-
-  const categoriesWithItems = (categories ?? []).map((cat) => ({
-    ...cat,
-    menu_items: (items ?? []).filter((i) => i.category_id === cat.id),
-  }));
-
+export default function MenuOverviewPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold">Menu</h1>
-        <p className="mt-2 text-zinc-400">
-          Manage categories and items for {restaurant.name}.
-        </p>
+    <div>
+      <PageHeader title="المنيو" description="نظّم أقسام المنيو ومنتجاتك" />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="hover:shadow-md transition-shadow">
+          <FolderOpen className="h-10 w-10 text-emerald-600" />
+          <h3 className="mt-3 text-lg font-semibold">أقسام المنيو</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            أنشئ أقساماً رئيسية وفرعية (مقبلات، أطباق، مشروبات...)
+          </p>
+          <Link href="/dashboard/menu/categories">
+            <Button className="mt-4">إدارة المنيو</Button>
+          </Link>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <List className="h-10 w-10 text-emerald-600" />
+          <h3 className="mt-3 text-lg font-semibold">المنتجات</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            أضف المنتجات مع الصور والفيديو داخل كل قسم
+          </p>
+          <Link href="/dashboard/menu/categories">
+            <Button variant="outline" className="mt-4">فتح المنيو</Button>
+          </Link>
+        </Card>
       </div>
-      <MenuManager
-        restaurantId={restaurant.id}
-        currency={restaurant.currency}
-        initialCategories={categoriesWithItems}
-      />
     </div>
   );
 }

@@ -1,0 +1,32 @@
+name: Daily Database Backup
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Run backup
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_RETENTION_DAYS: "14"
+        run: npx tsx scripts/backup-database.ts backups
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: menuos-db-backup
+          path: backups/menuos-*.sql*
+          retention-days: 14

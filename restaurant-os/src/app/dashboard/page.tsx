@@ -1,124 +1,124 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { formatCurrency } from "@/lib/validators";
-import type { RestaurantWithLocations } from "@/types/database";
+"use client";
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+import { useEffect, useState } from "react";
+import {
+  PageHeader,
+  StatCard,
+  Card,
+  CardTitle,
+  Badge,
+  LoadingSpinner,
+} from "@/components/ui";
+import {
+  formatCurrency,
+  formatDate,
+  ORDER_STATUS_LABELS,
+  ORDER_STATUS_VARIANTS,
+} from "@/lib/utils";
+import {
+  DollarSign,
+  ShoppingBag,
+  TrendingUp,
+  UtensilsCrossed,
+} from "lucide-react";
 
-  if (!user) redirect("/login");
+interface ReportData {
+  todaySales: number;
+  monthSales: number;
+  todayOrders: number;
+  avgOrderValue: number;
+}
 
-  const { data: restaurants } = await supabase
-    .from("restaurants")
-    .select("*, locations(*)")
-    .eq("owner_id", user.id);
+interface Order {
+  id: string;
+  orderNumber: number;
+  status: string;
+  totalAmount: number;
+  createdAt: string;
+  table?: { number: number; label?: string };
+}
 
-  const restaurant = restaurants?.[0] as RestaurantWithLocations | undefined;
+export default function DashboardPage() {
+  const [reports, setReports] = useState<ReportData | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (!restaurant) {
-    redirect("/onboarding");
-  }
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/reports").then((r) => r.json()),
+      fetch("/api/orders").then((r) => r.json()),
+    ])
+      .then(([rep, ord]) => {
+        setReports(rep);
+        setOrders(Array.isArray(ord) ? ord.slice(0, 5) : []);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const { data: orders } = await supabase
-    .from("orders")
-    .select("total_cents, status")
-    .eq("restaurant_id", restaurant.id)
-    .gte("created_at", today.toISOString());
-
-  const todayRevenue =
-    orders
-      ?.filter((o) => o.status !== "cancelled")
-      .reduce((sum, o) => sum + o.total_cents, 0) ?? 0;
-
-  const activeOrders =
-    orders?.filter((o) =>
-      ["pending", "confirmed", "preparing", "ready"].includes(o.status)
-    ).length ?? 0;
+  if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold">Dashboard</h1>
-        <p className="mt-2 text-zinc-400">
-          Welcome back. Here&apos;s today&apos;s snapshot.
-        </p>
-      </div>
+    <div>
+      <PageHeader
+        title="نظرة عامة"
+        description="ملخص أداء مطعمك اليوم"
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Today's revenue" value={formatCurrency(todayRevenue, restaurant.currency)} />
-        <StatCard label="Active orders" value={String(activeOrders)} />
-        <StatCard label="Locations" value={String(restaurant.locations?.length ?? 0)} />
-        <StatCard label="Public menu" value={`/menu/${restaurant.slug}`} link />
+        <StatCard
+          title="مبيعات اليوم"
+          value={formatCurrency(reports?.todaySales ?? 0)}
+          icon={<DollarSign className="h-5 w-5" />}
+        />
+        <StatCard
+          title="طلبات اليوم"
+          value={reports?.todayOrders ?? 0}
+          icon={<ShoppingBag className="h-5 w-5" />}
+        />
+        <StatCard
+          title="متوسط الطلب"
+          value={formatCurrency(reports?.avgOrderValue ?? 0)}
+          icon={<TrendingUp className="h-5 w-5" />}
+        />
+        <StatCard
+          title="مبيعات الشهر"
+          value={formatCurrency(reports?.monthSales ?? 0)}
+          icon={<UtensilsCrossed className="h-5 w-5" />}
+        />
       </div>
 
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-        <h2 className="text-lg font-medium">Quick actions</h2>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <ActionLink href="/dashboard/menu">Manage menu</ActionLink>
-          <ActionLink href="/dashboard/orders">View orders</ActionLink>
-          <ActionLink href="/dashboard/kds">Open kitchen display</ActionLink>
-          <ActionLink href={`/menu/${restaurant.slug}`} external>
-            Preview public menu
-          </ActionLink>
-        </div>
-      </div>
+      <Card className="mt-6">
+        <CardTitle>آخر الطلبات</CardTitle>
+        {orders.length === 0 ? (
+          <p className="py-8 text-center text-sm text-gray-500">لا توجد طلبات بعد</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {orders.map((order) => (
+              <div
+                key={order.id}
+                className="flex items-center justify-between rounded-lg border border-gray-100 p-3"
+              >
+                <div>
+                  <p className="font-medium">طلب #{order.orderNumber}</p>
+                  <p className="text-xs text-gray-500">
+                    {order.table ? `طاولة ${order.table.number}` : "—"} ·{" "}
+                    {formatDate(order.createdAt)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant={ORDER_STATUS_VARIANTS[order.status]}>
+                    {ORDER_STATUS_LABELS[order.status]}
+                  </Badge>
+                  <span className="font-semibold text-emerald-700">
+                    {formatCurrency(Number(order.totalAmount))}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  link,
-}: {
-  label: string;
-  value: string;
-  link?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
-      <p className="text-sm text-zinc-500">{label}</p>
-      <p className={`mt-2 text-2xl font-semibold ${link ? "text-amber-400" : ""}`}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function ActionLink({
-  href,
-  children,
-  external,
-}: {
-  href: string;
-  children: React.ReactNode;
-  external?: boolean;
-}) {
-  if (external) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-lg bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
-      >
-        {children}
-      </a>
-    );
-  }
-  return (
-    <Link
-      href={href}
-      className="rounded-lg bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
-    >
-      {children}
-    </Link>
   );
 }
