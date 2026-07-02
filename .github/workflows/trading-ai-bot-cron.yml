@@ -1,0 +1,28 @@
+name: Trading AI — Auto Paper Bot Cron
+
+on:
+  schedule:
+    # Every 5 minutes — paper trading scan (external scheduler; Vercel Hobby = daily cron only)
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run-paper-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger paper bot cron
+        env:
+          CRON_SECRET: ${{ secrets.TRADING_AI_CRON_SECRET }}
+          PRODUCTION_URL: https://trading-ai-beta.vercel.app
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "TRADING_AI_CRON_SECRET not configured in GitHub secrets"
+            exit 1
+          fi
+          curl -sf -X POST "$PRODUCTION_URL/api/bot/cron" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            | head -c 2000
+          echo ""
+          echo "Paper bot cron triggered successfully"

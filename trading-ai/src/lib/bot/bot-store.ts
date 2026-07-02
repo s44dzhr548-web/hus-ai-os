@@ -126,25 +126,33 @@ function stateToRow(state: PersistedBotState): Record<string, unknown> {
 }
 
 async function loadFromSupabase(): Promise<PersistedBotState | null> {
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return null;
-  const { data, error } = await supabase.from("bot_runtime_state").select("*").eq("id", "global").maybeSingle();
-  if (error || !data) return null;
-  return rowToState(data as Record<string, unknown>);
+  try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return null;
+    const { data, error } = await supabase.from("bot_runtime_state").select("*").eq("id", "global").maybeSingle();
+    if (error || !data) return null;
+    return rowToState(data as Record<string, unknown>);
+  } catch {
+    return null;
+  }
 }
 
 async function saveToSupabase(state: PersistedBotState): Promise<boolean> {
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return false;
-  const { error } = await supabase.from("bot_runtime_state").upsert(stateToRow(state));
-  return !error;
+  try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return false;
+    const { error } = await supabase.from("bot_runtime_state").upsert(stateToRow(state));
+    return !error;
+  } catch {
+    return false;
+  }
 }
 
 export function getStorageBackend(): BotStorageBackend {
   if (isSupabaseConfigured()) return "supabase";
-  if (process.env.NODE_ENV === "test") return "memory";
+  if (process.env.NODE_ENV === "test" || process.env.VERCEL) return "memory";
   try {
-    if (fs.existsSync(path.dirname(STATE_FILE)) || process.env.NODE_ENV === "development") return "file";
+    if (fs.existsSync(path.dirname(STATE_FILE))) return "file";
   } catch {
     /* read-only FS */
   }
