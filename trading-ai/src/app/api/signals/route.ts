@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { fetchBars } from "@/lib/alpaca/client";
+import type { MarketBar } from "@/types/trading";
 import { scanAllSignals } from "@/lib/ai/analysis-engine";
 import { DEFAULT_WATCHLIST } from "@/lib/data/mock-market";
+import { unifiedCandles } from "@/lib/market/unified";
+import { getDataMode } from "@/lib/market/config";
 import { scanSymbols } from "@/lib/strategies/sma-crossover";
 
 export async function GET(request: Request) {
@@ -11,17 +13,15 @@ export async function GET(request: Request) {
   const format = searchParams.get("format");
 
   if (format === "ai") {
-    return NextResponse.json({
-      symbols,
-      mode: process.env.ALPACA_API_KEY ? "live" : "mock",
-      signals: scanAllSignals(symbols),
-    });
+    const signals = await scanAllSignals(symbols);
+    return NextResponse.json({ symbols, mode: getDataMode(), signals });
   }
 
-  const data: Record<string, Awaited<ReturnType<typeof fetchBars>>> = {};
+  const data: Record<string, MarketBar[]> = {};
   await Promise.all(
     symbols.map(async (symbol) => {
-      data[symbol] = await fetchBars(symbol);
+      const result = await unifiedCandles(symbol, "1Day", 90);
+      data[symbol] = result.data.map(({ source, isDemoData, ...bar }) => bar);
     })
   );
 
@@ -29,10 +29,8 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     symbols,
-    mode: process.env.ALPACA_API_KEY ? "live" : "mock",
+    mode: getDataMode(),
     signals,
-    barCounts: Object.fromEntries(
-      Object.entries(data).map(([k, v]) => [k, v.length])
-    ),
+    barCounts: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v.length])),
   });
 }

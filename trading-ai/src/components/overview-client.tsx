@@ -11,6 +11,7 @@ export function OverviewClient() {
   const [assets, setAssets] = useState<MarketAsset[]>([]);
   const [signals, setSignals] = useState<AISignalScore[]>([]);
   const [mode, setMode] = useState("mock");
+  const [modeSub, setModeSub] = useState("");
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
@@ -22,6 +23,13 @@ export function OverviewClient() {
       setAssets(market.assets ?? []);
       setSignals(sig.signals ?? []);
       setMode(market.mode ?? "mock");
+      setModeSub(
+        market.mode === "live"
+          ? t.overview.liveSub
+          : market.mode === "mixed"
+            ? t.overview.mixedSub
+            : t.overview.mockSub
+      );
       setUnread(alerts.unread ?? 0);
     });
   }, []);
@@ -31,7 +39,7 @@ export function OverviewClient() {
   return (
     <div className="space-y-8">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label={t.overview.dataMode} value={mode.toUpperCase()} sub={t.overview.mockSub} />
+        <StatCard label={t.overview.dataMode} value={mode.toUpperCase()} sub={modeSub || t.overview.mockSub} />
         <StatCard label={t.overview.assetsTracked} value={String(assets.length)} />
         <StatCard
           label={t.overview.activeSignals}

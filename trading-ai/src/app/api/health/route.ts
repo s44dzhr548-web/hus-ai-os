@@ -1,13 +1,27 @@
 import { NextResponse } from "next/server";
-import { getPaperAccount } from "@/lib/alpaca/client";
+import { getPaperPortfolio } from "@/lib/paper/portfolio";
+import { getDataMode } from "@/lib/market/config";
+import { COMPLIANCE_CONFIG } from "@/lib/compliance/config";
 
 export async function GET() {
-  const account = await getPaperAccount();
+  const portfolio = await getPaperPortfolio();
   return NextResponse.json({
     status: "ok",
     service: "trading-ai",
-    mode: process.env.ALPACA_API_KEY ? "alpaca" : "mock",
-    paperAccount: account,
+    mode: getDataMode(),
+    paperTradingOnly: COMPLIANCE_CONFIG.paperTradingOnly,
+    brokerExecution: "DISABLED",
+    paperAccount: { cash: portfolio.cash, equity: portfolio.equity },
+    endpoints: [
+      "/api/market",
+      "/api/market/search",
+      "/api/market/quote",
+      "/api/market/candles",
+      "/api/market/status",
+      "/api/market/providers",
+      "/api/paper",
+      "/api/audit",
+    ],
     timestamp: new Date().toISOString(),
   });
 }

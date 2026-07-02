@@ -4,57 +4,15 @@ import type {
   MarketBar,
   Recommendation,
   RiskLevel,
-  TechnicalAnalysis,
 } from "@/types/trading";
-import { generateMockBars, getMockAsset, MOCK_UNIVERSE } from "@/lib/data/mock-market";
-import { getMockEconomicEvents, getMockNews, getSectorImpact } from "@/lib/data/mock-news";
+import { getMockAsset, MOCK_UNIVERSE } from "@/lib/data/mock-market";
+import { getSectorImpact } from "@/lib/data/mock-news";
 import { hashSymbol } from "@/lib/data/seed";
 import { COMPLIANCE_CONFIG } from "@/lib/compliance/config";
-
-function sma(values: number[], period: number): number {
-  if (values.length < period) return values[values.length - 1] ?? 0;
-  const slice = values.slice(-period);
-  return slice.reduce((a, b) => a + b, 0) / period;
-}
-
-function rsi(closes: number[], period = 14): number {
-  if (closes.length < period + 1) return 50;
-  let gains = 0;
-  let losses = 0;
-  for (let i = closes.length - period; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1];
-    if (diff >= 0) gains += diff;
-    else losses -= diff;
-  }
-  const avgGain = gains / period;
-  const avgLoss = losses / period || 0.0001;
-  const rs = avgGain / avgLoss;
-  return 100 - 100 / (1 + rs);
-}
-
-export function computeTechnical(bars: MarketBar[]): TechnicalAnalysis {
-  const closes = bars.map((b) => b.close);
-  const sma20 = sma(closes, 20);
-  const sma50 = sma(closes, 50);
-  const rsiVal = rsi(closes);
-  const last = closes[closes.length - 1];
-  const trend =
-    last > sma20 && sma20 > sma50 ? "bullish" : last < sma20 && sma20 < sma50 ? "bearish" : "neutral";
-  const macdSignal = sma20 > sma50 ? "positive" : sma20 < sma50 ? "negative" : "neutral";
-  const recentLow = Math.min(...closes.slice(-20));
-  const recentHigh = Math.max(...closes.slice(-20));
-
-  return {
-    trend,
-    rsi: Number(rsiVal.toFixed(1)),
-    sma20: Number(sma20.toFixed(2)),
-    sma50: Number(sma50.toFixed(2)),
-    macdSignal,
-    support: Number(recentLow.toFixed(2)),
-    resistance: Number(recentHigh.toFixed(2)),
-    summary: `${trend} trend · RSI ${rsiVal.toFixed(0)} · SMA20 ${sma20 > sma50 ? "above" : "below"} SMA50`,
-  };
-}
+import { computeTechnical } from "@/lib/market/indicators";
+import { unifiedCandles, unifiedQuote } from "@/lib/market/unified";
+import { fetchEconomicCalendar, fetchNews } from "@/lib/market/providers/news";
+import { logRecommendation } from "@/lib/audit/log";
 
 function scoreToRecommendation(score: number): Recommendation {
   if (score >= 65) return "buy";
@@ -62,17 +20,18 @@ function scoreToRecommendation(score: number): Recommendation {
   return "hold";
 }
 
-function scoreToRisk(score: number, volatility: number): RiskLevel {
-  const risk = (100 - score) * 0.4 + volatility * 100;
+function scoreToRisk(score: number, vol: number): RiskLevel {
+  const risk = (100 - score) * 0.4 + vol * 100;
   if (risk > 75) return "critical";
   if (risk > 55) return "high";
   if (risk > 35) return "medium";
   return "low";
 }
 
-export function computeSignalScore(symbol: string, bars: MarketBar[]): AISignalScore {
+export { computeTechnical };
+
+export function computeSignalScore(symbol: string, bars: MarketBar[], price?: number, changePct?: number): AISignalScore {
   const technical = computeTechnical(bars);
-  const asset = getMockAsset(symbol);
   let score = 50;
 
   if (technical.trend === "bullish") score += 15;
@@ -81,90 +40,110 @@ export function computeSignalScore(symbol: string, bars: MarketBar[]): AISignalS
   if (technical.rsi > 70) score -= 10;
   if (technical.macdSignal === "positive") score += 8;
   if (technical.macdSignal === "negative") score -= 8;
+  if (technical.volumeTrend === "rising" && technical.trend === "bullish") score += 5;
+  if (technical.trendStrength > 60) score += 5;
+  if (technical.trendStrength < 40) score -= 5;
 
   score = Math.max(5, Math.min(95, score + (hashSymbol(symbol) % 11) - 5));
   const confidence = Number((0.55 + (hashSymbol(symbol + "conf") % 40) / 100).toFixed(2));
-  const volatility = asset.assetClass === "crypto" ? 0.6 : asset.assetClass === "forex" ? 0.2 : 0.35;
+  const asset = getMockAsset(symbol);
+  const vol = technical.volatility || (asset.assetClass === "crypto" ? 0.6 : 0.35);
 
   return {
     symbol,
     score: Number(score.toFixed(0)),
     confidence,
-    riskLevel: scoreToRisk(score, volatility),
+    riskLevel: scoreToRisk(score, vol),
     recommendation: scoreToRecommendation(score),
-    price: asset.price,
-    changePct: asset.changePct,
+    price: price ?? asset.price,
+    changePct: changePct ?? asset.changePct,
   };
 }
 
-export function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"): AIAnalysis {
-  const bars = generateMockBars(symbol, 90);
+export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"): Promise<AIAnalysis> {
+  const candleResult = await unifiedCandles(symbol, "1Day", 90);
+  const bars: MarketBar[] = candleResult.data.map(({ source, isDemoData, ...bar }) => bar);
+  const quoteResult = await unifiedQuote(symbol);
   const technical = computeTechnical(bars);
-  const signal = computeSignalScore(symbol, bars);
-  const newsImpact = getMockNews(symbol);
+  const signal = computeSignalScore(symbol, bars, quoteResult.data.price, quoteResult.data.changePct);
+  const newsResult = await fetchNews(symbol);
+  const economicResult = await fetchEconomicCalendar();
   const sectorImpact = getSectorImpact(symbol);
-  const economicEvents = getMockEconomicEvents();
   const meta = MOCK_UNIVERSE[symbol];
+  const isDemo = candleResult.isDemoData && quoteResult.isDemoData;
 
   const newsSentiment =
-    newsImpact.reduce((s, n) => s + (n.sentiment === "positive" ? 1 : n.sentiment === "negative" ? -1 : 0), 0) /
-    Math.max(newsImpact.length, 1);
+    newsResult.items.reduce((s, n) => s + (n.sentiment === "positive" ? 1 : n.sentiment === "negative" ? -1 : 0), 0) /
+    Math.max(newsResult.items.length, 1);
 
-  const oilImpact = meta?.assetClass === "saudi" || symbol === "2222" ? 0.35 : 0.12;
+  const oilImpact = meta?.assetClass === "saudi" || meta?.assetClass === "commodity" || symbol === "2222" ? 0.35 : 0.12;
   const ratesImpact = meta?.assetClass === "forex" ? -0.28 : -0.15;
 
   const correlations = [
     { index: "SPY", correlation: Number((0.3 + (hashSymbol(symbol) % 60) / 100).toFixed(2)) },
     { index: "BTCUSD", correlation: Number((0.1 + (hashSymbol(symbol + "btc") % 50) / 100).toFixed(2)) },
-    { index: "Oil (Brent)", correlation: meta?.assetClass === "saudi" ? 0.72 : 0.25 },
+    { index: "Oil (Brent)", correlation: meta?.assetClass === "saudi" || meta?.assetClass === "commodity" ? 0.72 : 0.25 },
   ];
 
   const explanationEn: string[] = [
-    `Technical: ${technical.summary}. Support at ${technical.support}, resistance at ${technical.resistance}.`,
-    `News sentiment is ${newsSentiment > 0 ? "positive" : newsSentiment < 0 ? "negative" : "neutral"} based on ${newsImpact.length} recent headlines.`,
-    `${sectorImpact.sector} sector ${sectorImpact.summary}`,
-    `Market correlation with SPY: ${(correlations[0].correlation * 100).toFixed(0)}%. Oil impact: ${(oilImpact * 100).toFixed(0)}%. Rates sensitivity: ${(Math.abs(ratesImpact) * 100).toFixed(0)}%.`,
-    `Upcoming macro: ${economicEvents[0].title} (${economicEvents[0].impact} impact).`,
-    `AI signal ${signal.score}/100 → ${signal.recommendation.toUpperCase()} with ${(signal.confidence * 100).toFixed(0)}% confidence. Paper trading only — no real orders.`,
+    `Technical: ${technical.summary}. Support ${technical.support}, resistance ${technical.resistance}. Volatility ${(technical.volatility * 100).toFixed(1)}%.`,
+    `Volume trend: ${technical.volumeTrend}. Trend strength ${technical.trendStrength}/100. MACD histogram ${technical.macdHistogram}.`,
+    `News sentiment ${newsSentiment > 0 ? "positive" : newsSentiment < 0 ? "negative" : "neutral"} (${newsResult.source}${newsResult.isDemoData ? " · demo" : ""}).`,
+    `${sectorImpact.sector}: ${sectorImpact.summary}`,
+    `Correlation SPY ${(correlations[0].correlation * 100).toFixed(0)}%. Oil ${(oilImpact * 100).toFixed(0)}%. Rates ${(Math.abs(ratesImpact) * 100).toFixed(0)}%.`,
+    `Macro: ${economicResult.events[0]?.title ?? "N/A"} (${economicResult.isDemoData ? "demo calendar" : "live"}).`,
+    `Signal ${signal.score}/100 → ${signal.recommendation.toUpperCase()} · confidence ${(signal.confidence * 100).toFixed(0)}% · risk ${signal.riskLevel}. Data: ${isDemo ? "demo fallback" : quoteResult.source}. Paper only.`,
   ];
 
-  const recAr =
-    signal.recommendation === "buy" ? "شراء" : signal.recommendation === "sell" ? "بيع" : "احتفاظ";
+  const recAr = signal.recommendation === "buy" ? "شراء" : signal.recommendation === "sell" ? "بيع" : "احتفاظ";
   const explanationAr: string[] = [
-    `فني: ${technical.summary}. الدعم عند ${technical.support}، المقاومة عند ${technical.resistance}.`,
-    `مزاج الأخبار ${newsSentiment > 0 ? "إيجابي" : newsSentiment < 0 ? "سلبي" : "محايد"} بناءً على ${newsImpact.length} عنواناً.`,
+    `فني: ${technical.summary}. الدعم ${technical.support}، المقاومة ${technical.resistance}. التقلب ${(technical.volatility * 100).toFixed(1)}%.`,
+    `حجم التداول: ${technical.volumeTrend === "rising" ? "صاعد" : technical.volumeTrend === "falling" ? "هابط" : "مستقر"}. قوة الاتجاه ${technical.trendStrength}/100.`,
+    `مزاج الأخبار ${newsSentiment > 0 ? "إيجابي" : newsSentiment < 0 ? "سلبي" : "محايد"} (${newsResult.isDemoData ? "بيانات تجريبية" : "مباشر"}).`,
     `قطاع ${sectorImpact.sector}: ${sectorImpact.summary}`,
-    `ارتباط SPY: ${(correlations[0].correlation * 100).toFixed(0)}%. تأثير النفط: ${(oilImpact * 100).toFixed(0)}%. حساسية الفائدة: ${(Math.abs(ratesImpact) * 100).toFixed(0)}%.`,
-    `حدث ماكرو قادم: ${economicEvents[0].title}.`,
-    `درجة الإشارة ${signal.score}/100 → ${recAr} بثقة ${(signal.confidence * 100).toFixed(0)}%. تداول ورقي فقط — بدون أوامر حقيقية.`,
+    `ارتباط SPY ${(correlations[0].correlation * 100).toFixed(0)}%. النفط ${(oilImpact * 100).toFixed(0)}%.`,
+    `ماكرو: ${economicResult.events[0]?.title ?? "—"}.`,
+    `الإشارة ${signal.score}/100 → ${recAr} · ثقة ${(signal.confidence * 100).toFixed(0)}% · مخاطر ${signal.riskLevel}. ${isDemo ? "بيانات تجريبية" : "بيانات حية"}. تداول ورقي فقط.`,
   ];
 
-  const complianceNoteAr =
-    "هذه المنصة للتحليل التعليمي ومحاكاة التداول الورقي فقط. لا تُعد نصيحة مالية أو توصية استثمارية.";
+  logRecommendation({
+    symbol,
+    recommendation: signal.recommendation,
+    confidence: signal.confidence,
+    riskLevel: signal.riskLevel,
+    dataSource: isDemo ? "demo" : "live",
+    provider: quoteResult.source,
+    locale,
+    summary: explanationEn[explanationEn.length - 1],
+  });
 
   return {
     symbol,
-    assetClass: meta?.assetClass ?? "stock",
+    assetClass: meta?.assetClass ?? quoteResult.data.assetClass,
     generatedAt: new Date().toISOString(),
     recommendation: signal.recommendation,
     confidence: signal.confidence,
     riskLevel: signal.riskLevel,
     signalScore: signal.score,
     technical,
-    newsImpact,
+    newsImpact: newsResult.items,
     sectorImpact,
     marketCorrelation: correlations,
-    macroFactors: { oilImpact, ratesImpact, economicEvents },
+    macroFactors: { oilImpact, ratesImpact, economicEvents: economicResult.events },
     explanation: locale === "ar" ? explanationAr : explanationEn,
     explanationAr,
-    complianceNote:
-      locale === "ar"
-        ? complianceNoteAr
-        : COMPLIANCE_CONFIG.financialAdviceDisclaimer,
-    complianceNoteAr,
+    complianceNote: locale === "ar" ? COMPLIANCE_CONFIG.financialAdviceDisclaimerAr : COMPLIANCE_CONFIG.financialAdviceDisclaimer,
+    complianceNoteAr: COMPLIANCE_CONFIG.financialAdviceDisclaimerAr,
   };
 }
 
-export function scanAllSignals(symbols: string[]): AISignalScore[] {
-  return symbols.map((s) => computeSignalScore(s, generateMockBars(s, 60)));
+export async function scanAllSignals(symbols: string[]): Promise<AISignalScore[]> {
+  const results = await Promise.all(
+    symbols.map(async (s) => {
+      const candles = await unifiedCandles(s, "1Day", 60);
+      const quote = await unifiedQuote(s);
+      return computeSignalScore(s, candles.data, quote.data.price, quote.data.changePct);
+    })
+  );
+  return results;
 }

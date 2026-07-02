@@ -1,14 +1,23 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 
 export function ReportsClient() {
   const { t } = useI18n();
+  const [dataMode, setDataMode] = useState("MOCK");
+
+  useEffect(() => {
+    fetch("/api/compliance")
+      .then((r) => r.json())
+      .then((d) => setDataMode(String(d.dataMode ?? "mock").toUpperCase()));
+  }, []);
 
   const rows = [
-    [t.reports.dataMode, "MOCK"],
+    [t.reports.markets, t.reports.marketsValue],
+    [t.reports.dataMode, dataMode],
     [t.reports.execution, t.reports.executionValue],
-    [t.reports.tests, t.reports.testsValue],
+    [t.reports.tests, "8+ passing"],
     [t.reports.apis, t.reports.apisValue],
   ];
 

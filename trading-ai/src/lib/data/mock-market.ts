@@ -19,9 +19,20 @@ export const MOCK_UNIVERSE: Record<
   2222: { name: "Saudi Aramco", assetClass: "saudi", exchange: "Tadawul", currency: "SAR", basePrice: 28.5 },
   1120: { name: "Al Rajhi Bank", assetClass: "saudi", exchange: "Tadawul", currency: "SAR", basePrice: 92 },
   2010: { name: "SABIC", assetClass: "saudi", exchange: "Tadawul", currency: "SAR", basePrice: 88 },
+  QQQ: { name: "Invesco QQQ Trust", assetClass: "etf", exchange: "NASDAQ", currency: "USD", basePrice: 440 },
+  GLD: { name: "SPDR Gold Shares", assetClass: "etf", exchange: "NYSE", currency: "USD", basePrice: 215 },
+  XLE: { name: "Energy Select Sector SPDR", assetClass: "etf", exchange: "NYSE", currency: "USD", basePrice: 92 },
+  USO: { name: "United States Oil Fund", assetClass: "etf", exchange: "NYSE", currency: "USD", basePrice: 72 },
+  CLUSD: { name: "Crude Oil WTI", assetClass: "commodity", exchange: "COMEX", currency: "USD", basePrice: 78 },
+  GCUSD: { name: "Gold Spot", assetClass: "commodity", exchange: "COMEX", currency: "USD", basePrice: 2350 },
+  SIUSD: { name: "Silver Spot", assetClass: "commodity", exchange: "COMEX", currency: "USD", basePrice: 28 },
+  SPX: { name: "S&P 500 Index", assetClass: "index", exchange: "NYSE", currency: "USD", basePrice: 5200 },
+  DJI: { name: "Dow Jones Industrial", assetClass: "index", exchange: "NYSE", currency: "USD", basePrice: 39000 },
+  IXIC: { name: "NASDAQ Composite", assetClass: "index", exchange: "NASDAQ", currency: "USD", basePrice: 16500 },
+  TASI: { name: "Tadawul All Share", assetClass: "index", exchange: "Tadawul", currency: "SAR", basePrice: 11800 },
 };
 
-export const DEFAULT_WATCHLIST = ["AAPL", "MSFT", "NVDA", "BTCUSD", "2222", "EURUSD"];
+export const DEFAULT_WATCHLIST = ["AAPL", "MSFT", "NVDA", "BTCUSD", "2222", "EURUSD", "SPX", "CLUSD", "QQQ"];
 
 export function generateMockBars(symbol: string, days = 90): MarketBar[] {
   const meta = MOCK_UNIVERSE[symbol] ?? {
@@ -39,7 +50,14 @@ export function generateMockBars(symbol: string, days = 90): MarketBar[] {
   for (let i = days; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const volatility = meta.assetClass === "crypto" ? 0.04 : meta.assetClass === "forex" ? 0.008 : 0.02;
+    const volatility =
+      meta.assetClass === "crypto"
+        ? 0.04
+        : meta.assetClass === "forex"
+          ? 0.008
+          : meta.assetClass === "commodity"
+            ? 0.025
+            : 0.02;
     const change = (rand() - 0.48) * price * volatility;
     const open = price;
     const close = Math.max(0.01, price + change);
@@ -92,7 +110,9 @@ export function getMockMarketOverview(symbols = Object.keys(MOCK_UNIVERSE)) {
   return {
     mode: "mock" as const,
     assets,
-    indices: assets.filter((a) => ["SPY", "BTCUSD", "EURUSD"].includes(a.symbol)),
+    indices: assets.filter((a) =>
+      ["SPY", "BTCUSD", "EURUSD", "SPX", "TASI", "QQQ"].includes(a.symbol)
+    ),
     topGainers: sorted.slice(0, 3),
     topLosers: sorted.slice(-3).reverse(),
     updatedAt: new Date().toISOString(),

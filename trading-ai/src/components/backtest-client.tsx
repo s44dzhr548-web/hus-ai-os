@@ -11,17 +11,24 @@ export function BacktestClient() {
     null
   );
   const [comparison, setComparison] = useState<StrategyBacktest[]>([]);
+  const [isDemo, setIsDemo] = useState(false);
 
   async function runSingle() {
     const res = await fetch(`/api/backtest?symbol=${symbol}&strategy=sma-crossover`);
     const data = await res.json();
     setResult({ result: data.result, hash: data.reproducibilityHash, strategy: data.strategy });
+    setIsDemo(Boolean(data.isDemoData));
   }
 
   async function runCompare() {
     const res = await fetch(`/api/backtest?symbol=${symbol}&compare=1`);
     const data = await res.json();
     setComparison(data.comparisons ?? []);
+    setIsDemo(Boolean(data.isDemoData));
+  }
+
+  function exportReport() {
+    window.open(`/api/backtest?symbol=${symbol}&compare=1&export=markdown`, "_blank");
   }
 
   const metrics = result
@@ -32,6 +39,7 @@ export function BacktestClient() {
         [t.backtest.maxDrawdown, `${result.result.maxDrawdownPct.toFixed(2)}%`],
         [t.backtest.pl, `$${result.result.profitLoss.toLocaleString()}`],
         [t.backtest.riskReward, String(result.result.riskRewardRatio)],
+        [t.backtest.sharpe, String(result.result.sharpeRatio)],
         [t.backtest.trades, String(result.result.trades)],
         [t.backtest.hash, result.hash.slice(0, 24) + "…"],
       ]
@@ -51,7 +59,11 @@ export function BacktestClient() {
         <button type="button" onClick={runCompare} className="rounded-lg border border-zinc-600 px-4 py-2 text-sm">
           {t.backtest.compare}
         </button>
+        <button type="button" onClick={exportReport} className="rounded-lg border border-emerald-600/50 px-4 py-2 text-sm text-emerald-300">
+          {t.backtest.exportReport}
+        </button>
       </div>
+      {isDemo && <p className="text-xs text-amber-400">{t.backtest.demoData}</p>}
 
       {result && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

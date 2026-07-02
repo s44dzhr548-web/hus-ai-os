@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LanguageSwitcher } from "./language-switcher";
+import { DataModeBadge } from "./data-mode-badge";
 import { useI18n, useRecommendationLabel, useRiskLabel } from "@/lib/i18n/context";
 
 const NAV_KEYS = [
   { href: "/dashboard", key: "overview" as const },
   { href: "/dashboard/watchlist", key: "watchlist" as const },
   { href: "/dashboard/analysis", key: "analysis" as const },
+  { href: "/dashboard/paper", key: "paper" as const },
   { href: "/dashboard/backtest", key: "backtest" as const },
   { href: "/dashboard/risk", key: "risk" as const },
   { href: "/dashboard/learning", key: "learning" as const },
@@ -33,9 +35,7 @@ export function TradingShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <LanguageSwitcher />
-            <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-300">
-              {t.demoMode}
-            </span>
+            <DataModeBadge />
           </div>
         </div>
         <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-3">

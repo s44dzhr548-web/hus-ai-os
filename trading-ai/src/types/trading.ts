@@ -1,4 +1,11 @@
-export type AssetClass = "stock" | "crypto" | "forex" | "saudi";
+export type AssetClass =
+  | "stock"
+  | "crypto"
+  | "forex"
+  | "saudi"
+  | "commodity"
+  | "index"
+  | "etf";
 export type Recommendation = "buy" | "hold" | "sell";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type AlertChannel = "dashboard" | "email" | "whatsapp";
@@ -31,10 +38,22 @@ export interface PaperTrade {
   price: number;
 }
 
+export interface BacktestTrade {
+  entryDate: string;
+  exitDate?: string;
+  side: "long";
+  entryPrice: number;
+  exitPrice?: number;
+  quantity: number;
+  pnl?: number;
+  pnlPct?: number;
+}
+
 export interface BacktestResult {
   finalEquity: number;
   totalReturnPct: number;
   maxDrawdownPct: number;
+  sharpeRatio: number;
   trades: number;
   winRate: number;
   profitLoss: number;
@@ -42,6 +61,7 @@ export interface BacktestResult {
   winningTrades: number;
   losingTrades: number;
   equityCurve: { date: string; equity: number }[];
+  tradeHistory: BacktestTrade[];
 }
 
 export interface StrategyBacktest {
@@ -90,12 +110,20 @@ export interface AISignalScore {
 
 export interface TechnicalAnalysis {
   trend: "bullish" | "bearish" | "neutral";
+  trendStrength: number;
   rsi: number;
   sma20: number;
   sma50: number;
+  ema12: number;
+  ema26: number;
+  macd: number;
   macdSignal: "positive" | "negative" | "neutral";
+  macdHistogram: number;
   support: number;
   resistance: number;
+  volatility: number;
+  volumeTrend: "rising" | "falling" | "flat";
+  avgVolume: number;
   summary: string;
 }
 
@@ -184,7 +212,7 @@ export interface LearningStats {
 export interface Alert {
   id: string;
   channel: AlertChannel;
-  type: "signal" | "risk" | "price" | "system";
+  type: "signal" | "risk" | "price" | "system" | "market_event";
   title: string;
   message: string;
   symbol?: string;
@@ -192,28 +220,85 @@ export interface Alert {
   read: boolean;
   createdAt: string;
   whatsappReady: boolean;
+  emailReady?: boolean;
+}
+
+export interface PaperPosition {
+  id: string;
+  symbol: string;
+  side: "long";
+  quantity: number;
+  avgEntryPrice: number;
+  currentPrice: number;
+  unrealizedPnl: number;
+  unrealizedPnlPct: number;
+  openedAt: string;
+}
+
+export interface PaperOrder {
+  id: string;
+  symbol: string;
+  side: "buy" | "sell";
+  quantity: number;
+  price: number;
+  status: "filled" | "rejected";
+  reason?: string;
+  createdAt: string;
+}
+
+export interface PaperPortfolio {
+  cash: number;
+  initialCash: number;
+  equity: number;
+  totalPnl: number;
+  totalPnlPct: number;
+  openPositions: PaperPosition[];
+  closedPositions: PaperPosition[];
+  orders: PaperOrder[];
+  missedSignals: { symbol: string; recommendation: Recommendation; at: string; reason: string }[];
+  updatedAt: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  symbol: string;
+  recommendation: Recommendation;
+  confidence: number;
+  riskLevel: RiskLevel;
+  dataSource: "live" | "demo";
+  provider?: string;
+  locale: "ar" | "en";
+  createdAt: string;
+  summary: string;
 }
 
 export interface ComplianceConfig {
   paperTradingOnly: boolean;
   realBrokerExecution: boolean;
+  complianceModeLocked: boolean;
   financialAdviceDisclaimer: string;
+  financialAdviceDisclaimerAr: string;
   jurisdictionNotice: string;
-  dataMode: "mock" | "live";
+  jurisdictionNoticeAr: string;
+  dataMode: "mock" | "live" | "mixed";
 }
 
 export interface MarketOverview {
-  mode: "mock" | "live";
+  mode: "mock" | "live" | "mixed";
   assets: MarketAsset[];
   indices: MarketAsset[];
   topGainers: MarketAsset[];
   topLosers: MarketAsset[];
   updatedAt: string;
+  demoCount?: number;
+  liveCount?: number;
 }
 
 export interface DataAdapter {
+  id: string;
   name: string;
   assetClasses: AssetClass[];
-  status: "mock" | "ready" | "requires_oauth";
+  status: "mock" | "live" | "ready" | "requires_key" | "requires_oauth" | "disabled";
+  hasApiKey: boolean;
   description: string;
 }

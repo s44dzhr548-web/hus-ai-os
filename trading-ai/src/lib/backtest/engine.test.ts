@@ -32,10 +32,12 @@ describe("backtest engine", () => {
     expect(hashBacktestResult(r1)).toBe(hashBacktestResult(r2));
   });
 
-  it("returns equity curve", () => {
+  it("returns equity curve and sharpe", () => {
     const result = runBacktest(makeBars(60));
     expect(result.equityCurve.length).toBeGreaterThan(0);
     expect(result.finalEquity).toBeGreaterThan(0);
+    expect(typeof result.sharpeRatio).toBe("number");
+    expect(Array.isArray(result.tradeHistory)).toBe(true);
   });
 });
 

@@ -1,6 +1,7 @@
-import type { BacktestResult, MarketBar, Signal } from "@/types/trading";
+import type { BacktestResult, BacktestTrade, MarketBar, Signal } from "@/types/trading";
 import { smaCrossoverStrategy } from "@/lib/strategies/sma-crossover";
 import { rsiStrategy } from "@/lib/strategies/rsi-strategy";
+import { sharpeRatio } from "@/lib/market/indicators";
 
 export type StrategyFn = (bars: MarketBar[]) => Signal | null;
 
@@ -19,7 +20,9 @@ export function runBacktest(
   let totalProfit = 0;
   let totalLoss = 0;
   let entryPrice = 0;
+  let entryDate = "";
   const equityCurve: { date: string; equity: number }[] = [];
+  const tradeHistory: BacktestTrade[] = [];
 
   for (let i = 20; i < bars.length; i++) {
     const slice = bars.slice(0, i + 1);
@@ -34,10 +37,25 @@ export function runBacktest(
     if (signal?.direction === "long" && shares === 0 && cash > 0) {
       shares = Math.floor(cash / bar.close);
       entryPrice = bar.close;
+      entryDate = bar.bar_time.split("T")[0];
       cash -= shares * bar.close;
       trades++;
+      tradeHistory.push({
+        entryDate,
+        side: "long",
+        entryPrice,
+        quantity: shares,
+      });
     } else if (signal?.direction === "short" && shares > 0) {
       const pnl = shares * (bar.close - entryPrice);
+      const exitDate = bar.bar_time.split("T")[0];
+      const lastTrade = tradeHistory[tradeHistory.length - 1];
+      if (lastTrade && !lastTrade.exitDate) {
+        lastTrade.exitDate = exitDate;
+        lastTrade.exitPrice = bar.close;
+        lastTrade.pnl = Number(pnl.toFixed(2));
+        lastTrade.pnlPct = entryPrice > 0 ? Number(((pnl / (entryPrice * shares)) * 100).toFixed(2)) : 0;
+      }
       if (pnl >= 0) {
         winningTrades++;
         totalProfit += pnl;
@@ -71,6 +89,7 @@ export function runBacktest(
     finalEquity: Number(finalEquity.toFixed(2)),
     totalReturnPct,
     maxDrawdownPct: Number((maxDrawdown * 100).toFixed(6)),
+    sharpeRatio: sharpeRatio(equityCurve),
     trades,
     winRate,
     profitLoss,
@@ -78,6 +97,7 @@ export function runBacktest(
     winningTrades,
     losingTrades,
     equityCurve,
+    tradeHistory,
   };
 }
 
@@ -86,6 +106,7 @@ export function hashBacktestResult(result: BacktestResult): string {
     result.finalEquity.toFixed(6),
     result.totalReturnPct.toFixed(6),
     result.maxDrawdownPct.toFixed(6),
+    result.sharpeRatio.toFixed(2),
     result.trades,
     result.winRate.toFixed(2),
   ].join("|");
@@ -101,4 +122,31 @@ export function compareStrategies(bars: MarketBar[], initialCapital = 100_000) {
     const result = runBacktest(bars, initialCapital, fn);
     return { strategy: name, result, reproducibilityHash: hashBacktestResult(result) };
   });
+}
+
+export function exportBacktestReport(
+  symbol: string,
+  strategies: ReturnType<typeof compareStrategies>
+): string {
+  const lines = [
+    `# Backtest Report — ${symbol}`,
+    `Generated: ${new Date().toISOString()}`,
+    "",
+    "## Strategy Comparison",
+  ];
+  for (const s of strategies) {
+    const r = s.result;
+    lines.push(
+      `### ${s.strategy}`,
+      `- Return: ${r.totalReturnPct}%`,
+      `- Max Drawdown: ${r.maxDrawdownPct}%`,
+      `- Sharpe: ${r.sharpeRatio}`,
+      `- Win Rate: ${r.winRate}%`,
+      `- Trades: ${r.trades}`,
+      `- P/L: $${r.profitLoss}`,
+      `- Risk/Reward: ${r.riskRewardRatio}`,
+      ""
+    );
+  }
+  return lines.join("\n");
 }
