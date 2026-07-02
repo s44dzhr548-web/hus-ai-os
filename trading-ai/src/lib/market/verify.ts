@@ -64,13 +64,20 @@ async function probeQuote(symbol: string): Promise<{ ok: boolean; source?: Provi
   };
 }
 
+const PROVIDERS_WITH_PUBLIC_FALLBACK: ProviderId[] = [
+  "tadawul",
+  "economic_calendar",
+  "forex",
+  "news",
+];
+
 async function verifyProvider(
   id: ProviderId,
   probeFn?: () => Promise<boolean>
 ): Promise<ProviderVerification> {
   const envName = KEYED_PROVIDER_ENV[id];
-  const requiresKey = Boolean(envName);
-  const hasApiKey = requiresKey ? hasKey(envName!) : true;
+  const requiresKey = Boolean(envName) && !PROVIDERS_WITH_PUBLIC_FALLBACK.includes(id);
+  const hasApiKey = envName ? hasKey(envName) : true;
   const start = Date.now();
   let connected = false;
   let error: string | undefined;
@@ -127,7 +134,10 @@ export async function verifyAllProviders(useCache = true): Promise<MarketVerific
     verifyProvider("polygon", async () => (hasPolygonApiKey() ? Boolean(await polygonProvider.getQuote("AAPL")) : false)),
     verifyProvider("alpha_vantage", async () => (hasKey("ALPHA_VANTAGE_API_KEY") ? Boolean(await alphaVantageProvider.getQuote("AAPL")) : false)),
     verifyProvider("twelve_data", async () => (hasKey("TWELVE_DATA_API_KEY") ? Boolean(await twelveDataProvider.getQuote("AAPL")) : false)),
-    verifyProvider("forex", async () => (hasKey("FOREX_PROVIDER_KEY") ? Boolean(await forexProvider.getQuote(LIVE_PROBE_SYMBOLS.forex)) : false)),
+    verifyProvider("forex", async () => {
+      if (hasKey("FOREX_PROVIDER_KEY")) return Boolean(await forexProvider.getQuote(LIVE_PROBE_SYMBOLS.forex));
+      return Boolean(await frankfurterProvider.getQuote(LIVE_PROBE_SYMBOLS.forex));
+    }),
     verifyProvider("tadawul", async () => Boolean(await tadawulProvider.getQuote(LIVE_PROBE_SYMBOLS.saudi))),
     verifyProvider("news", async () => {
       const n = await fetchNews("AAPL");

@@ -1,32 +1,44 @@
-import type { MarketDataProvider } from "../types";
-import { envKey, hasKey } from "../config";
+import type { MarketDataProvider, MarketStatusInfo } from "../types";
 import { getCatalogEntry, searchCatalog } from "../catalog";
 import { mockProvider, wrapQuote } from "./mock";
 import { yahooProvider } from "./yahoo";
+import { getSaudiMarketMode, getSaudiMarketQuote, isSaudiMarketConfigured } from "./saudi-market";
+
+function tadawulSessionStatus(): MarketStatusInfo {
+  const now = new Date();
+  const riyadh = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Riyadh" }));
+  const day = riyadh.getDay();
+  const hour = riyadh.getHours() + riyadh.getMinutes() / 60;
+  const isWeekday = day >= 0 && day <= 4;
+  const isOpen = isWeekday && hour >= 10 && hour < 15;
+  return {
+    exchange: "Tadawul",
+    isOpen,
+    session: isOpen ? "open" : "closed",
+    timezone: "Asia/Riyadh",
+    localTime: riyadh.toISOString(),
+    nextOpen: isOpen ? undefined : "Sun–Thu 10:00 AST",
+  };
+}
 
 export const tadawulProvider: MarketDataProvider = {
   id: "tadawul",
   name: "Tadawul / Saudi Market",
   assetClasses: ["saudi"],
-  isConfigured: () => true,
+  isConfigured: () => isSaudiMarketConfigured(),
   async searchSymbols(query, limit = 10) {
     return searchCatalog(query, limit).filter((s) => s.assetClass === "saudi");
   },
   async getQuote(symbol) {
-    if (hasKey("TADAWUL_PROVIDER_KEY")) {
-      // Custom Tadawul API placeholder — falls through to Yahoo .SR suffix
-    }
+    const { quote } = await getSaudiMarketQuote(symbol);
+    if (quote) return quote;
     return yahooProvider.getQuote(symbol);
   },
   async getCandles(symbol, timeframe, limit) {
-    if (hasKey("TADAWUL_PROVIDER_KEY")) {
-      const key = envKey("TADAWUL_PROVIDER_KEY");
-      void key;
-    }
     return yahooProvider.getCandles(symbol, timeframe, limit);
   },
   async getMarketStatus() {
-    return mockProvider.getMarketStatus("Tadawul");
+    return tadawulSessionStatus();
   },
 };
 
@@ -48,3 +60,5 @@ export function saudiQuoteFallback(symbol: string) {
     true
   );
 }
+
+export { getSaudiMarketMode };

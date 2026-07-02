@@ -20,6 +20,7 @@ export const ENV_KEYS = {
   CRYPTO_PROVIDER_KEY: "CRYPTO_PROVIDER_KEY",
   FOREX_PROVIDER_KEY: "FOREX_PROVIDER_KEY",
   TADAWUL_PROVIDER_KEY: "TADAWUL_PROVIDER_KEY",
+  SAUDI_MARKET_API_URL: "SAUDI_MARKET_API_URL",
   ECONOMIC_CALENDAR_API_KEY: "ECONOMIC_CALENDAR_API_KEY",
   OPENAI_API_KEY: "OPENAI_API_KEY",
   ALPACA_API_KEY: "ALPACA_API_KEY",
@@ -88,6 +89,9 @@ export const OPTIONAL_MVP_PROVIDER_KEYS: (keyof typeof ENV_KEYS)[] = [
   "COINGECKO_API_KEY",
   "BINANCE_API_KEY",
   "TADAWUL_PROVIDER_KEY",
+  "ECONOMIC_CALENDAR_API_KEY",
+  "ALPHA_VANTAGE_API_KEY",
+  "FOREX_PROVIDER_KEY",
 ];
 
 /** Public endpoints work without keys; key only upgrades rate limits */
@@ -156,7 +160,7 @@ export const PROVIDER_LABELS: Record<ProviderId, string> = {
   binance: "Binance Public",
   forex: "Forex Provider (keyed)",
   frankfurter: "Frankfurter ECB",
-  tadawul: "Tadawul / Saudi",
+  tadawul: "Tadawul / Saudi (Yahoo .SR · licensed key optional)",
   news: "News API",
   economic_calendar: "Economic Calendar",
 };

@@ -61,7 +61,7 @@ export function buildRuntimeHealth(
 
   let status: ProviderRuntimeHealth["status"] = "healthy";
   if (!opts.enabled) status = "disabled";
-  else if (!opts.hasApiKey && !["yahoo", "coingecko", "binance", "frankfurter", "mock"].includes(id)) status = "requires_key";
+  else if (!opts.hasApiKey && !["yahoo", "coingecko", "binance", "frankfurter", "tadawul", "mock"].includes(id)) status = "requires_key";
   else if (availabilityPct < 50) status = "down";
   else if (availabilityPct < 85 || (state?.latencyMs ?? 0) > 2000) status = "degraded";
 

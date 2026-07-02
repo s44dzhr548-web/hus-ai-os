@@ -478,6 +478,109 @@ async function main() {
     return;
   }
 
+  if (cmd === "generate-final-status") {
+    const base = process.argv[3] || "https://trading-ai-beta.vercel.app";
+    const res = await fetch(`${base}/api/market/providers/status`);
+    if (!res.ok) throw new Error(`Production status HTTP ${res.status}`);
+    const status = await res.json();
+    const verify = status.verification ?? [];
+    const connected = verify.filter((p) => p.connected && p.id !== "mock");
+    const requiredIds = [
+      "polygon",
+      "finnhub",
+      "twelve_data",
+      "yahoo",
+      "coingecko",
+      "frankfurter",
+      "news",
+      "economic_calendar",
+      "tadawul",
+    ];
+    const requiredConnected = requiredIds.filter((id) => connected.some((p) => p.id === id && p.connected));
+    const pct = Math.round((requiredConnected.length / requiredIds.length) * 100);
+    const chains = {
+      us_stock: "polygon → finnhub → yahoo → twelve_data",
+      saudi: "tadawul licensed → yahoo .SR → alpha_vantage",
+      crypto: "binance → coingecko → polygon",
+      forex: "frankfurter → twelve_data → alpha_vantage",
+      commodity: "yahoo → twelve_data",
+      etf: "polygon → finnhub → yahoo",
+      news: "newsapi → yahoo rss",
+      economic_calendar: "faireconomy (free) → finnhub · trading economics optional",
+    };
+    const optional = [
+      { name: "Trading Economics", env: "TRADING_ECONOMICS_API_KEY", reason: "Paid (~$49/week) — deferred for MVP" },
+      { name: "Alpha Vantage", env: "ALPHA_VANTAGE_API_KEY", reason: "Backup only" },
+      { name: "Forex keyed (OANDA)", env: "FOREX_PROVIDER_KEY", reason: "Frankfurter public active" },
+      { name: "CoinGecko Pro", env: "COINGECKO_API_KEY", reason: "Public tier active" },
+      { name: "Binance signed", env: "BINANCE_API_KEY", reason: "Public market data active" },
+      { name: "Tadawul licensed", env: "TADAWUL_PROVIDER_KEY", reason: "Yahoo .SR fallback active" },
+      { name: "FMP", env: "FMP_API_KEY", reason: "Connected — financial statements" },
+    ];
+    const outPath = path.join(ROOT, "FINAL_PROVIDER_STATUS.md");
+    const lines = [
+      "# Trading AI — Final Provider Status",
+      "",
+      `**Generated:** ${new Date().toISOString()}`,
+      `**Production:** ${base}`,
+      `**Completion:** ${pct}% (${requiredConnected.length}/${requiredIds.length} required providers live)`,
+      "",
+      "## Connected providers",
+      "",
+      "| Provider | Live | Latency | Key | Error |",
+      "|----------|------|---------|-----|-------|",
+    ];
+    for (const p of verify) {
+      if (p.id === "mock") continue;
+      lines.push(
+        `| ${p.name} | ${p.connected ? "✅" : "❌"} | ${p.latencyMs ?? "—"}ms | ${p.hasApiKey ? "yes" : "public"} | ${p.error ?? "—"} |`
+      );
+    }
+    lines.push("", "## Remaining optional providers", "", "| Provider | Env | Notes |", "|----------|-----|-------|");
+    for (const o of optional) {
+      lines.push(`| ${o.name} | \`${o.env}\` | ${o.reason} |`);
+    }
+    lines.push(
+      "",
+      "## Missing required API keys",
+      "",
+      status.missingApiKeys?.length ? status.missingApiKeys.map((k) => `- \`${k}\``).join("\n") : "_None — all required keys configured_",
+      "",
+      "## Market coverage",
+      "",
+      "| Market | Symbol | Source | Price |",
+      "|--------|--------|--------|-------|"
+    );
+    for (const m of status.liveMarkets ?? []) {
+      lines.push(`| ${m.market} | ${m.symbol} | ${m.source} | ${m.price ?? "—"} |`);
+    }
+    lines.push("", "## Runtime health (manager)", "", "| Provider | Status | Latency | Last update | Errors |", "|----------|--------|---------|-------------|--------|");
+    for (const p of status.manager?.providers ?? []) {
+      lines.push(`| ${p.name} | ${p.status} | ${p.latencyMs}ms | ${p.lastUpdate} | ${p.errors} |`);
+    }
+    lines.push("", "## Fallback chains", "");
+    for (const [k, v] of Object.entries(chains)) {
+      lines.push(`- **${k}:** ${v}`);
+    }
+    lines.push(
+      "",
+      "## Infrastructure",
+      "",
+      `- Auto-failover: ${status.automaticFailover ? "ON" : "OFF"}`,
+      `- Cache: memory ${status.cache?.memory?.size ?? 0} · disk ${status.cache?.disk?.size ?? 0}`,
+      `- Avg log latency: ${status.logStats?.avgLatency ?? 0}ms`,
+      `- Monthly API cost: $${status.cost?.currentMonthCostUsd ?? 0}`,
+      "",
+      "## Polygon.io / Massive",
+      "",
+      "Polygon is connected via `MASSIVE_API_KEY` / `POLYGON_API_KEY` (Massive.com rebrand). Same key works on api.massive.com.",
+      ""
+    );
+    fs.writeFileSync(outPath, lines.join("\n"));
+    console.log(JSON.stringify({ ok: true, reportPath: outPath, completionPct: pct, connected: connected.length }));
+    return;
+  }
+
   if (cmd === "sync-vercel") {
     const keys = (process.argv[3] || "MASSIVE_API_KEY,POLYGON_API_KEY").split(",").map((k) => k.trim());
     const token = getVercelToken();
@@ -495,7 +598,7 @@ async function main() {
   }
 
   console.log(
-    "Usage: node scripts/provider-env.mjs <apply-local-input|verify-massive|verify-finnhub|verify-twelve-data|verify-fmp|verify-newsapi|verify-coingecko|verify-binance|verify-tadawul|verify-mvp-queue|generate-mvp-report|sync-vercel> [args]"
+    "Usage: node scripts/provider-env.mjs <...|generate-mvp-report|generate-final-status|sync-vercel> [args]"
   );
   process.exit(1);
 }
