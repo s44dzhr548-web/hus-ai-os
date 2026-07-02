@@ -134,6 +134,26 @@ export function AnalysisClient() {
             </section>
           )}
 
+          {analysis.qualityScore && (
+            <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
+              <h3 className="font-medium">{t.analysis.qualityTitle}</h3>
+              <p className="mt-2 text-sm text-zinc-400">{locale === "ar" ? analysis.qualityScore.summaryAr : analysis.qualityScore.summaryEn}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 text-sm">
+                <div><span className="text-zinc-500">{t.common.confidence}</span><p>{(analysis.qualityScore.confidence * 100).toFixed(0)}%</p></div>
+                <div><span className="text-zinc-500">Providers</span><p>{analysis.qualityScore.providerCount}</p></div>
+                <div><span className="text-zinc-500">Technical</span><p>{analysis.qualityScore.technicalScore}</p></div>
+                <div><span className="text-zinc-500">News</span><p>{analysis.qualityScore.newsScore}</p></div>
+                <div><span className="text-zinc-500">Macro</span><p>{analysis.qualityScore.macroScore}</p></div>
+                <div><span className="text-zinc-500">Liquidity</span><p>{analysis.qualityScore.liquidityScore}</p></div>
+                <div><span className="text-zinc-500">Risk</span><p>{analysis.qualityScore.riskScore}</p></div>
+                <div><span className="text-zinc-500">Data</span><p>{analysis.qualityScore.dataStatus}</p></div>
+              </div>
+              {analysis.qualityScore.validationWarning && (
+                <p className="mt-3 text-sm text-amber-400">{analysis.qualityScore.validationWarning}</p>
+              )}
+            </section>
+          )}
+
           {analysis.contributions && (
             <section className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-5">
               <h3 className="font-medium">{t.analysis.contributionsTitle}</h3>

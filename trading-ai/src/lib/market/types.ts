@@ -66,6 +66,15 @@ export interface MarketDataResult<T> {
   source: ProviderId;
   isDemoData: boolean;
   fallbackReason?: string;
+  dataStatus?: import("./provider-manager/health").PriceDataStatus;
+  latencyMs?: number;
+  cacheHit?: boolean;
+  cacheLayer?: "memory" | "redis" | "disk";
+  activeProvider?: string;
+  backupProvider?: string;
+  validationWarning?: string;
+  providerCount?: number;
+  aiConfidenceAdjustment?: number;
 }
 
 export interface MarketDataProvider {

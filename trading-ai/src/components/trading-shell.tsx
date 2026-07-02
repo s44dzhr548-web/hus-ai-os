@@ -33,10 +33,13 @@ const NAV_KEYS = [
   { href: "/dashboard/strategy-lab", key: "strategyLab" as const },
   { href: "/dashboard/cross-market", key: "crossMarket" as const },
   { href: "/dashboard/providers", key: "providers" as const },
+  { href: "/dashboard/provider-costs", key: "providerCosts" as const },
+  { href: "/dashboard/settings/providers", key: "providerSettings" as const },
   { href: "/dashboard/paper", key: "paper" as const },
   { href: "/dashboard/performance", key: "performance" as const },
   { href: "/dashboard/simulation", key: "simulation" as const },
   { href: "/competitors", key: "competitors" as const },
+  { href: "/dashboard/competitors", key: "enterpriseCompetitors" as const },
   { href: "/dashboard/settings", key: "settings" as const },
 ];
 

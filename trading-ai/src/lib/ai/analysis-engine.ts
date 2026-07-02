@@ -15,6 +15,7 @@ import { fetchEconomicCalendar, fetchNews } from "@/lib/market/providers/news";
 import { logRecommendation } from "@/lib/audit/log";
 import { buildExplainability } from "@/lib/intelligence/explainability";
 import { buildContributions } from "@/lib/intelligence/contributions";
+import { buildAIQualityScore } from "@/lib/intelligence/quality-score";
 import { buildMarketConsensus, buildRecommendationTransitions, buildWhatMustChange, buildWhyNow } from "@/lib/intelligence/decision-engines";
 import { recordMemoryFromAnalysis } from "@/lib/learning/memory";
 
@@ -127,10 +128,24 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
     quoteResult.source
   );
 
+  const qualityScore = buildAIQualityScore({
+    confidence: signal.confidence,
+    signalScore: signal.score,
+    newsSentiment,
+    sectorImpact: sectorImpact.impact,
+    oilImpact,
+    ratesImpact,
+    riskLevel: signal.riskLevel,
+    volatility: technical.volatility,
+    quoteResult,
+  });
+
+  const adjustedConfidence = qualityScore.confidence;
+
   const engineCtx = {
     symbol,
     recommendation: signal.recommendation,
-    confidence: signal.confidence,
+    confidence: adjustedConfidence,
     signalScore: signal.score,
     technical,
     newsSentiment,
@@ -147,7 +162,7 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
 
   const contributions = buildContributions({
     recommendation: signal.recommendation,
-    confidence: signal.confidence,
+    confidence: adjustedConfidence,
     riskLevel: signal.riskLevel,
     signalScore: signal.score,
     technical,
@@ -160,7 +175,7 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
   logRecommendation({
     symbol,
     recommendation: signal.recommendation,
-    confidence: signal.confidence,
+    confidence: adjustedConfidence,
     riskLevel: signal.riskLevel,
     dataSource: isDemo ? "demo" : "live",
     provider: quoteResult.source,
@@ -173,7 +188,7 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
     assetClass: meta?.assetClass ?? quoteResult.data.assetClass,
     generatedAt: new Date().toISOString(),
     recommendation: signal.recommendation,
-    confidence: signal.confidence,
+    confidence: adjustedConfidence,
     riskLevel: signal.riskLevel,
     signalScore: signal.score,
     technical,
@@ -183,6 +198,7 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
     macroFactors: { oilImpact, ratesImpact, economicEvents: economicResult.events },
     explainability,
     contributions,
+    qualityScore,
     whyNow,
     whatMustChange,
     recommendationTransitions,

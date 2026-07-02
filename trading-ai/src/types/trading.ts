@@ -228,6 +228,21 @@ export interface NormalizedAssetProfile {
   provider?: string;
 }
 
+export interface AIQualityScore {
+  confidence: number;
+  providerCount: number;
+  newsScore: number;
+  technicalScore: number;
+  fundamentalScore: number;
+  macroScore: number;
+  liquidityScore: number;
+  riskScore: number;
+  dataStatus: string;
+  validationWarning?: string;
+  summaryEn: string;
+  summaryAr: string;
+}
+
 export interface AIAnalysis {
   symbol: string;
   assetClass: AssetClass;
@@ -247,6 +262,7 @@ export interface AIAnalysis {
   };
   explainability: RecommendationExplainability;
   contributions?: ExplainabilityContributions;
+  qualityScore?: AIQualityScore;
   whyNow: WhyNowEngine;
   whatMustChange: WhatMustChangeRule[];
   recommendationTransitions: RecommendationTransition[];

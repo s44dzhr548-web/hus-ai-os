@@ -115,17 +115,8 @@ export async function unifiedSearch(query: string, limit = 20): Promise<SymbolSe
 }
 
 export async function unifiedQuote(symbol: string): Promise<MarketDataResult<NormalizedQuote>> {
-  if (!isRealMarketDataMode()) {
-    const mock = await mockProvider.getQuote(symbol);
-    return { data: mock!, source: "mock", isDemoData: true, fallbackReason: "MARKET_DATA_MODE=demo" };
-  }
-
-  const assetClass = assetClassForSymbol(symbol);
-  const result = await tryProviders(providersForAsset(assetClass), (p) => p.getQuote(symbol));
-  if (result && !result.isDemoData) return result as MarketDataResult<NormalizedQuote>;
-
-  const mock = await mockProvider.getQuote(symbol);
-  return demoFallback(() => Promise.resolve(mock), result?.fallbackReason ?? "All live providers failed");
+  const { managedQuote } = await import("./provider-manager/manager");
+  return managedQuote(symbol);
 }
 
 export async function unifiedCandles(
@@ -133,17 +124,8 @@ export async function unifiedCandles(
   timeframe = "1Day",
   limit = 90
 ): Promise<MarketDataResult<NormalizedCandle[]>> {
-  if (!isRealMarketDataMode()) {
-    const mock = await mockProvider.getCandles(symbol, timeframe, limit);
-    return { data: mock!, source: "mock", isDemoData: true, fallbackReason: "MARKET_DATA_MODE=demo" };
-  }
-
-  const assetClass = assetClassForSymbol(symbol);
-  const result = await tryProviders(providersForAsset(assetClass), (p) => p.getCandles(symbol, timeframe, limit));
-  if (result && !result.isDemoData) return result as MarketDataResult<NormalizedCandle[]>;
-
-  const mock = await mockProvider.getCandles(symbol, timeframe, limit);
-  return demoFallback(() => Promise.resolve(mock), result?.fallbackReason ?? "All live providers failed");
+  const { managedCandles } = await import("./provider-manager/manager");
+  return managedCandles(symbol, timeframe, limit);
 }
 
 export async function unifiedMarketStatus(exchange: string): Promise<MarketStatusInfo> {
