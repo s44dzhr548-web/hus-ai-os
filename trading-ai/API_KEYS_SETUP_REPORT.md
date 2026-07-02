@@ -8,7 +8,7 @@
 | # | Provider | Env variable | Status | Notes |
 |---|----------|--------------|--------|-------|
 | 1 | Massive / Polygon.io | `MASSIVE_API_KEY` / `POLYGON_API_KEY` | ✅ Connected | Live US stocks · production verified |
-| 2 | NewsAPI | `NEWS_API_KEY` | ⏳ **Awaiting key** | Signup open — paste key when ready |
+| 2 | NewsAPI | `NEWS_API_KEY` | ✅ Connected | Live headlines verified |
 | 3 | CoinGecko | `COINGECKO_API_KEY` | ✅ Connected (public) | Live BTC · optional Pro key |
 | 4 | Binance | `BINANCE_API_KEY` | ✅ Connected (public) | Live BTC · optional signed API |
 | 5 | Tadawul / Saudi | `TADAWUL_PROVIDER_KEY` | ✅ Connected (fallback) | Live 2222 via Yahoo `.SR` |
@@ -69,5 +69,5 @@ npx vercel deploy --prod --yes --scope hus707002h-7024s-projects --force --proje
 - [x] Massive/Polygon · Finnhub · Twelve Data · FMP — local + Vercel + production
 - [x] Trading Economics marked optional (`TRADING_ECONOMICS_API_KEY=` placeholder)
 - [x] CoinGecko · Binance · Saudi (Yahoo `.SR`) — verified live locally
-- [ ] NewsAPI — **waiting for your key**
-- [ ] Final MVP report after NewsAPI connected
+- [x] NewsAPI — local + Vercel + production
+- [x] Final MVP report generated
