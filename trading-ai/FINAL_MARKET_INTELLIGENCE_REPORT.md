@@ -33,3 +33,7 @@
 - ✅ Profile page route: HTTP 200
 - ✅ Markets page: HTTP 200
 - ✅ Paper order only: Blocked: Volatility. Reduce size or wait.
+- ✅ Alert creation: created
+- ✅ Journal entry: added
+- ✅ Portfolio simulator add: NVDA added
+- ✅ Provider persistence note: Persistence not configured — using local seed/cache fallback

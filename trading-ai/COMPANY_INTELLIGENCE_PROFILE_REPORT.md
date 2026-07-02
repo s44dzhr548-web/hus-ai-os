@@ -1,7 +1,7 @@
 # COMPANY_INTELLIGENCE_PROFILE_REPORT
 
 **Profile route:** https://trading-ai-beta.vercel.app/dashboard/markets/[symbol]
-**Verified:** 2026-07-02T04:51:23.698Z
+**Verified:** 2026-07-02T05:12:50.416Z
 
 ## Sections
 
@@ -15,7 +15,7 @@
 
 - GET /api/company/[symbol]/profile
 - GET /api/company/[symbol]/quote|financials|news|announcements|technical|risk|ai
-- POST /api/paper/order, /api/watchlist/add, /api/alerts/create, /api/journal/add
+- POST /api/paper/order, /api/watchlist/add, /api/alerts/create, /api/journal/add, /api/portfolio/simulation/add
 
 ## Verification
 
@@ -33,3 +33,7 @@
 | Profile page route | ✅ | HTTP 200 |
 | Markets page | ✅ | HTTP 200 |
 | Paper order only | ✅ | Blocked: Volatility. Reduce size or wait. |
+| Alert creation | ✅ | created |
+| Journal entry | ✅ | added |
+| Portfolio simulator add | ✅ | NVDA added |
+| Provider persistence note | ✅ | Persistence not configured — using local seed/cache fallback |
