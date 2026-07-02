@@ -10,7 +10,13 @@ export function MarketsAssetCard({ item }: { item: MarketBrowseItem }) {
   const classLabel = useAssetClassLabel(item.category);
   const up = item.changePct >= 0;
   const sourceTone =
-    item.dataSource === "live" ? "text-emerald-400 bg-emerald-500/10" : item.dataSource === "cached" ? "text-sky-400 bg-sky-500/10" : "text-amber-400 bg-amber-500/10";
+    item.dataSource === "live"
+      ? "text-emerald-400 bg-emerald-500/10"
+      : item.dataSource === "cached"
+        ? "text-sky-400 bg-sky-500/10"
+        : item.dataSource === "seeded"
+          ? "text-violet-400 bg-violet-500/10"
+          : "text-amber-400 bg-amber-500/10";
 
   return (
     <article className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-start transition hover:border-zinc-600">

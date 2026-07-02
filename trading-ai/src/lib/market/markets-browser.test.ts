@@ -11,7 +11,7 @@ import {
 
 describe("markets browser filters", () => {
   it("includes all catalog symbols by default", () => {
-    expect(getAllCatalogSymbols().length).toBeGreaterThanOrEqual(75);
+    expect(getAllCatalogSymbols().length).toBeGreaterThanOrEqual(95);
   });
 
   it("filters US stocks to NYSE/NASDAQ/AMEX", () => {

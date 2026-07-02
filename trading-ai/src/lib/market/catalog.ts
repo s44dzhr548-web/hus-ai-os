@@ -68,6 +68,8 @@ export const COINGECKO_IDS: Record<string, string> = {
   ADAUSD: "cardano",
   DOGEUSD: "dogecoin",
   AVAXUSD: "avalanche-2",
+  LINKUSD: "chainlink",
+  MATICUSD: "matic-network",
 };
 
 export const BINANCE_SYMBOLS: Record<string, string> = {
@@ -79,4 +81,6 @@ export const BINANCE_SYMBOLS: Record<string, string> = {
   ADAUSD: "ADAUSDT",
   DOGEUSD: "DOGEUSDT",
   AVAXUSD: "AVAXUSDT",
+  LINKUSD: "LINKUSDT",
+  MATICUSD: "MATICUSDT",
 };

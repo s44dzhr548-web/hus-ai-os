@@ -262,7 +262,7 @@ function index(
 
 /** Master seed list — single source of truth for Markets tabs. */
 export const ASSET_UNIVERSE: AssetUniverseRecord[] = [
-  // —— Saudi Stocks (Tadawul) ——
+  // —— Saudi Stocks (Tadawul) — required + extended ——
   saudi("2222.SR", "Saudi Aramco", "Energy", "Integrated Oil & Gas", 28.5),
   saudi("1120.SR", "Al Rajhi Bank", "Financials", "Banking", 92),
   saudi("1180.SR", "Saudi National Bank (SNB)", "Financials", "Banking", 38),
@@ -271,32 +271,42 @@ export const ASSET_UNIVERSE: AssetUniverseRecord[] = [
   saudi("1211.SR", "Maaden", "Materials", "Mining", 58),
   saudi("2020.SR", "SABIC Agri-Nutrients", "Materials", "Fertilizers", 102),
   saudi("2082.SR", "ACWA Power", "Utilities", "Renewable Power", 62),
-  saudi("1010.SR", "Riyad Bank", "Financials", "Banking", 28),
+  saudi("4002.SR", "Mouwasat Medical Services", "Healthcare", "Hospitals", 95),
+  saudi("4004.SR", "Dallah Healthcare", "Healthcare", "Hospitals", 118),
+  saudi("4005.SR", "Care Medical Services", "Healthcare", "Hospitals", 42),
+  saudi("4013.SR", "Dr. Sulaiman Al Habib Medical", "Healthcare", "Hospitals", 285),
+  saudi("1020.SR", "Bank AlJazira", "Financials", "Banking", 18),
+  saudi("1050.SR", "Banque Saudi Fransi", "Financials", "Banking", 42),
+  saudi("1060.SR", "Saudi Awwal Bank (SAB)", "Financials", "Banking", 36),
+  saudi("1080.SR", "Arab National Bank", "Financials", "Banking", 22),
+  saudi("1150.SR", "Alinma Bank", "Financials", "Banking", 28),
+  saudi("2380.SR", "Petro Rabigh", "Energy", "Refining", 14),
   saudi("4030.SR", "Bahri", "Industrials", "Shipping & Logistics", 22),
+  saudi("7203.SR", "Elm Company", "Technology", "Software & IT", 78),
+  saudi("1010.SR", "Riyad Bank", "Financials", "Banking", 28),
   saudi("2280.SR", "Almarai", "Consumer", "Food & Beverage", 48),
-  saudi("2350.SR", "Saudi Kayan", "Materials", "Petrochemicals", 8.5),
 
-  // —— US Stocks ——
+  // —— US Stocks — required minimum ——
   usStock("AAPL", "Apple Inc.", "NASDAQ", "Technology", "Consumer Electronics", 178),
   usStock("MSFT", "Microsoft", "NASDAQ", "Technology", "Software", 415),
-  usStock("GOOGL", "Alphabet", "NASDAQ", "Technology", "Internet Services", 175),
-  usStock("AMZN", "Amazon", "NASDAQ", "Consumer", "E-Commerce", 185),
-  usStock("META", "Meta Platforms", "NASDAQ", "Technology", "Social Media", 480),
   usStock("NVDA", "NVIDIA", "NASDAQ", "Technology", "Semiconductors", 875),
+  usStock("AMZN", "Amazon", "NASDAQ", "Consumer", "E-Commerce", 185),
+  usStock("GOOGL", "Alphabet", "NASDAQ", "Technology", "Internet Services", 175),
+  usStock("META", "Meta Platforms", "NASDAQ", "Technology", "Social Media", 480),
   usStock("TSLA", "Tesla", "NASDAQ", "Consumer", "Automotive", 248),
+  usStock("BRK-B", "Berkshire Hathaway", "NYSE", "Financials", "Conglomerate", 420),
   usStock("JPM", "JPMorgan Chase", "NYSE", "Financials", "Banking", 195),
-  usStock("KO", "Coca-Cola", "NYSE", "Consumer", "Beverages", 62),
-  usStock("XOM", "Exxon Mobil", "NYSE", "Energy", "Integrated Oil", 110),
   usStock("V", "Visa", "NYSE", "Financials", "Payments", 280),
   usStock("MA", "Mastercard", "NYSE", "Financials", "Payments", 460),
-  usStock("WMT", "Walmart", "NYSE", "Consumer", "Retail", 165),
-  usStock("DIS", "Walt Disney", "NYSE", "Communication", "Entertainment", 95),
+  usStock("UNH", "UnitedHealth Group", "NYSE", "Healthcare", "Managed Care", 520),
+  usStock("XOM", "Exxon Mobil", "NYSE", "Energy", "Integrated Oil", 110),
+  usStock("JNJ", "Johnson & Johnson", "NYSE", "Healthcare", "Pharmaceuticals", 155),
+  usStock("PG", "Procter & Gamble", "NYSE", "Consumer", "Household Products", 165),
+  usStock("HD", "Home Depot", "NYSE", "Consumer", "Retail", 380),
+  usStock("COST", "Costco Wholesale", "NASDAQ", "Consumer", "Retail", 720),
   usStock("NFLX", "Netflix", "NASDAQ", "Communication", "Streaming", 620),
   usStock("AMD", "Advanced Micro Devices", "NASDAQ", "Technology", "Semiconductors", 160),
-  usStock("INTC", "Intel", "NASDAQ", "Technology", "Semiconductors", 42),
-  usStock("BAC", "Bank of America", "NYSE", "Financials", "Banking", 38),
-  usStock("PFE", "Pfizer", "NYSE", "Healthcare", "Pharmaceuticals", 28),
-  usStock("CVX", "Chevron", "NYSE", "Energy", "Integrated Oil", 155),
+  usStock("AVGO", "Broadcom", "NASDAQ", "Technology", "Semiconductors", 165),
 
   // —— Global Stocks ——
   globalStock("BP", "BP plc", "LSE", "UK", "GBP", "Energy", "Integrated Oil", 480),
@@ -305,55 +315,67 @@ export const ASSET_UNIVERSE: AssetUniverseRecord[] = [
   globalStock("BABA", "Alibaba Group", "NYSE", "CN", "USD", "Consumer", "E-Commerce", 85),
   globalStock("NVO", "Novo Nordisk", "NYSE", "DK", "USD", "Healthcare", "Pharmaceuticals", 135),
   globalStock("ASML", "ASML Holding", "NASDAQ", "NL", "USD", "Technology", "Semiconductor Equipment", 920),
-  globalStock("HSBA", "HSBC Holdings", "LSE", "UK", "GBP", "Financials", "Banking", 620),
   globalStock("SHEL", "Shell plc", "LSE", "UK", "GBP", "Energy", "Integrated Oil", 2650),
 
-  // —— ETFs ——
+  // —— ETFs — required minimum ——
   etf("SPY", "SPDR S&P 500 ETF", "NYSE", "Broad Market", 520),
   etf("QQQ", "Invesco QQQ Trust", "NASDAQ", "Technology", 440),
+  etf("DIA", "SPDR Dow Jones Industrial", "NYSE", "Broad Market", 390),
   etf("IWM", "Russell 2000 ETF", "AMEX", "Small Cap", 210),
+  etf("VOO", "Vanguard S&P 500 ETF", "NYSE", "Broad Market", 480),
   etf("VTI", "Vanguard Total Stock Market", "NYSE", "Broad Market", 260),
-  etf("EEM", "iShares MSCI Emerging Markets", "NYSE", "Emerging Markets", 42),
   etf("GLD", "SPDR Gold Shares", "NYSE", "Commodities", 215),
-  etf("GLDM", "SPDR Gold MiniShares", "NYSE", "Commodities", 42),
-  etf("XLE", "Energy Select Sector SPDR", "NYSE", "Energy", 92),
+  etf("SLV", "iShares Silver Trust", "NYSE", "Commodities", 28),
   etf("USO", "United States Oil Fund", "NYSE", "Energy", 72),
-  etf("BNO", "United States Brent Oil", "NYSE", "Energy", 28),
-  etf("XLF", "Financial Select Sector SPDR", "NYSE", "Financials", 42),
-  etf("ARKK", "ARK Innovation ETF", "NYSE", "Thematic", 48),
+  etf("TLT", "iShares 20+ Year Treasury", "NASDAQ", "Fixed Income", 95),
 
-  // —— Crypto ——
-  crypto("BTCUSD", "Bitcoin", 67000),
-  crypto("ETHUSD", "Ethereum", 3500),
-  crypto("SOLUSD", "Solana", 145),
-  crypto("BNBUSD", "BNB", 580),
-  crypto("XRPUSD", "XRP", 0.62),
-  crypto("ADAUSD", "Cardano", 0.45),
-  crypto("DOGEUSD", "Dogecoin", 0.12),
-  crypto("AVAXUSD", "Avalanche", 35),
+  // —— Crypto — required ——
+  crypto("BTCUSD", "Bitcoin / USD", 67000),
+  crypto("ETHUSD", "Ethereum / USD", 3500),
+  crypto("BNBUSD", "BNB / USD", 580),
+  crypto("SOLUSD", "Solana / USD", 145),
+  crypto("XRPUSD", "XRP / USD", 0.62),
+  crypto("ADAUSD", "Cardano / USD", 0.45),
+  crypto("DOGEUSD", "Dogecoin / USD", 0.12),
+  crypto("AVAXUSD", "Avalanche / USD", 35),
+  crypto("LINKUSD", "Chainlink / USD", 15),
+  crypto("MATICUSD", "Polygon / USD", 0.55),
 
-  // —— Forex ——
-  forex("EURUSD", "Euro / US Dollar", 1.08),
-  forex("GBPUSD", "British Pound / USD", 1.27),
-  forex("USDJPY", "USD / Japanese Yen", 157),
-  forex("AUDUSD", "Australian Dollar / USD", 0.65),
-  forex("USDCAD", "USD / Canadian Dollar", 1.36),
-  forex("USDCHF", "USD / Swiss Franc", 0.88),
+  // —— Forex — required ——
+  forex("EURUSD", "EUR / USD", 1.08),
+  forex("GBPUSD", "GBP / USD", 1.27),
+  forex("USDJPY", "USD / JPY", 157),
+  forex("USDCHF", "USD / CHF", 0.88),
+  forex("AUDUSD", "AUD / USD", 0.65),
+  forex("USDCAD", "USD / CAD", 1.36),
+  forex("NZDUSD", "NZD / USD", 0.61),
+  forex("EURGBP", "EUR / GBP", 0.85),
+  forex("EURJPY", "EUR / JPY", 170),
+  forex("GBPJPY", "GBP / JPY", 200),
 
-  // —— Commodities (gold / oil / silver / gas) ——
-  commodity("GCUSD", "Gold Spot", "gold", "COMEX", "Precious Metals", 2350),
-  commodity("SIUSD", "Silver Spot", "commodity", "COMEX", "Precious Metals", 28),
-  commodity("CLUSD", "Crude Oil WTI", "oil", "COMEX", "Energy", 78),
+  // —— Commodities — gold / silver / oil / gas / metals / agriculture ——
+  commodity("GCUSD", "Gold", "gold", "COMEX", "Precious Metals", 2350),
+  commodity("SIUSD", "Silver", "commodity", "COMEX", "Precious Metals", 28),
+  commodity("PLUSD", "Platinum", "commodity", "COMEX", "Precious Metals", 980),
+  commodity("CLUSD", "WTI Crude Oil", "oil", "COMEX", "Energy", 78),
+  commodity("BZUSD", "Brent Crude Oil", "oil", "COMEX", "Energy", 82),
   commodity("NGUSD", "Natural Gas", "gas", "COMEX", "Energy", 2.8),
   commodity("HGUSD", "Copper", "commodity", "COMEX", "Industrial Metals", 4.2),
+  commodity("ZWUSD", "Wheat", "commodity", "CBOT", "Agriculture", 580),
+  commodity("ZCUSD", "Corn", "commodity", "CBOT", "Agriculture", 480),
+  commodity("SBUSD", "Sugar", "commodity", "ICE", "Agriculture", 21),
 
-  // —— Indices ——
-  index("SPX", "S&P 500 Index", "NYSE", "US", "USD", 5200, "US"),
+  // —— Indices — required ——
+  index("SPX", "S&P 500", "NYSE", "US", "USD", 5200, "US"),
+  index("NDX", "Nasdaq 100", "NASDAQ", "US", "USD", 18500, "US"),
   index("DJI", "Dow Jones Industrial", "NYSE", "US", "USD", 39000, "US"),
-  index("IXIC", "NASDAQ Composite", "NASDAQ", "US", "USD", 16500, "US"),
-  index("RUT", "Russell 2000 Index", "NYSE", "US", "USD", 2100, "US"),
-  index("TASI", "Tadawul All Share Index", "Tadawul", "SA", "SAR", 11800, "SA"),
-  index("VIX", "CBOE Volatility Index", "CBOE", "US", "USD", 18, "US"),
+  index("RUT", "Russell 2000", "NYSE", "US", "USD", 2100, "US"),
+  index("TASI", "Tadawul All Share (TASI)", "Tadawul", "SA", "SAR", 11800, "SA"),
+  index("FTSE", "FTSE 100", "LSE", "UK", "GBP", 7800, "Global"),
+  index("DAX", "DAX 40", "XETRA", "DE", "EUR", 18000, "Global"),
+  index("N225", "Nikkei 225", "TSE", "JP", "JPY", 38000, "Global"),
+  index("HSI", "Hang Seng", "HKEX", "HK", "HKD", 17000, "Global"),
+  index("CAC", "CAC 40", "EURONEXT", "FR", "EUR", 7500, "Global"),
 ];
 
 const SYMBOL_INDEX = new Map(ASSET_UNIVERSE.map((a) => [a.symbol.toUpperCase(), a]));
@@ -420,9 +442,9 @@ export function matchesUniverseCategory(record: AssetUniverseRecord, tab: Market
     case "commodity":
       return ["commodity", "gold", "oil", "gas"].includes(record.category);
     case "gold":
-      return record.category === "gold" || record.symbol === "GLD" || record.symbol === "GLDM";
+      return record.category === "gold" || ["GCUSD", "GLD", "SLV"].includes(record.symbol);
     case "oil":
-      return record.category === "oil" || ["USO", "BNO", "XLE", "CLUSD"].includes(record.symbol);
+      return record.category === "oil" || ["CLUSD", "BZUSD", "USO"].includes(record.symbol);
     case "index":
       return record.category === "index";
     default:

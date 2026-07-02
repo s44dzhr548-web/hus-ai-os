@@ -55,7 +55,7 @@ export type MarketBrowseItem = {
   recommendation: Recommendation;
   whySelected: string;
   whySelectedAr: string;
-  dataSource: "live" | "demo" | "cached";
+  dataSource: "live" | "demo" | "cached" | "seeded";
   quoteSource: string;
   volume: number;
   signalScore: number;
@@ -71,7 +71,8 @@ function riskLevelToScore(level: RiskLevel): number {
   return 90;
 }
 
-function dataSourceBadge(isDemo: boolean): "live" | "demo" | "cached" {
+function dataSourceBadge(isDemo: boolean, quoteAttempted: boolean): "live" | "demo" | "cached" | "seeded" {
+  if (!quoteAttempted) return "seeded";
   return isDemo ? "demo" : "live";
 }
 
@@ -145,10 +146,12 @@ export async function buildMarketBrowseItem(
   let changePct = fast.mock.changePct;
   let volume = fast.mock.volume;
   let isDemo = true;
-  let quoteSource = "mock";
+  let quoteSource = "seeded";
+  let quoteAttempted = false;
 
   try {
     const quote = await unifiedQuote(symbol);
+    quoteAttempted = true;
     price = quote.data.price;
     changePct = quote.data.changePct;
     volume = quote.data.volume ?? volume;
@@ -156,7 +159,7 @@ export async function buildMarketBrowseItem(
     quoteSource = quote.source;
     fast.signal = computeSignalScore(symbol, fast.bars, price, changePct);
   } catch {
-    /* keep mock quote */
+    /* keep seeded mock quote */
   }
 
   const why = buildWhySelected(symbol, fast.signal, fast.technical);
@@ -183,7 +186,7 @@ export async function buildMarketBrowseItem(
     recommendation: fast.signal.recommendation,
     whySelected: why.en,
     whySelectedAr: why.ar,
-    dataSource: dataSourceBadge(isDemo),
+    dataSource: dataSourceBadge(isDemo, quoteAttempted),
     quoteSource,
     volume,
     signalScore: fast.signal.score,
@@ -265,7 +268,7 @@ export function rankUniverseSymbols(symbols: string[], sort: MarketSortOption) {
       recommendation: fast.signal.recommendation,
       whySelected: "",
       whySelectedAr: "",
-      dataSource: "demo" as const,
+      dataSource: "seeded" as const,
       quoteSource: "mock",
       volume: fast.mock.volume,
       signalScore: fast.signal.score,
@@ -290,7 +293,7 @@ export function rankUniverseSymbols(symbols: string[], sort: MarketSortOption) {
           recommendation: fast.signal.recommendation,
           whySelected: "",
           whySelectedAr: "",
-          dataSource: "demo",
+          dataSource: "seeded",
           quoteSource: "mock",
           volume: fast.mock.volume,
           signalScore: fast.signal.score,

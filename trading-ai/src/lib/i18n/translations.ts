@@ -161,6 +161,7 @@ const en = {
       live: "Live",
       demo: "Demo",
       cached: "Cached",
+      seeded: "Seeded",
     },
   },
   watchlist: {
@@ -844,6 +845,7 @@ const ar: TranslationKeys = {
       live: "مباشر",
       demo: "تجريبي",
       cached: "مخزّن",
+      seeded: "مُزروع",
     },
   },
   watchlist: {
