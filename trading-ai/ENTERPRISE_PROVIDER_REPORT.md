@@ -118,7 +118,13 @@ Licensed providers (Tadawul, Refinitiv, Trading Economics, OANDA) appear in chai
 
 ## GitHub & Vercel
 
-See commit after push. Production alias: **https://trading-ai-beta.vercel.app**
+| Item | Value |
+|------|-------|
+| **GitHub commit** | `07857f1` on `main` |
+| **Vercel deployment** | `dpl_FBtWeAyDzW9P4MZ5bZJougDUVF5W` |
+| **Production URL** | https://trading-ai-beta.vercel.app |
+| **Routes** | 93 |
+| **Tests** | 67/67 |
 
 ---
 
