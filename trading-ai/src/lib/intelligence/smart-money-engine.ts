@@ -13,6 +13,7 @@ import {
   universeCategoryToAssetClass,
 } from "@/lib/markets/asset-universe";
 import { createAlert } from "@/lib/learning/tracker";
+import { computeOpportunityScore } from "./opportunity-score";
 import type {
   AssetClassFlow,
   AssetFlowProfile,
@@ -141,25 +142,24 @@ async function scoreSymbol(symbol: string) {
   const macro = Math.min(100, 40 + Math.abs(sector.impact) * 40);
   const risk = Math.min(100, 25 + technical.volatility * 80 + (100 - signal.score) * 0.2);
 
-  const total = Number(
-    (
-      moneyFlow * 0.25 +
-      technicalStrength * 0.2 +
-      fundamentals * 0.2 +
-      newsSentiment * 0.15 +
-      macro * 0.1 +
-      (100 - risk) * 0.1
-    ).toFixed(1)
-  );
+  const scored = computeOpportunityScore({
+    moneyFlow,
+    technical: technicalStrength,
+    fundamentals,
+    newsSentiment,
+    macro,
+    risk,
+  });
 
   const breakdown: FlowOpportunityScore = {
-    total,
-    moneyFlow: Number(moneyFlow.toFixed(1)),
-    technical: Number(technicalStrength.toFixed(1)),
-    fundamentals: Number(fundamentals.toFixed(1)),
-    newsSentiment: Number(newsSentiment.toFixed(1)),
-    macro: Number(macro.toFixed(1)),
-    risk: Number(risk.toFixed(1)),
+    total: scored.total,
+    moneyFlow: scored.moneyFlow,
+    technical: scored.technical,
+    fundamentals: scored.fundamentals,
+    newsSentiment: scored.newsSentiment,
+    macro: scored.macro,
+    risk: scored.risk,
+    riskManagement: scored.riskManagement,
   };
 
   const flowDirection = directionFromPct(changePct + (signal.score - 50) * 0.08);
@@ -172,6 +172,7 @@ async function scoreSymbol(symbol: string) {
     technical,
     changePct,
     breakdown,
+    grade: scored.grade,
     flowDirection,
     volumeAnomaly,
     inst,
@@ -247,6 +248,7 @@ async function buildOpportunities(): Promise<FlowOpportunity[]> {
       sector: asset.sector,
       assetClass: universeCategoryToAssetClass(asset),
       score: s.breakdown.total,
+      grade: s.grade,
       confidence: Number((s.signal.confidence * (s.breakdown.total / 100)).toFixed(2)),
       riskScore: s.breakdown.risk,
       riskLevel: riskLevelFromScore(s.breakdown.risk),
@@ -492,6 +494,8 @@ export async function buildAssetFlowProfile(symbolInput: string): Promise<AssetF
       ? `${rotation.fromSectorAr} → ${rotation.toSectorAr}: ${rotation.reasonAr}`
       : `لا تناوب كبير يؤثر على ${asset.sector} حالياً.`,
     opportunityScore: s.breakdown.total,
+    grade: s.grade,
+    breakdown: s.breakdown,
     confidence: Number((s.signal.confidence * (s.breakdown.total / 100)).toFixed(2)),
     expectedReturnPct: Number(((s.breakdown.total - 50) * 0.18 + s.changePct * 0.5).toFixed(2)),
     timeHorizon: timeHorizon(s.breakdown.total, s.technical.volatility),

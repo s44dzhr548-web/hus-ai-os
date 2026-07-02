@@ -20,8 +20,10 @@ describe("smart money flow engine", () => {
     const top = snapshot.opportunities[0];
     expect(top?.score).toBeGreaterThan(0);
     expect(top?.score).toBeLessThanOrEqual(100);
+    expect(top?.grade).toMatch(/A\+|A|B|C|Avoid/);
     expect(top?.breakdown.moneyFlow).toBeDefined();
     expect(top?.breakdown.technical).toBeDefined();
+    expect(top?.breakdown.riskManagement).toBeDefined();
     expect(top?.confidence).toBeGreaterThan(0);
     expect(top?.expectedReturnPct).toBeDefined();
     expect(top?.timeHorizon).toMatch(/short|medium|long/);
@@ -43,6 +45,8 @@ describe("smart money flow engine", () => {
     const flow = await buildAssetFlowProfile("2222");
     expect(flow?.symbol).toBe("2222");
     expect(flow?.opportunityScore).toBeGreaterThan(0);
+    expect(flow?.grade).toMatch(/A\+|A|B|C|Avoid/);
+    expect(flow?.breakdown.riskManagement).toBeDefined();
     expect(flow?.explanationEn.whyMoving.length).toBeGreaterThan(0);
   }, 120000);
 });

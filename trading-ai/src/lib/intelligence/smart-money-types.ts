@@ -1,4 +1,5 @@
 import type { AssetClass, Recommendation, RiskLevel } from "@/types/trading";
+import type { OpportunityGrade } from "./opportunity-score";
 
 export type FlowDirection = "inflow" | "outflow" | "neutral";
 export type FlowRegime = "risk_on" | "risk_off" | "mixed";
@@ -62,7 +63,10 @@ export interface FlowOpportunityScore {
   fundamentals: number;
   newsSentiment: number;
   macro: number;
+  /** Raw risk 0–100 (higher = more risk). */
   risk: number;
+  /** Risk-management component (100 − risk) used in weighted formula. */
+  riskManagement: number;
 }
 
 export interface FlowOpportunity {
@@ -73,6 +77,7 @@ export interface FlowOpportunity {
   sector: string;
   assetClass: AssetClass;
   score: number;
+  grade: OpportunityGrade;
   confidence: number;
   riskScore: number;
   riskLevel: RiskLevel;
@@ -140,6 +145,8 @@ export interface AssetFlowProfile {
   sectorRotationImpactEn: string;
   sectorRotationImpactAr: string;
   opportunityScore: number;
+  grade: OpportunityGrade;
+  breakdown: FlowOpportunityScore;
   confidence: number;
   expectedReturnPct: number;
   timeHorizon: FlowTimeHorizon;

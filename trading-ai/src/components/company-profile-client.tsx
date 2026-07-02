@@ -309,10 +309,27 @@ export function CompanyProfileClient({ symbolParam }: { symbolParam: string }) {
           <Section title={t.smartMoney.moneyFlowSection}>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <p>{t.smartMoney.inflowOutflow}: <span className={moneyFlow.flowDirection === "inflow" ? "text-emerald-400" : moneyFlow.flowDirection === "outflow" ? "text-red-400" : "text-zinc-400"}>{moneyFlow.flowDirection}</span></p>
-              <p>{t.smartMoney.flowOpportunityScore}: {moneyFlow.opportunityScore}/100</p>
+              <p>{t.smartMoney.opportunityScore}: <span className="font-semibold text-emerald-400">{moneyFlow.opportunityScore}/100</span> · {moneyFlow.grade}</p>
               <p>{t.smartMoney.volumeAnomaly}: {moneyFlow.volumeAnomaly ? "Yes" : "No"} ({moneyFlow.volumeAnomalyScore})</p>
               <p>{locale === "ar" ? "إشارة" : "Signal"}: {moneyFlow.institutionalSignal}</p>
               <p className="col-span-2 text-xs text-zinc-400">{locale === "ar" ? moneyFlow.sectorRotationImpactAr : moneyFlow.sectorRotationImpactEn}</p>
+            </div>
+            <p className="mt-2 rounded-lg border border-sky-500/10 bg-sky-500/5 px-3 py-2 text-xs text-sky-200">{t.smartMoney.multiSignalNote}</p>
+            <div className="mt-3 space-y-1 text-xs">
+              <p className="text-[10px] uppercase tracking-wide text-zinc-500">{t.smartMoney.scoreBreakdown}</p>
+              {[
+                [t.smartMoney.scoreMoneyFlow, moneyFlow.breakdown.moneyFlow],
+                [t.smartMoney.scoreTechnical, moneyFlow.breakdown.technical],
+                [t.smartMoney.scoreFundamentals, moneyFlow.breakdown.fundamentals],
+                [t.smartMoney.scoreNews, moneyFlow.breakdown.newsSentiment],
+                [t.smartMoney.scoreMacro, moneyFlow.breakdown.macro],
+                [t.smartMoney.scoreRisk, moneyFlow.breakdown.riskManagement],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="flex justify-between text-zinc-400">
+                  <span>{label}</span>
+                  <span className="text-zinc-200">{value}/100</span>
+                </div>
+              ))}
             </div>
             <p className="mt-2 text-xs text-zinc-500">{locale === "ar" ? moneyFlow.explanationAr.whyMoving : moneyFlow.explanationEn.whyMoving}</p>
             {moneyFlow.relatedAffected.length > 0 && (
