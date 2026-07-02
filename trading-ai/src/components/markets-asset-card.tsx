@@ -2,13 +2,26 @@
 
 import Link from "next/link";
 import type { MarketBrowseItem } from "@/lib/market/markets-browser";
+import { profilePathForSymbol } from "@/lib/intelligence/symbol-resolver";
 import { RecommendationBadge, RiskBadge } from "./trading-shell";
 import { useAssetClassLabel, useI18n } from "@/lib/i18n/context";
+
+function LogoBadge({ initials, color }: { initials: string; color: string }) {
+  return (
+    <span
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </span>
+  );
+}
 
 export function MarketsAssetCard({ item }: { item: MarketBrowseItem }) {
   const { t } = useI18n();
   const classLabel = useAssetClassLabel(item.category);
   const up = item.changePct >= 0;
+  const profileHref = profilePathForSymbol(item.symbol, item.displaySymbol);
   const sourceTone =
     item.dataSource === "live"
       ? "text-emerald-400 bg-emerald-500/10"
@@ -25,8 +38,9 @@ export function MarketsAssetCard({ item }: { item: MarketBrowseItem }) {
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-sm font-bold text-emerald-400">
             #{item.rank}
           </span>
+          <LogoBadge initials={item.logo.initials} color={item.logo.color} />
           <div>
-            <Link href={`/dashboard/analysis?symbol=${item.symbol}`} className="font-semibold hover:text-emerald-300">
+            <Link href={profileHref} className="font-semibold hover:text-emerald-300">
               {item.displaySymbol ?? item.symbol}
             </Link>
             <p className="text-xs text-zinc-500">{item.name}</p>
@@ -40,16 +54,29 @@ export function MarketsAssetCard({ item }: { item: MarketBrowseItem }) {
       <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-zinc-500">
         <span className="rounded bg-zinc-800 px-2 py-0.5">{classLabel}</span>
         <span className="rounded bg-zinc-800 px-2 py-0.5">{item.market}</span>
+        <span className="rounded bg-zinc-800 px-2 py-0.5">{item.exchange}</span>
+        <span className="rounded bg-zinc-800 px-2 py-0.5">{item.sector}</span>
+        {item.industry !== "—" && <span className="rounded bg-zinc-800 px-2 py-0.5">{item.industry}</span>}
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
         <div>
           <p className="text-xs text-zinc-500">{t.markets.price}</p>
           <p className="text-xl font-semibold">${item.price.toLocaleString()}</p>
-          <p className={up ? "text-emerald-400" : "text-red-400"}>
-            {up ? "+" : ""}
-            {item.changePct.toFixed(2)}%
-          </p>
+          <div className="mt-1 space-y-0.5 text-xs">
+            <p className={up ? "text-emerald-400" : "text-red-400"}>
+              Day {up ? "+" : ""}
+              {item.changePct.toFixed(2)}%
+            </p>
+            <p className={item.weekChangePct >= 0 ? "text-emerald-400/80" : "text-red-400/80"}>
+              {t.markets.weekChange} {item.weekChangePct >= 0 ? "+" : ""}
+              {item.weekChangePct.toFixed(2)}%
+            </p>
+            <p className={item.monthChangePct >= 0 ? "text-emerald-400/80" : "text-red-400/80"}>
+              {t.markets.monthChange} {item.monthChangePct >= 0 ? "+" : ""}
+              {item.monthChangePct.toFixed(2)}%
+            </p>
+          </div>
         </div>
         <div className="space-y-1 text-xs">
           <p>
@@ -83,6 +110,13 @@ export function MarketsAssetCard({ item }: { item: MarketBrowseItem }) {
       </div>
 
       <p className="mt-2 text-xs leading-relaxed text-zinc-400">{item.whySelected}</p>
+
+      <Link
+        href={profileHref}
+        className="mt-3 inline-flex rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20"
+      >
+        {t.markets.viewProfile}
+      </Link>
     </article>
   );
 }

@@ -11,6 +11,8 @@ import {
   universeCategoryToAssetClass,
   type MarketCategory,
 } from "@/lib/markets/asset-universe";
+import { computePeriodChanges } from "@/lib/markets/period-changes";
+import { getAssetLogoProps } from "@/lib/markets/asset-logo";
 import { unifiedQuote } from "@/lib/market/unified";
 
 export { MARKET_CATEGORIES, type MarketCategory };
@@ -58,6 +60,10 @@ export type MarketBrowseItem = {
   dataSource: "live" | "demo" | "cached" | "seeded";
   quoteSource: string;
   volume: number;
+  weekChangePct: number;
+  monthChangePct: number;
+  industry: string;
+  logo: { initials: string; color: string };
   signalScore: number;
   riskLevel: RiskLevel;
 };
@@ -166,6 +172,8 @@ export async function buildMarketBrowseItem(
   const expectedReturnPct = Number(((fast.signal.score - 50) * 0.15 + changePct * 0.6).toFixed(2));
   const aiOpportunityScore = Number((fast.signal.score * fast.signal.confidence).toFixed(1));
   const assetClass = asset ? universeCategoryToAssetClass(asset) : fast.mock.assetClass;
+  const periods = computePeriodChanges(fast.bars, price);
+  const logo = getAssetLogoProps(symbol, asset?.name ?? fast.mock.name);
 
   const item: MarketBrowseItem = {
     rank: 0,
@@ -177,8 +185,11 @@ export async function buildMarketBrowseItem(
     market: asset?.market ?? asset?.country ?? "—",
     exchange: asset?.exchange ?? fast.mock.exchange,
     sector: asset?.sector ?? "—",
+    industry: asset?.industry ?? "—",
     price,
     changePct,
+    weekChangePct: periods.weekChangePct,
+    monthChangePct: periods.monthChangePct,
     expectedReturnPct,
     riskScore: riskLevelToScore(fast.signal.riskLevel),
     aiConfidence: fast.signal.confidence,
@@ -189,6 +200,7 @@ export async function buildMarketBrowseItem(
     dataSource: dataSourceBadge(isDemo, quoteAttempted),
     quoteSource,
     volume,
+    logo,
     signalScore: fast.signal.score,
     riskLevel: fast.signal.riskLevel,
   };
@@ -259,8 +271,11 @@ export function rankUniverseSymbols(symbols: string[], sort: MarketSortOption) {
       market: asset?.market ?? "—",
       exchange: asset?.exchange ?? fast.mock.exchange,
       sector: asset?.sector ?? "—",
+      industry: asset?.industry ?? "—",
       price: fast.mock.price,
       changePct: fast.mock.changePct,
+      weekChangePct: computePeriodChanges(fast.bars, fast.mock.price).weekChangePct,
+      monthChangePct: computePeriodChanges(fast.bars, fast.mock.price).monthChangePct,
       expectedReturnPct,
       riskScore: riskLevelToScore(fast.signal.riskLevel),
       aiConfidence: fast.signal.confidence,
@@ -271,6 +286,7 @@ export function rankUniverseSymbols(symbols: string[], sort: MarketSortOption) {
       dataSource: "seeded" as const,
       quoteSource: "mock",
       volume: fast.mock.volume,
+      logo: getAssetLogoProps(symbol, asset?.name ?? fast.mock.name),
       signalScore: fast.signal.score,
       riskLevel: fast.signal.riskLevel,
       _sort: sortMetrics(
@@ -284,6 +300,10 @@ export function rankUniverseSymbols(symbols: string[], sort: MarketSortOption) {
           market: "—",
           exchange: fast.mock.exchange,
           sector: "—",
+          industry: "—",
+          weekChangePct: 0,
+          monthChangePct: 0,
+          logo: getAssetLogoProps(symbol),
           price: fast.mock.price,
           changePct: fast.mock.changePct,
           expectedReturnPct,
