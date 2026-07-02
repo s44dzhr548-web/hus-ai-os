@@ -62,7 +62,11 @@ export function validatePaperTrade(
   if (side === "buy") {
     const assessment = assessRisk(symbol, entryPrice, portfolio.equity, settings);
     if (!assessment.withinLimits) reasons.push(...assessment.violations);
-    if (quantity > assessment.positionSize * 1.5) {
+    const maxCost = portfolio.equity * (settings.maxPositionPct / 100);
+    const orderCost = entryPrice * quantity;
+    if (orderCost > maxCost * 1.05) {
+      reasons.push(`Order cost exceeds max position allocation (${maxCost.toFixed(0)})`);
+    } else if (assessment.positionSize > 0 && quantity > assessment.positionSize * 1.5) {
       reasons.push(`Quantity exceeds max position size (${assessment.positionSize})`);
     }
   }

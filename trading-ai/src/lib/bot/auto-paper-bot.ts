@@ -2,7 +2,8 @@ import type { AutoPaperBotStatus, BotActivityLog } from "@/types/trading";
 import { scanAllSignals } from "@/lib/ai/analysis-engine";
 import { DEFAULT_WATCHLIST } from "@/lib/data/mock-market";
 import { DEFAULT_RISK_SETTINGS } from "@/lib/compliance/config";
-import { getPaperPortfolio, placePaperOrder } from "@/lib/paper/portfolio";
+import { executeGuardedPaperOrder } from "@/lib/paper/guarded-order";
+import { getPaperPortfolio } from "@/lib/paper/portfolio";
 import { getGuardianState, isEmergencyStopActive, setEmergencyStop, validatePaperTrade } from "@/lib/risk/guardian";
 import { runGuardianProAssessment } from "@/lib/risk/guardian-pro";
 import { unifiedQuote } from "@/lib/market/unified";
@@ -129,7 +130,7 @@ export async function runBotCycle(): Promise<AutoPaperBotStatus> {
     if (pos.unrealizedPnlPct <= -settings.stopLossPct) {
       const pro = runGuardianProAssessment(pos.symbol, "sell", pos.quantity, portfolio, pos.currentPrice, settings);
       if (pro.allowed) {
-        await placePaperOrder(pos.symbol, "sell", pos.quantity);
+        await executeGuardedPaperOrder(pos.symbol, "sell", pos.quantity, { useGuardianPro: false });
         tradesToday++;
         log({
           action: "stop_loss",
@@ -142,7 +143,7 @@ export async function runBotCycle(): Promise<AutoPaperBotStatus> {
     } else if (pos.unrealizedPnlPct >= settings.takeProfitPct) {
       const pro = runGuardianProAssessment(pos.symbol, "sell", pos.quantity, portfolio, pos.currentPrice, settings);
       if (pro.allowed) {
-        await placePaperOrder(pos.symbol, "sell", pos.quantity);
+        await executeGuardedPaperOrder(pos.symbol, "sell", pos.quantity, { useGuardianPro: false });
         tradesToday++;
         log({
           action: "take_profit",
@@ -184,7 +185,10 @@ export async function runBotCycle(): Promise<AutoPaperBotStatus> {
         log({ action: "blocked", symbol: sig.symbol, detailEn: check.reasons.join("; "), detailAr: check.reasons.join("؛ "), success: false });
         continue;
       }
-      const result = await placePaperOrder(sig.symbol, "buy", qty);
+      const result = await executeGuardedPaperOrder(sig.symbol, "buy", qty, {
+        aiRecommendation: sig.recommendation,
+        useGuardianPro: false,
+      });
       if (result.ok) tradesToday++;
       log({
         action: "buy",
@@ -201,7 +205,7 @@ export async function runBotCycle(): Promise<AutoPaperBotStatus> {
       if (!pos) continue;
       const pro = runGuardianProAssessment(sig.symbol, "sell", pos.quantity, portfolio, quote.data.price, settings);
       if (!pro.allowed) continue;
-      const result = await placePaperOrder(sig.symbol, "sell", pos.quantity);
+      const result = await executeGuardedPaperOrder(sig.symbol, "sell", pos.quantity, { useGuardianPro: false });
       if (result.ok) tradesToday++;
       log({
         action: "sell",

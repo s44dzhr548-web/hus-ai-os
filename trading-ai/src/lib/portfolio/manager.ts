@@ -8,7 +8,7 @@ const SECTOR_MAP: Record<string, string> = {
   MSFT: "Technology",
   TSLA: "Consumer",
   "2222": "Energy",
-  BTC: "Crypto",
+  BTCUSD: "Crypto",
   EURUSD: "Forex",
   GLD: "Commodity",
   SPY: "Index ETF",

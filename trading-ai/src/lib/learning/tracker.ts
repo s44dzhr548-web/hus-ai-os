@@ -87,7 +87,7 @@ const SEED_ALERTS: Alert[] = [
     type: "price",
     title: "BTC Price Alert",
     message: "BTC crossed simulated threshold — paper watch only",
-    symbol: "BTC",
+    symbol: "BTCUSD",
     severity: "low",
     read: true,
     createdAt: new Date(Date.now() - 18000000).toISOString(),
