@@ -168,9 +168,13 @@ Real broker execution remains **OFF and locked**. No real buy/sell orders.
 
 ## GitHub & Vercel
 
-See commit hash and deployment ID in deployment section after push.
-
-**Repository:** https://github.com/s44dzhr548-web/hus-ai-os
+| Item | Value |
+|------|-------|
+| **GitHub commit** | `3ab1ea9` on `main` |
+| **Repository** | https://github.com/s44dzhr548-web/hus-ai-os |
+| **Vercel deployment** | `dpl_J8ouV79TMQNXdoM3BT6UexSAtmif` |
+| **Production alias** | https://trading-ai-beta.vercel.app |
+| **Production smoke test** | All key APIs + CEO/Consensus pages → 200 OK |
 
 ---
 
