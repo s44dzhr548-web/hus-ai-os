@@ -12,6 +12,7 @@ import { assetClassForSymbol, getCatalogEntry, searchCatalog } from "./catalog";
 import {
   getMissingApiKeys,
   hasKey,
+  hasPolygonApiKey,
   isRealMarketDataMode,
   PROVIDER_LABELS,
   PUBLIC_LIVE_PROVIDERS,
@@ -161,7 +162,7 @@ export function getProviderHealth(): ProviderHealth[] {
     { id: "binance", name: PROVIDER_LABELS.binance, assetClasses: ["crypto"], status: "live", hasApiKey: true, description: "Live Binance public market data" },
     { id: "frankfurter", name: PROVIDER_LABELS.frankfurter, assetClasses: ["forex"], status: "live", hasApiKey: true, description: "Live ECB forex rates — no key required" },
     { id: "finnhub", name: PROVIDER_LABELS.finnhub, assetClasses: ["stock", "etf"], status: hasKey("FINNHUB_API_KEY") ? "live" : "requires_key", hasApiKey: hasKey("FINNHUB_API_KEY"), description: "FINNHUB_API_KEY → auto-enables live US data" },
-    { id: "polygon", name: PROVIDER_LABELS.polygon, assetClasses: ["stock", "etf", "crypto"], status: hasKey("POLYGON_API_KEY") ? "live" : "requires_key", hasApiKey: hasKey("POLYGON_API_KEY"), description: "POLYGON_API_KEY" },
+    { id: "polygon", name: PROVIDER_LABELS.polygon, assetClasses: ["stock", "etf", "crypto"], status: hasPolygonApiKey() ? "live" : "requires_key", hasApiKey: hasPolygonApiKey(), description: "MASSIVE_API_KEY / POLYGON_API_KEY" },
     { id: "alpha_vantage", name: PROVIDER_LABELS.alpha_vantage, assetClasses: ["stock", "forex", "commodity"], status: hasKey("ALPHA_VANTAGE_API_KEY") ? "live" : "requires_key", hasApiKey: hasKey("ALPHA_VANTAGE_API_KEY"), description: "ALPHA_VANTAGE_API_KEY" },
     { id: "twelve_data", name: PROVIDER_LABELS.twelve_data, assetClasses: ["stock", "forex", "crypto"], status: hasKey("TWELVE_DATA_API_KEY") ? "live" : "requires_key", hasApiKey: hasKey("TWELVE_DATA_API_KEY"), description: "TWELVE_DATA_API_KEY" },
     { id: "forex", name: PROVIDER_LABELS.forex, assetClasses: ["forex"], status: hasKey("FOREX_PROVIDER_KEY") ? "live" : "requires_key", hasApiKey: hasKey("FOREX_PROVIDER_KEY"), description: "FOREX_PROVIDER_KEY" },

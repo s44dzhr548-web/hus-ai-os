@@ -1,4 +1,5 @@
 import type { MarketDataProvider, NormalizedCandle, NormalizedQuote } from "../types";
+import { envKey } from "../config";
 import { fetchJson } from "../fetch";
 import { COINGECKO_IDS, getCatalogEntry } from "../catalog";
 import { wrapQuote } from "./mock";

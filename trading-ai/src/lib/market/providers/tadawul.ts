@@ -8,7 +8,7 @@ export const tadawulProvider: MarketDataProvider = {
   id: "tadawul",
   name: "Tadawul / Saudi Market",
   assetClasses: ["saudi"],
-  isConfigured: () => hasKey("TADAWUL_PROVIDER_KEY"),
+  isConfigured: () => true,
   async searchSymbols(query, limit = 10) {
     return searchCatalog(query, limit).filter((s) => s.assetClass === "saudi");
   },

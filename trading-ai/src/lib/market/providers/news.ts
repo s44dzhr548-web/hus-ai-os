@@ -66,7 +66,7 @@ export async function fetchEconomicCalendar(): Promise<{
   isDemoData: boolean;
   source: string;
 }> {
-  const key = envKey("ECONOMIC_CALENDAR_API_KEY");
+  const key = envKey("ECONOMIC_CALENDAR_API_KEY") ?? envKey("TRADING_ECONOMICS_API_KEY");
   if (key) {
     const data = await fetchJson<{ data?: { event: string; country: string; date: string; impact: string }[] }>(
       `https://api.tradingeconomics.com/calendar?c=${key}&format=json`,

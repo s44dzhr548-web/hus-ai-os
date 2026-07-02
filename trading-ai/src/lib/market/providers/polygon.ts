@@ -1,5 +1,5 @@
 import type { MarketDataProvider } from "../types";
-import { envKey, hasKey } from "../config";
+import { getPolygonApiKey, hasPolygonApiKey } from "../config";
 import { fetchJson } from "../fetch";
 import { getCatalogEntry } from "../catalog";
 import { mockProvider, wrapQuote } from "./mock";
@@ -8,15 +8,15 @@ export const polygonProvider: MarketDataProvider = {
   id: "polygon",
   name: "Polygon.io",
   assetClasses: ["stock", "etf", "index", "crypto", "forex"],
-  isConfigured: () => hasKey("POLYGON_API_KEY"),
+  isConfigured: () => hasPolygonApiKey(),
   async searchSymbols() {
     return [];
   },
   async getQuote(symbol) {
-    const key = envKey("POLYGON_API_KEY");
+    const key = getPolygonApiKey();
     if (!key) return null;
     const data = await fetchJson<{ results?: { c: number; o: number; h: number; l: number; v: number }[] }>(
-      `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(symbol)}/prev?adjusted=true&apiKey=${key}`
+      `https://api.massive.com/v2/aggs/ticker/${encodeURIComponent(symbol)}/prev?adjusted=true&apiKey=${key}`
     );
     const bar = data?.results?.[0];
     if (!bar?.c) return null;
@@ -40,14 +40,14 @@ export const polygonProvider: MarketDataProvider = {
     );
   },
   async getCandles(symbol, timeframe = "1Day", limit = 90) {
-    const key = envKey("POLYGON_API_KEY");
+    const key = getPolygonApiKey();
     if (!key) return null;
     const to = new Date().toISOString().slice(0, 10);
     const fromDate = new Date(Date.now() - limit * 86400000).toISOString().slice(0, 10);
     const mult = timeframe === "1Day" ? "1" : "1";
     const span = timeframe === "1Day" ? "day" : "hour";
     const data = await fetchJson<{ results?: { t: number; o: number; h: number; l: number; c: number; v: number }[] }>(
-      `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/${mult}/${span}/${fromDate}/${to}?adjusted=true&sort=asc&limit=${limit}&apiKey=${key}`
+      `https://api.massive.com/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/${mult}/${span}/${fromDate}/${to}?adjusted=true&sort=asc&limit=${limit}&apiKey=${key}`
     );
     if (!data?.results?.length) return null;
     return data.results.map((bar) => ({
