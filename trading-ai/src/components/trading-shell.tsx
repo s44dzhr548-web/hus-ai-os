@@ -8,6 +8,7 @@ import { useI18n, useRecommendationLabel, useRiskLabel } from "@/lib/i18n/contex
 
 const NAV_KEYS = [
   { href: "/dashboard", key: "overview" as const },
+  { href: "/dashboard/markets", key: "markets" as const },
   { href: "/dashboard/ceo", key: "ceoDashboard" as const },
   { href: "/dashboard/auto-bot", key: "autoBot" as const },
   { href: "/dashboard/portfolio-manager", key: "portfolioManager" as const },
