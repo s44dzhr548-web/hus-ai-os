@@ -12,8 +12,10 @@ export function JournalClient() {
   const [userDecision, setUserDecision] = useState<Recommendation | "no_action">("buy");
   const [aiRecommendation, setAiRecommendation] = useState<Recommendation>("buy");
   const [userReason, setUserReason] = useState("");
+  const [exitReason, setExitReason] = useState("");
   const [notes, setNotes] = useState("");
   const [emotion, setEmotion] = useState<JournalEntry["emotion"]>("neutral");
+  const [mistakeTags, setMistakeTags] = useState("");
   const [lessonsLearned, setLessonsLearned] = useState("");
 
   function load() {
@@ -31,7 +33,17 @@ export function JournalClient() {
     await fetch("/api/journal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol, userDecision, aiRecommendation, userReason, userNotes: notes, emotion, lessonsLearned }),
+      body: JSON.stringify({
+        symbol,
+        userDecision,
+        aiRecommendation,
+        userReason,
+        exitReason,
+        userNotes: notes,
+        emotion,
+        mistakeTags: mistakeTags ? mistakeTags.split(",").map((s) => s.trim()) : [],
+        lessonsLearned,
+      }),
     });
     setUserReason("");
     setNotes("");
@@ -65,6 +77,8 @@ export function JournalClient() {
           </select>
         </div>
         <input value={userReason} onChange={(e) => setUserReason(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm" placeholder={t.journal.reasonPlaceholder} />
+        <input value={exitReason} onChange={(e) => setExitReason(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm" placeholder={t.journal.exitPlaceholder} />
+        <input value={mistakeTags} onChange={(e) => setMistakeTags(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm" placeholder={t.journal.mistakeTagsPlaceholder} />
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm" rows={2} placeholder={t.journal.notesPlaceholder} />
         <input value={lessonsLearned} onChange={(e) => setLessonsLearned(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm" placeholder={t.journal.lessonsPlaceholder} />
         <button type="submit" className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950">{t.journal.save}</button>
@@ -94,7 +108,11 @@ function JournalRow({ entry }: { entry: JournalEntry }) {
       </div>
       <p className="mt-2 text-zinc-400">{t.journal.userDecision}: {entry.userDecision === "no_action" ? t.journal.noAction : userLabel}</p>
       {entry.userReason && <p className="mt-1 text-zinc-500">{t.journal.reason}: {entry.userReason}</p>}
+      {entry.exitReason && <p className="mt-1 text-zinc-500">{t.journal.exitReason}: {entry.exitReason}</p>}
       {entry.emotion && <p className="mt-1 text-zinc-500">{t.journal.emotion}: {entry.emotion}</p>}
+      {entry.mistakeTags && entry.mistakeTags.length > 0 && (
+        <p className="mt-1 text-amber-400/80">{t.journal.mistakeTags}: {entry.mistakeTags.join(", ")}</p>
+      )}
       {entry.lessonsLearned && <p className="mt-1 text-emerald-400/80">{t.journal.lessons}: {entry.lessonsLearned}</p>}
       <p className="mt-1 text-zinc-600">{entry.userNotes}</p>
     </li>

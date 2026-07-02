@@ -7,8 +7,10 @@ const SEED: JournalEntry[] = [
     userDecision: "buy",
     aiRecommendation: "buy",
     userReason: "Aligned with AI bullish MACD",
+    exitReason: "Take profit at resistance",
     userNotes: "Followed AI — aligned with my view",
     emotion: "confident",
+    mistakeTags: [],
     lessonsLearned: "Trust volume confirmation",
     followedAi: true,
     outcome: "profit",
@@ -20,8 +22,10 @@ const SEED: JournalEntry[] = [
     userDecision: "hold",
     aiRecommendation: "sell",
     userReason: "Believed in earnings recovery",
+    exitReason: "Still holding",
     userNotes: "Disagreed with AI — held position",
     emotion: "uncertain",
+    mistakeTags: ["timing", "ignored-ai"],
     lessonsLearned: "Check earnings calendar before overriding AI",
     followedAi: false,
     outcome: "loss",
@@ -40,8 +44,10 @@ export function addJournalEntry(entry: {
   userDecision: Recommendation | "no_action";
   aiRecommendation: Recommendation;
   userReason: string;
+  exitReason?: string;
   userNotes: string;
   emotion?: JournalEntry["emotion"];
+  mistakeTags?: string[];
   lessonsLearned?: string;
 }): JournalEntry {
   const row: JournalEntry = {

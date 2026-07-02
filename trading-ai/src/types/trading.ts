@@ -248,6 +248,7 @@ export interface AIAnalysis {
   explainability: RecommendationExplainability;
   whyNow: WhyNowEngine;
   whatMustChange: WhatMustChangeRule[];
+  recommendationTransitions: RecommendationTransition[];
   marketConsensus: MarketConsensus;
   explanation: string[];
   explanationAr?: string[];
@@ -331,12 +332,89 @@ export interface JournalEntry {
   userDecision: Recommendation | "no_action";
   aiRecommendation: Recommendation;
   userReason: string;
+  exitReason?: string;
   userNotes: string;
   emotion?: "confident" | "fearful" | "greedy" | "neutral" | "uncertain";
+  mistakeTags?: string[];
   lessonsLearned?: string;
   followedAi: boolean;
   outcome?: "pending" | "profit" | "loss" | "neutral";
   createdAt: string;
+}
+
+export interface RecommendationTransition {
+  from: Recommendation;
+  to: Recommendation;
+  conditionEn: string;
+  conditionAr: string;
+  triggerEn: string;
+  triggerAr: string;
+}
+
+export interface EventImpactItem {
+  id: string;
+  driverEn: string;
+  driverAr: string;
+  impacts: { targetEn: string; targetAr: string; direction: "up" | "down" | "mixed"; score: number }[];
+  summaryEn: string;
+  summaryAr: string;
+}
+
+export interface AIDebateAgent {
+  role: "bull" | "bear" | "risk";
+  labelEn: string;
+  labelAr: string;
+  argumentEn: string;
+  argumentAr: string;
+  score: number;
+}
+
+export interface AIDebateResult {
+  symbol: string;
+  recommendation: Recommendation;
+  confidence: number;
+  agents: AIDebateAgent[];
+  finalVerdictEn: string;
+  finalVerdictAr: string;
+}
+
+export interface RiskGuardianState {
+  emergencyStop: boolean;
+  dailyLossBreached: boolean;
+  allowedMarkets: AssetClass[];
+  maxRiskPerTradePct: number;
+  dailyLossLimitPct: number;
+  blockedReasons: string[];
+  canTrade: boolean;
+}
+
+export interface BotActivityLog {
+  id: string;
+  at: string;
+  action: "scan" | "buy" | "sell" | "stop_loss" | "take_profit" | "blocked" | "schedule";
+  symbol?: string;
+  detailEn: string;
+  detailAr: string;
+  success: boolean;
+}
+
+export interface AutoPaperBotStatus {
+  enabled: boolean;
+  mode: "demo";
+  scheduleMinutes: number;
+  lastRunAt?: string;
+  nextRunAt?: string;
+  openPositions: number;
+  todayPnlPct: number;
+  activityLog: BotActivityLog[];
+  guardian: RiskGuardianState;
+}
+
+export interface ArabicMarketBrief {
+  headlineAr: string;
+  headlineEn: string;
+  focusAreas: { titleAr: string; titleEn: string; detailAr: string; detailEn: string }[];
+  saudiHighlights: { symbol: string; nameAr: string; noteAr: string; noteEn: string }[];
 }
 
 export interface MarketHealthMetric {

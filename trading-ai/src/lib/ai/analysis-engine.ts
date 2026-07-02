@@ -14,7 +14,7 @@ import { unifiedCandles, unifiedQuote } from "@/lib/market/unified";
 import { fetchEconomicCalendar, fetchNews } from "@/lib/market/providers/news";
 import { logRecommendation } from "@/lib/audit/log";
 import { buildExplainability } from "@/lib/intelligence/explainability";
-import { buildMarketConsensus, buildWhatMustChange, buildWhyNow } from "@/lib/intelligence/decision-engines";
+import { buildMarketConsensus, buildRecommendationTransitions, buildWhatMustChange, buildWhyNow } from "@/lib/intelligence/decision-engines";
 import { recordMemoryFromAnalysis } from "@/lib/learning/memory";
 
 function scoreToRecommendation(score: number): Recommendation {
@@ -141,6 +141,7 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
 
   const whyNow = buildWhyNow(engineCtx);
   const whatMustChange = buildWhatMustChange(engineCtx);
+  const recommendationTransitions = buildRecommendationTransitions(signal.recommendation, engineCtx);
   const marketConsensus = buildMarketConsensus({ ...engineCtx, riskLevel: signal.riskLevel, aiScore: signal.score });
 
   logRecommendation({
@@ -170,6 +171,7 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
     explainability,
     whyNow,
     whatMustChange,
+    recommendationTransitions,
     marketConsensus,
     explanation: locale === "ar" ? explanationAr : explanationEn,
     explanationAr,

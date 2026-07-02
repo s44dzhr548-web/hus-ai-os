@@ -12,14 +12,16 @@ export async function POST(request: Request) {
   const userDecision = body.userDecision as Recommendation | "no_action";
   const aiRecommendation = body.aiRecommendation as Recommendation;
   const userReason = String(body.userReason ?? body.userNotes ?? "");
+  const exitReason = body.exitReason ? String(body.exitReason) : undefined;
   const userNotes = String(body.userNotes ?? "");
   const emotion = body.emotion as JournalEntry["emotion"] | undefined;
+  const mistakeTags = Array.isArray(body.mistakeTags) ? body.mistakeTags.map(String) : undefined;
   const lessonsLearned = body.lessonsLearned ? String(body.lessonsLearned) : undefined;
 
   if (!symbol || !userDecision || !aiRecommendation) {
     return NextResponse.json({ error: "symbol, userDecision, aiRecommendation required" }, { status: 400 });
   }
 
-  const entry = addJournalEntry({ symbol, userDecision, aiRecommendation, userReason, userNotes, emotion, lessonsLearned });
+  const entry = addJournalEntry({ symbol, userDecision, aiRecommendation, userReason, exitReason, userNotes, emotion, mistakeTags, lessonsLearned });
   return NextResponse.json({ entry });
 }

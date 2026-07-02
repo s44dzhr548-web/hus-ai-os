@@ -1,90 +1,93 @@
-# HUSAI Trading AI — World's Most Intelligent Analysis Platform
+# HUSAI Trading AI — Advanced Differentiation Platform
 
 **Date:** June 30, 2026  
 **Production:** https://trading-ai-beta.vercel.app  
 **GitHub:** https://github.com/s44dzhr548-web/hus-ai-os  
-**Tests:** 40/40 passing · **Routes:** 52 · **Paper only · Broker OFF**
+**Tests:** 51/51 · **Routes:** 66 · **Paper only · Broker OFF**
 
 ---
 
-## Original Intelligence Features (Not Competitor Clones)
+## New Advanced Features (This Release)
 
-| # | Feature | Status | Route / API |
-|---|---------|--------|-------------|
-| 1 | **AI Decision Explainability Engine** | ✅ | `/dashboard/analysis` — technical, fundamental, news, sector, oil, rates, economic events, correlation, risk, confidence, invalidation, monitor next, review time |
-| 2 | **Cross-Market Intelligence** | ✅ | `/dashboard/cross-market` — relationship chains (Oil→Retail, Rates→Growth, USD→EM, Crypto→Risk, Saudi→Banks) + correlation cards |
-| 3 | **Why Now Engine** | ✅ | Built into every analysis — why now / not yesterday / not tomorrow / what changed |
-| 4 | **What Must Change Engine** | ✅ | Conditional rules: if price X → BUY, volume drops → HOLD, earnings miss → SELL |
-| 5 | **Market Consensus Engine** | ✅ | 8-source agreement % (TA, fundamentals, news, macro, sector, sentiment, AI, institutional flow) |
-| 6 | **AI Memory** | ✅ | Tracks every recommendation with price, return, mistakes, lessons, improved rules |
-| 7 | **Prediction Performance** | ✅ | `/dashboard/performance` — win rate by confidence, market, risk, strategy |
-| 8 | **Portfolio Simulator** | ✅ | `/dashboard/simulation` — equity curve, P/L, drawdown vs benchmarks |
-| 9 | **Investment Journal** | ✅ | `/dashboard/journal` — decision, reason, emotion, AI rec, lessons learned |
-| 10 | **Strategy Lab** | ✅ | `/dashboard/strategy-lab` — RSI, MACD, MA, Breakout, Mean Reversion, News, AI (8 strategies) |
-| 11 | **Market Health Dashboard** | ✅ | `/dashboard/market-health` — trend, liquidity, fear/greed, volatility, momentum, breadth, flow, rotation, institutional |
-| 12 | **Smart Money Flow Map** | ✅ | Embedded in Market Health — stocks, crypto, gold, oil, forex, bonds, cash |
-| 13 | **Scenario Simulator** | ✅ | `/dashboard/scenarios` — oil +10%, Fed cut, inflation, earnings miss |
-| 14 | **Opportunity Radar** | ✅ | `/dashboard/opportunities` — AI-scanned momentum, volume, rotation, hidden setups |
-| 15 | **Market Health Score** | ✅ | 0–100 score with per-factor breakdown on Market Health page |
-| 16 | **Data Quality Score** | ✅ | `/dashboard/providers` — freshness, missing providers, API health, confidence |
-| 17 | **Competitors Intelligence** | ✅ | `/competitors` — 20 platforms with features, strengths, weaknesses, pricing, HUSAI opportunity |
-| 18 | **Feature Gap Analysis** | ✅ | Missing features by priority (high/medium/low) + competitive advantages |
-| 19 | **Roadmap From Competitors** | ✅ | 4-phase auto-prioritized roadmap |
-| 20 | **Arabic First Experience** | ✅ | Default AR, RTL/LTR, professional bilingual terminology |
-| 21 | **Compliance** | ✅ | Educational only · not financial advice · paper only · audit log |
-| 22 | **Production** | ✅ | Tests, build, deploy ready |
+| # | Feature | Route | API |
+|---|---------|-------|-----|
+| 1 | **Auto Paper Trading Bot** | `/dashboard/auto-bot` | `GET/POST /api/bot` |
+| 2 | **Why Now AI** | `/dashboard/why-now` | `/api/intelligence/modules?module=why-now` |
+| 3 | **What Must Change** | `/dashboard/what-must-change` | `/api/intelligence/modules?module=what-must-change` |
+| 4 | **Event Impact Map** | `/dashboard/event-impact` | `/api/intelligence/event-impact` |
+| 5 | **Market Health Score** | `/dashboard/market-health` | `/api/intelligence/platform` |
+| 6 | **Smart Money Flow** | `/dashboard/money-flow` | `/api/intelligence/platform?type=smart-money` |
+| 7 | **Scenario Simulator** | `/dashboard/scenarios` | `/api/intelligence/platform?type=scenarios` |
+| 8 | **AI Memory** | `/dashboard/ai-memory` | `/api/intelligence/performance` |
+| 9 | **Confidence Accuracy** | `/dashboard/ai-memory` | `/api/intelligence/performance` |
+| 10 | **Investor Journal** | `/dashboard/journal` | `/api/journal` (entry/exit reason, emotion, mistake tags) |
+| 11 | **Risk Guardian** | `/dashboard/risk-guardian` | `/api/risk/guardian` |
+| 12 | **Competitor Gap Engine** | `/competitors` | `/api/competitors` |
+| 13 | **Arabic Market Intelligence** | `/dashboard/arabic-intelligence` | `/api/intelligence/modules` |
+| 14 | **AI Debate** | `/dashboard/ai-debate` | `/api/intelligence/debate` |
 
 ---
 
-## Core API Endpoints
+## Auto Bot Behavior (Paper Only)
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/analysis?symbol=AAPL` | Full AI analysis + Why Now + What Must Change + Consensus |
-| `GET /api/intelligence/platform` | Market health, smart money, scenarios, opportunities, data quality |
-| `GET /api/intelligence/platform?type=strategy-lab&symbol=AAPL` | Strategy comparison |
-| `GET /api/intelligence/performance` | AI memory + confidence analytics + portfolio sim |
-| `GET /api/intelligence/cross-market` | Chains + relations |
-| `GET/POST /api/journal` | Investment journal |
-| `GET /api/competitors` | Competitor intelligence + gap + roadmap |
+- Scans watchlist on 15-minute schedule (manual run supported)
+- Opens/closes **virtual** positions from AI signals
+- Stop loss / take profit from risk settings
+- Daily loss limit via Risk Guardian
+- Full activity log (EN/AR)
 
 ---
 
-## HUSAI Differentiators vs Bloomberg, TradingView, Trade Ideas, etc.
+## Risk Guardian
 
-| Original Capability | Competitors |
-|---------------------|-------------|
-| **Why Now / Why Not Yesterday / Why Not Tomorrow** | Most show BUY/SELL without timing narrative |
-| **What Must Change conditional rules** | Rare — usually static alerts only |
-| **8-source Market Consensus %** | Fragmented across separate tools |
-| **Cross-market causal chains** | Correlation matrices, not narrative chains |
-| **Arabic-first explainability** | Partial or none |
-| **Paper-only safety locked** | Many push live execution |
-| **AI memory + confidence analytics loop** | Limited self-improvement tracking |
-| **Scenario macro simulator** | Enterprise-only (Bloomberg) |
+- Emergency stop toggle
+- Blocks paper orders when daily loss exceeded
+- Max risk per trade enforcement
+- Allowed markets filter
+- Integrated into `/api/paper` and auto bot
 
 ---
 
-## Safety (Unchanged)
+## AI Debate
+
+- **Bull agent** argues BUY
+- **Bear agent** argues SELL
+- **Risk agent** evaluates downside
+- Final bilingual verdict with confidence
+
+---
+
+## Unified Modules API
+
+`GET /api/intelligence/modules` — bot, guardian, event impact, market health, smart money, scenarios, Arabic brief, AI memory, competitor gaps, data quality
+
+---
+
+## Safety
 
 | Rule | Status |
 |------|--------|
 | Real broker execution | **DISABLED** |
 | Paper trading only | **YES** |
-| Real buy/sell orders | **NONE** |
-| Demo fallback + badge | **YES** when keys missing |
+| No real money | **YES** |
+| Demo fallback when keys missing | **YES** |
+| Arabic default + English | **YES** |
 | Audit log | **YES** |
+
+---
+
+## Test Coverage
+
+- `bot.test.ts` — auto bot, guardian, debate, event impact, Arabic brief, transitions
+- `intelligence.test.ts` — cross-market, strategy lab, memory, scenarios
+- `i18n.test.ts` — Arabic default, RTL/LTR, bilingual module keys
+- `analysis-engine.test.ts` — Why Now, transitions, consensus
 
 ---
 
 ## Remaining Human Actions
 
-1. Add optional API keys in Vercel for premium data (FINNHUB, POLYGON, etc.)
-2. SMTP / WhatsApp for alert delivery (optional)
-3. OAuth / payment / KYC only if enabling real broker (not planned)
-
-**No OAuth, payment, or KYC required for current platform.**
-
----
+1. Optional API keys in Vercel (FINNHUB, POLYGON, etc.)
+2. SMTP/WhatsApp for alerts (optional)
 
 *Not financial advice · Educational use only · Paper trading simulation*

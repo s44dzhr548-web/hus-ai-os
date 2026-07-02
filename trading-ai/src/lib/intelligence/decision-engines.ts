@@ -1,6 +1,7 @@
 import type {
   MarketConsensus,
   Recommendation,
+  RecommendationTransition,
   RiskLevel,
   TechnicalAnalysis,
   WhatMustChangeRule,
@@ -117,6 +118,70 @@ export function buildWhatMustChange(ctx: Ctx): WhatMustChangeRule[] {
   }
 
   return rules.slice(0, 6);
+}
+
+export function buildRecommendationTransitions(current: Recommendation, ctx: Ctx): RecommendationTransition[] {
+  const { technical } = ctx;
+  const transitions: RecommendationTransition[] = [];
+
+  if (current === "buy") {
+    transitions.push({
+      from: "buy",
+      to: "hold",
+      conditionEn: `Price stalls below $${technical.resistance} with falling volume`,
+      conditionAr: `السعر يتوقف تحت $${technical.resistance} مع حجم هابط`,
+      triggerEn: "Momentum fades — downgrade to wait",
+      triggerAr: "زخم يضعف — انتقل للانتظار",
+    });
+    transitions.push({
+      from: "buy",
+      to: "sell",
+      conditionEn: `Break below support $${technical.support}`,
+      conditionAr: `كسر الدعم $${technical.support}`,
+      triggerEn: "Thesis invalidated — exit",
+      triggerAr: "الفرضية أُلغيت — اخرج",
+    });
+  }
+
+  if (current === "hold") {
+    transitions.push({
+      from: "hold",
+      to: "sell",
+      conditionEn: "Negative news cluster or macro surprise",
+      conditionAr: "مجموعة أخبار سلبية أو مفاجأة ماكرو",
+      triggerEn: "Risk-off catalyst",
+      triggerAr: "محفّز risk-off",
+    });
+    transitions.push({
+      from: "hold",
+      to: "buy",
+      conditionEn: `Breakout above $${technical.resistance} with volume`,
+      conditionAr: `اختراق فوق $${technical.resistance} مع حجم`,
+      triggerEn: "Confirmation of upward edge",
+      triggerAr: "تأكيد أفضلية صاعدة",
+    });
+  }
+
+  if (current === "sell") {
+    transitions.push({
+      from: "sell",
+      to: "hold",
+      conditionEn: "Oversold bounce without trend reversal",
+      conditionAr: "ارتداد oversold بدون انعكاس اتجاه",
+      triggerEn: "Cover shorts / wait for clarity",
+      triggerAr: "غطّ مراكز / انتظر وضوحاً",
+    });
+    transitions.push({
+      from: "sell",
+      to: "buy",
+      conditionEn: `Reclaim resistance $${technical.resistance} + positive catalyst`,
+      conditionAr: `استرداد $${technical.resistance} + محفّز إيجابي`,
+      triggerEn: "Trend reversal confirmed",
+      triggerAr: "انعكاس اتجاه مؤكد",
+    });
+  }
+
+  return transitions;
 }
 
 export function buildMarketConsensus(ctx: Ctx & { riskLevel: RiskLevel; aiScore: number }): MarketConsensus {

@@ -13,7 +13,7 @@ describe("AI analysis engine", () => {
     expect(analysis.explainability).toBeDefined();
     expect(analysis.explainability.fundamental.en.length).toBeGreaterThan(10);
     expect(analysis.whyNow).toBeDefined();
-    expect(analysis.whatMustChange.length).toBeGreaterThan(0);
+    expect(analysis.recommendationTransitions.length).toBeGreaterThan(0);
     expect(analysis.marketConsensus.consensusPct).toBeGreaterThan(0);
     expect(analysis.complianceNote).toContain("financial advice");
     expect(analysis.technical.trendStrength).toBeGreaterThan(0);
