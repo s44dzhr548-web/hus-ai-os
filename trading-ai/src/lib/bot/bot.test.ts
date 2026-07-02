@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { getBotStatus, runBotCycle, setBotEnabled } from "@/lib/bot/auto-paper-bot";
+import { describe, expect, it, beforeEach } from "vitest";
+import { getBotStatus, runBotCycle, startBot } from "@/lib/bot/auto-paper-bot";
+import { resetBotStateForTests } from "@/lib/bot/bot-store";
 import { getGuardianState, setEmergencyStop, validatePaperTrade } from "@/lib/risk/guardian";
 import { runAIDebate } from "@/lib/intelligence/ai-debate";
 import { getEventImpactMap } from "@/lib/intelligence/event-impact";
@@ -11,8 +12,13 @@ import { DEFAULT_RISK_SETTINGS } from "@/lib/compliance/config";
 import { getPaperPortfolio } from "@/lib/paper/portfolio";
 
 describe("advanced differentiation modules", () => {
+  beforeEach(async () => {
+    await resetBotStateForTests();
+    setEmergencyStop(false);
+    await startBot();
+  });
+
   it("returns bot status in demo mode", async () => {
-    setBotEnabled(true);
     const status = await getBotStatus();
     expect(status.mode).toBe("demo");
     expect(status.enabled).toBe(true);
@@ -20,8 +26,9 @@ describe("advanced differentiation modules", () => {
   });
 
   it("runs bot cycle without real execution", async () => {
-    const status = await runBotCycle();
+    const status = await runBotCycle({ trigger: "test", skipLock: true });
     expect(status.activityLog.length).toBeGreaterThan(0);
+    expect(status.paperOnly).toBe(true);
   });
 
   it("guardian blocks emergency stop", async () => {

@@ -37,8 +37,10 @@ npm-debug.log*
 # TypeScript
 *.tsbuildinfo
 
-# Supabase CLI local state
+# Bot runtime state (local dev)
+trading-ai/data/
 supabase/.temp/
 
 # Nested app git (managed separately until monorepo merge)
 restaurant-os/.git/
+.env*

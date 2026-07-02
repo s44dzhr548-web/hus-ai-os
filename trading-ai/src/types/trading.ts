@@ -571,9 +571,13 @@ export interface CEODashboardData {
   generatedAt: string;
 }
 
+export type BotLifecycleStatus = "running" | "stopped" | "paused" | "error";
+
 export interface AutoPaperBotStatus {
   enabled: boolean;
+  paused: boolean;
   running: boolean;
+  lifecycleStatus: BotLifecycleStatus;
   mode: "demo";
   scheduleMinutes: number;
   maxTradesPerDay: number;
@@ -583,10 +587,17 @@ export interface AutoPaperBotStatus {
   emergencyStop: boolean;
   lastRunAt?: string;
   nextRunAt?: string;
+  lastScannedSymbols: string[];
+  lastTrade?: { symbol: string; side: string; at: string };
+  lastError?: string;
+  consecutiveErrors: number;
   openPositions: number;
   todayPnlPct: number;
   activityLog: BotActivityLog[];
   guardian: RiskGuardianState;
+  storageBackend: "supabase" | "file" | "memory";
+  cronEnabled: boolean;
+  paperOnly: boolean;
 }
 
 export interface ArabicMarketBrief {
