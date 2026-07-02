@@ -98,6 +98,17 @@ export function CompanyProfileClient({ symbolParam }: { symbolParam: string }) {
     setActionMsg(data.ok ? "Journal entry added" : data.error ?? "Failed");
   }
 
+  async function addPortfolioSimulator() {
+    if (!profile) return;
+    const res = await fetch("/api/portfolio/simulation/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol: profile.overview.symbol, weightPct: 5 }),
+    });
+    const data = await res.json();
+    setActionMsg(data.ok ? `Added to portfolio simulator (${profile.overview.displaySymbol})` : data.error ?? "Failed");
+  }
+
   if (loading) return <p className="text-zinc-400">{cp.loading}</p>;
   if (!profile) return <p className="text-red-400">{cp.notFound}</p>;
 
@@ -166,12 +177,18 @@ export function CompanyProfileClient({ symbolParam }: { symbolParam: string }) {
             <div><p className="text-zinc-500">{cp.open}</p><p>{quote.open}</p></div>
             <div><p className="text-zinc-500">{cp.high}</p><p>{quote.high}</p></div>
             <div><p className="text-zinc-500">{cp.low}</p><p>{quote.low}</p></div>
+            <div><p className="text-zinc-500">{cp.previousClose}</p><p>{quote.previousClose}</p></div>
             <div><p className="text-zinc-500">{cp.volume}</p><p>{quote.volume.toLocaleString()}</p></div>
+            {quote.high52w != null && <div><p className="text-zinc-500">{cp.high52w}</p><p>{quote.high52w}</p></div>}
+            {quote.low52w != null && <div><p className="text-zinc-500">{cp.low52w}</p><p>{quote.low52w}</p></div>}
             <div><p className="text-zinc-500">{cp.dayChange}</p><p>{pct(quote.dayChangePct)}</p></div>
             <div><p className="text-zinc-500">{cp.weekChange}</p><p>{pct(quote.weekChangePct)}</p></div>
             <div><p className="text-zinc-500">{cp.monthChange}</p><p>{pct(quote.monthChangePct)}</p></div>
             <div><p className="text-zinc-500">{cp.yearChange}</p><p>{pct(quote.yearChangePct)}</p></div>
           </div>
+          <p className="mt-3 text-xs text-zinc-500">
+            {cp.dataSourceLabel}: {quote.dataSource.toUpperCase()} · {quote.provider} · {new Date(quote.lastUpdated).toLocaleString()}
+          </p>
         </Section>
 
         <Section title={cp.aiRecommendation}>
@@ -247,6 +264,18 @@ export function CompanyProfileClient({ symbolParam }: { symbolParam: string }) {
               </li>
             ))}
           </ul>
+          {related.length > 0 && (
+            <div className="mt-3 border-t border-zinc-800 pt-3">
+              <p className="text-xs font-medium text-zinc-500">{cp.newsRelated}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {related.slice(0, 4).map((r) => (
+                  <Link key={r.symbol} href={profilePathForSymbol(r.symbol, r.displaySymbol)} className="text-xs text-emerald-400 hover:underline">
+                    {r.displaySymbol}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </Section>
 
         <Section title={cp.technical}>
@@ -254,6 +283,8 @@ export function CompanyProfileClient({ symbolParam }: { symbolParam: string }) {
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
             <p>RSI: {technical.rsi.toFixed(1)}</p>
             <p>MACD: {technical.macdSignal}</p>
+            <p>{cp.sma20}: {technical.sma20.toFixed(2)}</p>
+            <p>{cp.sma50}: {technical.sma50.toFixed(2)}</p>
             <p>Support: {technical.support}</p>
             <p>Resistance: {technical.resistance}</p>
             <p>Trend: {technical.trend}</p>
@@ -329,6 +360,9 @@ export function CompanyProfileClient({ symbolParam }: { symbolParam: string }) {
           </button>
           <button type="button" onClick={addJournal} className="rounded-lg bg-zinc-800 px-4 py-2 text-sm">
             {cp.addJournal}
+          </button>
+          <button type="button" onClick={addPortfolioSimulator} className="rounded-lg bg-zinc-800 px-4 py-2 text-sm">
+            {cp.addPortfolioSimulator}
           </button>
         </div>
         {actionMsg && <p className="mt-3 text-sm text-emerald-400">{actionMsg}</p>}

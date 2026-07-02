@@ -8,6 +8,7 @@ import { getEnterpriseProviderDashboard } from "@/lib/market/provider-manager/ma
 import { getCostDashboard } from "@/lib/market/provider-manager/cost";
 import { getEnterpriseLogStats } from "@/lib/market/provider-manager/logging";
 import { isAutomaticSwitchingEnabled } from "@/lib/market/provider-manager/config-store";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export async function GET() {
   const providers = getProviderHealth();
@@ -34,5 +35,9 @@ export async function GET() {
     cost,
     logStats: getEnterpriseLogStats(),
     automaticFailover: isAutomaticSwitchingEnabled(),
+    persistenceConfigured: isSupabaseConfigured(),
+    persistenceNote: isSupabaseConfigured()
+      ? "Supabase configured — cache tables available"
+      : "Persistence not configured — using local seed/cache fallback",
   });
 }

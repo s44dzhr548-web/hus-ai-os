@@ -12,8 +12,11 @@ const ROOT = path.join(__dirname, "..");
 const BASE = process.argv.find((a) => !a.startsWith("--") && a.endsWith(".app")) ?? "https://trading-ai-beta.vercel.app";
 const writeReports = process.argv.includes("--write-reports");
 
-async function fetchJson(path) {
-  const res = await fetch(`${BASE}${path}`, { headers: { Accept: "application/json" } });
+async function fetchJson(path, options) {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { Accept: "application/json", ...(options?.headers ?? {}) },
+    ...options,
+  });
   const data = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, data };
 }
@@ -63,6 +66,30 @@ async function run() {
   const paperData = await paper.json().catch(() => ({}));
   steps.push(step("Paper order only", paperData.brokerEnabled === false && paperData.executionMode === "paper_only", paperData.ok ? "paper buy ok" : paperData.error ?? "blocked"));
 
+  const alert = await fetchJson("/api/alerts/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "Test Alert", message: "Market intelligence verify", symbol: "AAPL", type: "signal" }),
+  });
+  steps.push(step("Alert creation", alert.ok && alert.data.ok, alert.ok ? "created" : "failed"));
+
+  const journal = await fetchJson("/api/journal/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol: "AAPL", userDecision: "hold", aiRecommendation: "hold", userNotes: "verify" }),
+  });
+  steps.push(step("Journal entry", journal.ok && journal.data.ok, journal.ok ? "added" : "failed"));
+
+  const sim = await fetchJson("/api/portfolio/simulation/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol: "NVDA", weightPct: 5 }),
+  });
+  steps.push(step("Portfolio simulator add", sim.ok && sim.data.ok, sim.ok ? "NVDA added" : "failed"));
+
+  const providers = await fetchJson("/api/market/providers/status");
+  steps.push(step("Provider persistence note", providers.ok && providers.data.persistenceNote, providers.data?.persistenceNote ?? "missing"));
+
   const finishedAt = new Date().toISOString();
   const allPassed = steps.every((s) => s.ok);
   const stats = markets.data?.stats ?? {};
@@ -111,7 +138,7 @@ async function run() {
     "",
     "- GET /api/company/[symbol]/profile",
     "- GET /api/company/[symbol]/quote|financials|news|announcements|technical|risk|ai",
-    "- POST /api/paper/order, /api/watchlist/add, /api/alerts/create, /api/journal/add",
+    "- POST /api/paper/order, /api/watchlist/add, /api/alerts/create, /api/journal/add, /api/portfolio/simulation/add",
     "",
     "## Verification",
     "",

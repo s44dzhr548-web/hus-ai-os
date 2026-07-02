@@ -52,6 +52,8 @@ type StatusPayload = {
   cost: { currentMonthCostUsd: number; estimatedEndOfMonthUsd: number; totalApiCalls: number };
   logStats: { cacheHits: number; cacheMisses: number; switches: number; avgLatency: number };
   cache: { memory: { size: number }; disk: { size: number }; redisConfigured: boolean };
+  persistenceConfigured?: boolean;
+  persistenceNote?: string;
 };
 
 const REFRESH_MS = 60_000;
@@ -111,6 +113,12 @@ export function ProvidersClient() {
           {refreshing ? t.common.loading : t.providers.refresh}
         </button>
       </div>
+
+      {data.persistenceConfigured === false && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+          {data.persistenceNote ?? t.companyProfile.persistenceWarning}
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <StatCard label={t.providers.dataMode} value={data.dataMode.toUpperCase()} />
