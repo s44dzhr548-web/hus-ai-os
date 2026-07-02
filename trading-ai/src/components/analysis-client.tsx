@@ -134,6 +134,22 @@ export function AnalysisClient() {
             </section>
           )}
 
+          {analysis.contributions && (
+            <section className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-5">
+              <h3 className="font-medium">{t.analysis.contributionsTitle}</h3>
+              <div className="mt-3 grid gap-2 sm:grid-cols-5 text-sm">
+                <ContributionBar label={t.analysis.contribTechnical} pct={analysis.contributions.technicalPct} />
+                <ContributionBar label={t.analysis.contribNews} pct={analysis.contributions.newsPct} />
+                <ContributionBar label={t.analysis.contribMacro} pct={analysis.contributions.macroPct} />
+                <ContributionBar label={t.analysis.contribSector} pct={analysis.contributions.sectorPct} />
+                <ContributionBar label={t.analysis.contribRisk} pct={analysis.contributions.riskPct} />
+              </div>
+              <p className="mt-3 text-sm text-zinc-400">{locale === "ar" ? analysis.contributions.whyNowAr : analysis.contributions.whyNowEn}</p>
+              <p className="mt-2 text-sm text-amber-300/80">{locale === "ar" ? analysis.contributions.invalidationAr : analysis.contributions.invalidationEn}</p>
+              <p className="mt-2 text-xs text-zinc-500">{t.analysis.reviewBy}: {new Date(analysis.contributions.nextReviewAt).toLocaleString(locale === "ar" ? "ar-SA" : "en-US")}</p>
+            </section>
+          )}
+
           {analysis.whatMustChange?.length > 0 && (
             <section className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
               <h3 className="font-medium">{t.analysis.whatMustChangeTitle}</h3>
@@ -184,6 +200,15 @@ export function AnalysisClient() {
           </section>
         </div>
       )}
+    </div>
+  );
+}
+
+function ContributionBar({ label, pct }: { label: string; pct: number }) {
+  return (
+    <div>
+      <p className="text-xs text-zinc-500">{label}</p>
+      <p className="text-lg font-semibold">{pct}%</p>
     </div>
   );
 }

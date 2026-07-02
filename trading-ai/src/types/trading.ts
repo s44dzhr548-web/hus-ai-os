@@ -246,6 +246,7 @@ export interface AIAnalysis {
     economicEvents: EconomicEvent[];
   };
   explainability: RecommendationExplainability;
+  contributions?: ExplainabilityContributions;
   whyNow: WhyNowEngine;
   whatMustChange: WhatMustChangeRule[];
   recommendationTransitions: RecommendationTransition[];
@@ -398,10 +399,172 @@ export interface BotActivityLog {
   success: boolean;
 }
 
+export interface ExplainabilityContributions {
+  technicalPct: number;
+  newsPct: number;
+  macroPct: number;
+  sectorPct: number;
+  riskPct: number;
+  whyNowEn: string;
+  whyNowAr: string;
+  invalidationEn: string;
+  invalidationAr: string;
+  nextReviewAt: string;
+}
+
+export interface AgentOpinion {
+  agentId: string;
+  nameEn: string;
+  nameAr: string;
+  stance: Recommendation;
+  confidence: number;
+  reasonsEn: string[];
+  reasonsAr: string[];
+}
+
+export interface MultiAgentConsensusResult {
+  agents: AgentOpinion[];
+  consensusScore: number;
+  finalDecision: Recommendation;
+  conflicts: { agentA: string; agentB: string; issueEn: string; issueAr: string }[];
+  decisionRationaleEn: string;
+  decisionRationaleAr: string;
+  generatedAt: string;
+}
+
+export interface PortfolioAllocation {
+  symbol: string;
+  name: string;
+  assetClass: AssetClass;
+  targetWeightPct: number;
+  currentWeightPct: number;
+  sector: string;
+  riskBand: RiskLevel;
+}
+
+export interface PortfolioManagerState {
+  totalEquity: number;
+  cashPct: number;
+  allocations: PortfolioAllocation[];
+  sectorExposure: { sector: string; pct: number }[];
+  drawdownPct: number;
+  totalPnlPct: number;
+  concentrationRisk: RiskLevel;
+  rebalanceActions: { symbol: string; actionEn: string; actionAr: string }[];
+  updatedAt: string;
+}
+
+export interface GlobalMarketBrainInsight {
+  id: string;
+  titleEn: string;
+  titleAr: string;
+  markets: string[];
+  drivers: string[];
+  impactEn: string;
+  impactAr: string;
+  correlationScore: number;
+  severity: RiskLevel;
+}
+
+export interface GlobalMarketBrain {
+  regions: { id: string; nameEn: string; nameAr: string; health: number; trend: Recommendation }[];
+  crossMarketInsights: GlobalMarketBrainInsight[];
+  macroDrivers: {
+    oil: { value: string; impactEn: string; impactAr: string };
+    rates: { value: string; impactEn: string; impactAr: string };
+    usd: { value: string; impactEn: string; impactAr: string };
+    gold: { value: string; impactEn: string; impactAr: string };
+    cryptoSentiment: { value: string; impactEn: string; impactAr: string };
+    saudiSector: { value: string; impactEn: string; impactAr: string };
+  };
+  updatedAt: string;
+}
+
+export interface ResearchNewsItem {
+  id: string;
+  headlineEn: string;
+  headlineAr: string;
+  summaryEn: string;
+  summaryAr: string;
+  affectedAssets: string[];
+  expectedImpactEn: string;
+  expectedImpactAr: string;
+  sentiment: "positive" | "negative" | "neutral";
+  publishedAt: string;
+  dataSource: "live" | "demo";
+}
+
+export interface StrategyMarketplaceItem {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  bestMarket: string;
+  winRate: number;
+  totalReturnPct: number;
+  maxDrawdownPct: number;
+  riskReward: number;
+  strengthsEn: string[];
+  strengthsAr: string[];
+  weaknessesEn: string[];
+  weaknessesAr: string[];
+}
+
+export interface ImprovementRecord {
+  id: string;
+  category: string;
+  mistakeEn: string;
+  mistakeAr: string;
+  suggestedRuleEn: string;
+  suggestedRuleAr: string;
+  backtestImprovementPct: number;
+  accepted: boolean;
+  createdAt: string;
+}
+
+export interface GuardianProCheck {
+  id: string;
+  labelEn: string;
+  labelAr: string;
+  passed: boolean;
+  severity: RiskLevel;
+  detailEn: string;
+  detailAr: string;
+}
+
+export interface GuardianProResult {
+  allowed: boolean;
+  checks: GuardianProCheck[];
+  suggestedPositionSizePct: number;
+  summaryEn: string;
+  summaryAr: string;
+}
+
+export interface CEODashboardData {
+  topOpportunities: OpportunityItem[];
+  topRisks: { titleEn: string; titleAr: string; severity: RiskLevel; detailEn: string; detailAr: string }[];
+  botStatus: AutoPaperBotStatus;
+  paperPerformance: { totalPnlPct: number; todayPnlPct: number; winRate: number; trades: number };
+  marketHealth: MarketHealthDashboard;
+  providerStatus: { live: number; demo: number; pendingKeys: string[] };
+  portfolioSimulation: PortfolioSimulationResult;
+  topRecommendations: { symbol: string; recommendation: Recommendation; confidence: number }[];
+  alerts: Alert[];
+  compliance: ComplianceConfig;
+  generatedAt: string;
+}
+
 export interface AutoPaperBotStatus {
   enabled: boolean;
+  running: boolean;
   mode: "demo";
   scheduleMinutes: number;
+  maxTradesPerDay: number;
+  tradesToday: number;
+  maxRiskPerTradePct: number;
+  dailyLossLimitPct: number;
+  emergencyStop: boolean;
   lastRunAt?: string;
   nextRunAt?: string;
   openPositions: number;
@@ -510,7 +673,15 @@ export interface LearningStats {
 export interface Alert {
   id: string;
   channel: AlertChannel;
-  type: "signal" | "risk" | "price" | "system" | "market_event";
+  type:
+    | "signal"
+    | "risk"
+    | "price"
+    | "system"
+    | "market_event"
+    | "news"
+    | "economic"
+    | "portfolio";
   title: string;
   message: string;
   symbol?: string;

@@ -8,7 +8,14 @@ import { useI18n, useRecommendationLabel, useRiskLabel } from "@/lib/i18n/contex
 
 const NAV_KEYS = [
   { href: "/dashboard", key: "overview" as const },
+  { href: "/dashboard/ceo", key: "ceoDashboard" as const },
   { href: "/dashboard/auto-bot", key: "autoBot" as const },
+  { href: "/dashboard/portfolio-manager", key: "portfolioManager" as const },
+  { href: "/dashboard/market-brain", key: "marketBrain" as const },
+  { href: "/dashboard/research", key: "researchAgent" as const },
+  { href: "/dashboard/strategy-marketplace", key: "strategyMarketplace" as const },
+  { href: "/dashboard/consensus", key: "consensus" as const },
+  { href: "/dashboard/improvement", key: "improvement" as const },
   { href: "/dashboard/analysis", key: "analysis" as const },
   { href: "/dashboard/why-now", key: "whyNow" as const },
   { href: "/dashboard/what-must-change", key: "whatMustChange" as const },
@@ -19,6 +26,7 @@ const NAV_KEYS = [
   { href: "/dashboard/scenarios", key: "scenarios" as const },
   { href: "/dashboard/opportunities", key: "opportunities" as const },
   { href: "/dashboard/risk-guardian", key: "riskGuardian" as const },
+  { href: "/dashboard/alerts", key: "alerts" as const },
   { href: "/dashboard/ai-memory", key: "aiMemory" as const },
   { href: "/dashboard/journal", key: "journal" as const },
   { href: "/dashboard/arabic-intelligence", key: "arabicIntel" as const },

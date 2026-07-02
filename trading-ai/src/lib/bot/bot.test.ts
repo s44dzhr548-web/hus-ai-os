@@ -16,6 +16,7 @@ describe("advanced differentiation modules", () => {
     const status = await getBotStatus();
     expect(status.mode).toBe("demo");
     expect(status.enabled).toBe(true);
+    expect(status.maxTradesPerDay).toBeGreaterThan(0);
   });
 
   it("runs bot cycle without real execution", async () => {

@@ -14,6 +14,7 @@ import { unifiedCandles, unifiedQuote } from "@/lib/market/unified";
 import { fetchEconomicCalendar, fetchNews } from "@/lib/market/providers/news";
 import { logRecommendation } from "@/lib/audit/log";
 import { buildExplainability } from "@/lib/intelligence/explainability";
+import { buildContributions } from "@/lib/intelligence/contributions";
 import { buildMarketConsensus, buildRecommendationTransitions, buildWhatMustChange, buildWhyNow } from "@/lib/intelligence/decision-engines";
 import { recordMemoryFromAnalysis } from "@/lib/learning/memory";
 
@@ -144,6 +145,18 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
   const recommendationTransitions = buildRecommendationTransitions(signal.recommendation, engineCtx);
   const marketConsensus = buildMarketConsensus({ ...engineCtx, riskLevel: signal.riskLevel, aiScore: signal.score });
 
+  const contributions = buildContributions({
+    recommendation: signal.recommendation,
+    confidence: signal.confidence,
+    riskLevel: signal.riskLevel,
+    signalScore: signal.score,
+    technical,
+    newsCount: newsResult.items.length,
+    oilImpact,
+    ratesImpact,
+    sectorImpact: sectorImpact.impact,
+  });
+
   logRecommendation({
     symbol,
     recommendation: signal.recommendation,
@@ -169,6 +182,7 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
     marketCorrelation: correlations,
     macroFactors: { oilImpact, ratesImpact, economicEvents: economicResult.events },
     explainability,
+    contributions,
     whyNow,
     whatMustChange,
     recommendationTransitions,
