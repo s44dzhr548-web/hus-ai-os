@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { runAIAnalysis, scanAllSignals } from "@/lib/ai/analysis-engine";
 import { DEFAULT_WATCHLIST } from "@/lib/data/mock-market";
-import { recordPrediction } from "@/lib/learning/tracker";
 import { getDataMode } from "@/lib/market/config";
 
 export async function GET(request: Request) {
@@ -23,12 +22,5 @@ export async function GET(request: Request) {
   }
 
   const analysis = await runAIAnalysis(symbol, lang);
-  recordPrediction(
-    symbol,
-    analysis.recommendation,
-    analysis.confidence,
-    analysis.recommendation === "buy" ? "up" : analysis.recommendation === "sell" ? "down" : "flat"
-  );
-
   return NextResponse.json({ analysis, mode: getDataMode() });
 }

@@ -1,84 +1,67 @@
-# Trading AI — REAL MARKET DATA MODE Report
+# HUSAI Trading AI — World's Most Intelligent Analysis Platform
 
 **Date:** June 30, 2026  
-**Production URL:** https://trading-ai-beta.vercel.app  
+**Production:** https://trading-ai-beta.vercel.app  
 **GitHub:** https://github.com/s44dzhr548-web/hus-ai-os  
-**Mode:** `MARKET_DATA_MODE=live` (default) · Paper trading only · Broker **DISABLED**
+**Tests:** 40/40 passing · **Routes:** 52 · **Paper only · Broker OFF**
 
 ---
 
-## What Changed
+## Original Intelligence Features (Not Competitor Clones)
 
-Trading AI now runs in **Real Market Data mode** by default:
-
-- Live providers are tried **first** for every quote, candle, news, and calendar request
-- **Mock/demo fallback** only when all live sources fail (or `MARKET_DATA_MODE=demo`)
-- **No broker** connected · **No real trades** · paper portfolio only
-- Adding API keys in Vercel auto-enables premium providers on next deploy
-
----
-
-## Connected Providers (Live — No API Key Required)
-
-| Provider | Markets | Status |
-|----------|---------|--------|
-| **Yahoo Finance** | US stocks, ETFs, indices, commodities, Saudi (.SR), forex, crypto | Live |
-| **CoinGecko** | Crypto (BTC, ETH) | Live |
-| **Binance Public** | Crypto | Live |
-| **Frankfurter ECB** | Forex (EUR, GBP, JPY pairs) | Live |
-| **Yahoo Finance RSS** | Market news headlines | Live |
-| **FairEconomy Calendar** | Economic events this week | Live |
-
-Verify: `GET /api/market/providers/verify`
-
----
-
-## Missing API Keys (Optional Upgrades)
-
-These keys are **not required** to build or run. Add in Vercel → Environment Variables:
-
-| Env Variable | Unlocks |
-|--------------|---------|
-| `FINNHUB_API_KEY` | Premium US stock data + search |
-| `POLYGON_API_KEY` | Polygon.io equities/crypto |
-| `ALPHA_VANTAGE_API_KEY` | Alpha Vantage stocks/forex/commodities |
-| `TWELVE_DATA_API_KEY` | Twelve Data multi-asset |
-| `FOREX_PROVIDER_KEY` | Keyed forex feed |
-| `TADAWUL_PROVIDER_KEY` | Official Saudi market API |
-| `NEWS_API_KEY` | NewsAPI.org (replaces Yahoo RSS) |
-| `ECONOMIC_CALENDAR_API_KEY` | TradingEconomics calendar |
-
-**Auto-switch:** When keys are added and redeployed, keyed providers join the live chain automatically.
+| # | Feature | Status | Route / API |
+|---|---------|--------|-------------|
+| 1 | **AI Decision Explainability Engine** | ✅ | `/dashboard/analysis` — technical, fundamental, news, sector, oil, rates, economic events, correlation, risk, confidence, invalidation, monitor next, review time |
+| 2 | **Cross-Market Intelligence** | ✅ | `/dashboard/cross-market` — relationship chains (Oil→Retail, Rates→Growth, USD→EM, Crypto→Risk, Saudi→Banks) + correlation cards |
+| 3 | **Why Now Engine** | ✅ | Built into every analysis — why now / not yesterday / not tomorrow / what changed |
+| 4 | **What Must Change Engine** | ✅ | Conditional rules: if price X → BUY, volume drops → HOLD, earnings miss → SELL |
+| 5 | **Market Consensus Engine** | ✅ | 8-source agreement % (TA, fundamentals, news, macro, sector, sentiment, AI, institutional flow) |
+| 6 | **AI Memory** | ✅ | Tracks every recommendation with price, return, mistakes, lessons, improved rules |
+| 7 | **Prediction Performance** | ✅ | `/dashboard/performance` — win rate by confidence, market, risk, strategy |
+| 8 | **Portfolio Simulator** | ✅ | `/dashboard/simulation` — equity curve, P/L, drawdown vs benchmarks |
+| 9 | **Investment Journal** | ✅ | `/dashboard/journal` — decision, reason, emotion, AI rec, lessons learned |
+| 10 | **Strategy Lab** | ✅ | `/dashboard/strategy-lab` — RSI, MACD, MA, Breakout, Mean Reversion, News, AI (8 strategies) |
+| 11 | **Market Health Dashboard** | ✅ | `/dashboard/market-health` — trend, liquidity, fear/greed, volatility, momentum, breadth, flow, rotation, institutional |
+| 12 | **Smart Money Flow Map** | ✅ | Embedded in Market Health — stocks, crypto, gold, oil, forex, bonds, cash |
+| 13 | **Scenario Simulator** | ✅ | `/dashboard/scenarios` — oil +10%, Fed cut, inflation, earnings miss |
+| 14 | **Opportunity Radar** | ✅ | `/dashboard/opportunities` — AI-scanned momentum, volume, rotation, hidden setups |
+| 15 | **Market Health Score** | ✅ | 0–100 score with per-factor breakdown on Market Health page |
+| 16 | **Data Quality Score** | ✅ | `/dashboard/providers` — freshness, missing providers, API health, confidence |
+| 17 | **Competitors Intelligence** | ✅ | `/competitors` — 20 platforms with features, strengths, weaknesses, pricing, HUSAI opportunity |
+| 18 | **Feature Gap Analysis** | ✅ | Missing features by priority (high/medium/low) + competitive advantages |
+| 19 | **Roadmap From Competitors** | ✅ | 4-phase auto-prioritized roadmap |
+| 20 | **Arabic First Experience** | ✅ | Default AR, RTL/LTR, professional bilingual terminology |
+| 21 | **Compliance** | ✅ | Educational only · not financial advice · paper only · audit log |
+| 22 | **Production** | ✅ | Tests, build, deploy ready |
 
 ---
 
-## Live Markets Available (via public providers)
+## Core API Endpoints
 
-| Market | Probe Symbol | Primary Live Source |
-|--------|--------------|---------------------|
-| US Stocks | AAPL | Yahoo Finance |
-| Saudi / Tadawul | 2222 | Yahoo Finance (2222.SR) |
-| Crypto | BTCUSD | CoinGecko / Binance |
-| Forex | EURUSD | Frankfurter / Yahoo |
-| Commodities | CLUSD | Yahoo (CL=F) |
-| Indices | SPX | Yahoo (^GSPC) |
-| ETFs | SPY | Yahoo Finance |
-| News | AAPL | Yahoo RSS |
-| Economic Calendar | Global | FairEconomy JSON |
-
-Check runtime status: `GET /api/market/providers/status`
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/analysis?symbol=AAPL` | Full AI analysis + Why Now + What Must Change + Consensus |
+| `GET /api/intelligence/platform` | Market health, smart money, scenarios, opportunities, data quality |
+| `GET /api/intelligence/platform?type=strategy-lab&symbol=AAPL` | Strategy comparison |
+| `GET /api/intelligence/performance` | AI memory + confidence analytics + portfolio sim |
+| `GET /api/intelligence/cross-market` | Chains + relations |
+| `GET/POST /api/journal` | Investment journal |
+| `GET /api/competitors` | Competitor intelligence + gap + roadmap |
 
 ---
 
-## Demo Markets Remaining
+## HUSAI Differentiators vs Bloomberg, TradingView, Trade Ideas, etc.
 
-Demo fallback activates **only when**:
-
-- All live provider probes fail for a symbol (network/API outage)
-- `MARKET_DATA_MODE=demo` is set
-- Keyed-only provider requested without key **and** free sources failed
-
-The dashboard shows **LIVE DATA** / **MIXED DATA** / **Demo Data** badges per runtime verification.
+| Original Capability | Competitors |
+|---------------------|-------------|
+| **Why Now / Why Not Yesterday / Why Not Tomorrow** | Most show BUY/SELL without timing narrative |
+| **What Must Change conditional rules** | Rare — usually static alerts only |
+| **8-source Market Consensus %** | Fragmented across separate tools |
+| **Cross-market causal chains** | Correlation matrices, not narrative chains |
+| **Arabic-first explainability** | Partial or none |
+| **Paper-only safety locked** | Many push live execution |
+| **AI memory + confidence analytics loop** | Limited self-improvement tracking |
+| **Scenario macro simulator** | Enterprise-only (Bloomberg) |
 
 ---
 
@@ -88,26 +71,19 @@ The dashboard shows **LIVE DATA** / **MIXED DATA** / **Demo Data** badges per ru
 |------|--------|
 | Real broker execution | **DISABLED** |
 | Paper trading only | **YES** |
-| Compliance mode locked | **YES** |
-| Alpaca keys | Data-only if set; execution blocked |
-
----
-
-## Tests & Deploy
-
-- **31/31** Vitest tests passing
-- TypeScript build clean
-- New endpoint: `/api/market/providers/verify`
+| Real buy/sell orders | **NONE** |
+| Demo fallback + badge | **YES** when keys missing |
+| Audit log | **YES** |
 
 ---
 
 ## Remaining Human Actions
 
-1. Add optional API keys in Vercel for premium data feeds
-2. Set `MARKET_DATA_MODE=live` in Vercel (recommended, default in `.env.example`)
-3. SMTP / WhatsApp for alert delivery (optional)
+1. Add optional API keys in Vercel for premium data (FINNHUB, POLYGON, etc.)
+2. SMTP / WhatsApp for alert delivery (optional)
+3. OAuth / payment / KYC only if enabling real broker (not planned)
 
-**No OAuth, payment, or KYC required for live market data.**
+**No OAuth, payment, or KYC required for current platform.**
 
 ---
 

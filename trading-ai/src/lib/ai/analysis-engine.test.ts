@@ -10,6 +10,11 @@ describe("AI analysis engine", () => {
     expect(analysis.symbol).toBe("AAPL");
     expect(["buy", "hold", "sell"]).toContain(analysis.recommendation);
     expect(analysis.explanation.length).toBeGreaterThan(3);
+    expect(analysis.explainability).toBeDefined();
+    expect(analysis.explainability.fundamental.en.length).toBeGreaterThan(10);
+    expect(analysis.whyNow).toBeDefined();
+    expect(analysis.whatMustChange.length).toBeGreaterThan(0);
+    expect(analysis.marketConsensus.consensusPct).toBeGreaterThan(0);
     expect(analysis.complianceNote).toContain("financial advice");
     expect(analysis.technical.trendStrength).toBeGreaterThan(0);
   });

@@ -38,8 +38,8 @@ describe("competitors intelligence", () => {
     expect(adv.some((a) => a.id === "arabic")).toBe(true);
   });
 
-  it("renders 3-phase roadmap", () => {
-    expect(ROADMAP).toHaveLength(3);
+  it("renders 4-phase roadmap", () => {
+    expect(ROADMAP).toHaveLength(4);
     expect(ROADMAP[0].itemsEn.length).toBeGreaterThan(0);
     expect(ROADMAP[0].itemsAr.length).toBeGreaterThan(0);
   });

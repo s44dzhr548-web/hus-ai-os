@@ -143,6 +143,91 @@ export interface EconomicEvent {
   description: string;
 }
 
+export interface RecommendationExplainability {
+  technical: { en: string; ar: string };
+  fundamental: { en: string; ar: string };
+  news: { en: string; ar: string };
+  sector: { en: string; ar: string };
+  macro: { en: string; ar: string };
+  oilImpact: { en: string; ar: string; score: number };
+  ratesImpact: { en: string; ar: string; score: number };
+  economicEvent: { en: string; ar: string };
+  correlation: { en: string; ar: string };
+  risk: { en: string; ar: string };
+  confidence: { en: string; ar: string };
+  invalidation: { en: string; ar: string };
+  monitorNext: { en: string; ar: string };
+  reviewBy: string;
+  dataSource: "live" | "demo";
+  provider?: string;
+}
+
+export interface WhyNowEngine {
+  whyNow: { en: string; ar: string };
+  whyNotYesterday: { en: string; ar: string };
+  whyNotTomorrow: { en: string; ar: string };
+  whatChanged: { en: string; ar: string };
+}
+
+export interface WhatMustChangeRule {
+  id: string;
+  conditionEn: string;
+  conditionAr: string;
+  newRecommendation: Recommendation;
+  triggerEn: string;
+  triggerAr: string;
+}
+
+export interface MarketConsensus {
+  consensusPct: number;
+  sources: {
+    id: string;
+    labelEn: string;
+    labelAr: string;
+    score: number;
+    direction: Recommendation;
+    weight: number;
+  }[];
+  summaryEn: string;
+  summaryAr: string;
+}
+
+export interface CrossMarketChain {
+  id: string;
+  titleEn: string;
+  titleAr: string;
+  nodes: { labelEn: string; labelAr: string }[];
+  correlationScore: number;
+  impactScore: number;
+  expectedDirection: "up" | "down" | "mixed";
+  confidence: number;
+}
+
+export interface CrossMarketRelation {
+  id: string;
+  titleEn: string;
+  titleAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  driver: string;
+  affected: string;
+  impactScore: number;
+  correlation: number;
+  direction: "positive" | "negative" | "mixed";
+}
+
+export interface NormalizedAssetProfile {
+  symbol: string;
+  name: string;
+  assetClass: AssetClass;
+  exchange: string;
+  currency: string;
+  region: string;
+  sector?: string;
+  dataSource: "live" | "demo";
+  provider?: string;
+}
+
 export interface AIAnalysis {
   symbol: string;
   assetClass: AssetClass;
@@ -160,6 +245,10 @@ export interface AIAnalysis {
     ratesImpact: number;
     economicEvents: EconomicEvent[];
   };
+  explainability: RecommendationExplainability;
+  whyNow: WhyNowEngine;
+  whatMustChange: WhatMustChangeRule[];
+  marketConsensus: MarketConsensus;
   explanation: string[];
   explanationAr?: string[];
   complianceNote: string;
@@ -191,14 +280,145 @@ export interface RiskAssessment {
 export interface LearningRecord {
   id: string;
   symbol: string;
+  assetClass?: AssetClass;
   recommendation: Recommendation;
   predictedDirection: "up" | "down" | "flat";
   actualDirection: "up" | "down" | "flat";
   confidence: number;
+  riskLevel?: RiskLevel;
+  reasons?: string[];
+  priceAtRecommendation: number;
+  pricesAfter?: { h1?: number; d1?: number; w1?: number; m1?: number };
+  returnPct?: number;
   wasCorrect: boolean;
   mistake?: string;
+  mistakeCategory?: "technical" | "news" | "macro" | "timing" | "risk" | "other";
+  lessonLearned?: string;
+  improvedRule?: string;
+  dataSource?: "live" | "demo";
   recordedAt: string;
   resolvedAt?: string;
+}
+
+export interface ConfidenceAnalytics {
+  winRateByConfidence: { range: string; total: number; correct: number; winRate: number }[];
+  winRateByMarket: { market: string; total: number; correct: number; winRate: number }[];
+  winRateByStrategy: { strategy: string; total: number; correct: number; winRate: number }[];
+  winRateByRisk: { risk: RiskLevel; total: number; correct: number; winRate: number }[];
+  avgReturnAfterRecommendation: number;
+  accuracyTrend: { period: string; accuracy: number }[];
+  bestType: { recommendation: Recommendation; winRate: number };
+  worstType: { recommendation: Recommendation; winRate: number };
+}
+
+export interface PortfolioSimulationResult {
+  initialCapital: number;
+  finalEquity: number;
+  totalReturnPct: number;
+  maxDrawdownPct: number;
+  bestTrade: { symbol: string; pnlPct: number } | null;
+  worstTrade: { symbol: string; pnlPct: number } | null;
+  equityCurve: { date: string; equity: number }[];
+  buyHoldReturnPct: number;
+  indexBenchmarkReturnPct: number;
+  trades: number;
+  winRate: number;
+}
+
+export interface JournalEntry {
+  id: string;
+  symbol: string;
+  userDecision: Recommendation | "no_action";
+  aiRecommendation: Recommendation;
+  userReason: string;
+  userNotes: string;
+  emotion?: "confident" | "fearful" | "greedy" | "neutral" | "uncertain";
+  lessonsLearned?: string;
+  followedAi: boolean;
+  outcome?: "pending" | "profit" | "loss" | "neutral";
+  createdAt: string;
+}
+
+export interface MarketHealthMetric {
+  id: string;
+  labelEn: string;
+  labelAr: string;
+  value: number;
+  status: "bullish" | "bearish" | "neutral";
+  detailEn: string;
+  detailAr: string;
+}
+
+export interface MarketHealthDashboard {
+  metrics: MarketHealthMetric[];
+  score: MarketHealthScore;
+  updatedAt: string;
+}
+
+export interface MarketHealthScore {
+  score: number;
+  labelEn: string;
+  labelAr: string;
+  breakdown: { factorEn: string; factorAr: string; points: number; maxPoints: number }[];
+}
+
+export interface SmartMoneyFlowNode {
+  asset: string;
+  assetAr: string;
+  flowPct: number;
+  direction: "in" | "out" | "neutral";
+}
+
+export interface SmartMoneyFlowMap {
+  period: string;
+  nodes: SmartMoneyFlowNode[];
+  summaryEn: string;
+  summaryAr: string;
+}
+
+export interface ScenarioResult {
+  id: string;
+  questionEn: string;
+  questionAr: string;
+  impacts: { marketEn: string; marketAr: string; direction: "up" | "down" | "mixed"; magnitudePct: number }[];
+  summaryEn: string;
+  summaryAr: string;
+}
+
+export interface OpportunityItem {
+  symbol: string;
+  name: string;
+  assetClass: AssetClass;
+  type: "momentum" | "volume" | "rotation" | "undervalued" | "hidden";
+  score: number;
+  reasonEn: string;
+  reasonAr: string;
+}
+
+export interface DataQualityScore {
+  score: number;
+  freshnessEn: string;
+  freshnessAr: string;
+  missingProviders: string[];
+  delayedData: boolean;
+  confidenceEn: string;
+  confidenceAr: string;
+  apiHealthPct: number;
+  breakdown: { factorEn: string; factorAr: string; points: number; maxPoints: number }[];
+}
+
+export interface StrategyLabResult {
+  symbol: string;
+  strategies: {
+    id: string;
+    nameEn: string;
+    nameAr: string;
+    winRate: number;
+    totalReturnPct: number;
+    maxDrawdownPct: number;
+    sharpeLike: number;
+    trades: number;
+  }[];
 }
 
 export interface LearningStats {

@@ -1,0 +1,81 @@
+import type { CrossMarketRelation } from "@/types/trading";
+import { CROSS_MARKET_CHAINS } from "./market-intelligence";
+
+export const CROSS_MARKET_RELATIONS: CrossMarketRelation[] = [
+  {
+    id: "oil-transport",
+    titleEn: "Oil prices → Transportation",
+    titleAr: "أسعار النفط ← شركات النقل",
+    descriptionEn: "Higher crude oil raises fuel costs for airlines, shipping, and logistics — compressing margins unless passed to consumers.",
+    descriptionAr: "ارتفاع النفط يزيد تكلفة الوقود للطيران والشحن واللوجستيات — يضغط على الهوامش ما لم تُ transferred للمستهلك.",
+    driver: "CLUSD / Brent",
+    affected: "XLE, airlines, transport ETFs",
+    impactScore: 0.78,
+    correlation: 0.65,
+    direction: "negative",
+  },
+  {
+    id: "rates-banks",
+    titleEn: "Interest rates → Banks & REITs",
+    titleAr: "أسعار الفائدة ← البنوك والعقار",
+    descriptionEn: "Rising rates boost bank net interest margins but hurt rate-sensitive REITs and leveraged growth names.",
+    descriptionAr: "رفع الفائدة يدعم هوامش البنوك لكن يضر REITs وأسهم النمو heavily leveraged.",
+    driver: "Fed / ECB policy",
+    affected: "Banks, REITs, growth stocks",
+    impactScore: 0.82,
+    correlation: 0.71,
+    direction: "mixed",
+  },
+  {
+    id: "usd-gold",
+    titleEn: "USD strength → Gold & Commodities",
+    titleAr: "قوة الدولار ← الذهب والسلع",
+    descriptionEn: "A stronger USD typically pressures gold and dollar-denominated commodities; inverse relationship in risk-off regimes.",
+    descriptionAr: "دولار أقوى يضغط عادة على الذهب والسلع الم priced بالدولار.",
+    driver: "DXY / USD index",
+    affected: "GCUSD, SIUSD, emerging markets",
+    impactScore: 0.74,
+    correlation: -0.68,
+    direction: "negative",
+  },
+  {
+    id: "crypto-risk",
+    titleEn: "Crypto → Global risk sentiment",
+    titleAr: "العملات الرقمية ← apetite للمخاطر",
+    descriptionEn: "Bitcoin often acts as a high-beta risk asset — correlates with tech and liquidity conditions.",
+    descriptionAr: "Bitcoin يتصرف كأصل عالي المخاطر — يرتبط بالتقنية وظروف السيولة.",
+    driver: "BTCUSD",
+    affected: "QQQ, NVDA, high-beta equities",
+    impactScore: 0.69,
+    correlation: 0.55,
+    direction: "positive",
+  },
+  {
+    id: "saudi-oil",
+    titleEn: "Saudi market → Oil & petrochemicals",
+    titleAr: "السوق السعودي ← النفط والبتروكيماويات",
+    descriptionEn: "Tadawul heavyweights (Aramco, SABIC, banks) move with Brent crude and OPEC+ supply dynamics.",
+    descriptionAr: "Heavyweights في تداول (أرامكو، سابك، البنوك) تتحرك مع Brent وديناميكيات OPEC+.",
+    driver: "Brent / 2222",
+    affected: "2222, 2010, 1120, TASI",
+    impactScore: 0.85,
+    correlation: 0.72,
+    direction: "positive",
+  },
+  {
+    id: "us-global",
+    titleEn: "US market → Global sentiment",
+    titleAr: "السوق الأمريكي ← المعنويات العالمية",
+    descriptionEn: "SPY/SPX leadership drives cross-border flows; weak US sessions often spill into Europe, EM, and crypto.",
+    descriptionAr: "قيادة SPY/SPX تدفع التدفقات العابرة للحدود؛ جلسات أمريكية ضعيفة تنتقل لأوروبا والأسواق الناشئة.",
+    driver: "SPX / SPY",
+    affected: "Global equities, EM, crypto",
+    impactScore: 0.88,
+    correlation: 0.8,
+    direction: "positive",
+  },
+];
+
+export function getCrossMarketIntelligence() {
+  return { relations: CROSS_MARKET_RELATIONS, chains: CROSS_MARKET_CHAINS, updatedAt: new Date().toISOString() };
+}

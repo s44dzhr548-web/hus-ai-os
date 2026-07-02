@@ -106,6 +106,49 @@ export function AnalysisClient() {
             </ul>
           </section>
 
+          {analysis.whyNow && (
+            <section className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-5">
+              <h3 className="font-medium">{t.analysis.whyNowTitle}</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <ExplainRow label={t.analysis.whyNow} text={locale === "ar" ? analysis.whyNow.whyNow.ar : analysis.whyNow.whyNow.en} />
+                <ExplainRow label={t.analysis.whyNotYesterday} text={locale === "ar" ? analysis.whyNow.whyNotYesterday.ar : analysis.whyNow.whyNotYesterday.en} />
+                <ExplainRow label={t.analysis.whyNotTomorrow} text={locale === "ar" ? analysis.whyNow.whyNotTomorrow.ar : analysis.whyNow.whyNotTomorrow.en} />
+                <ExplainRow label={t.analysis.whatChanged} text={locale === "ar" ? analysis.whyNow.whatChanged.ar : analysis.whyNow.whatChanged.en} />
+              </div>
+            </section>
+          )}
+
+          {analysis.marketConsensus && (
+            <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
+              <h3 className="font-medium">{t.analysis.consensusTitle}</h3>
+              <p className="mt-2 text-3xl font-semibold text-emerald-400">{analysis.marketConsensus.consensusPct}%</p>
+              <p className="mt-1 text-sm text-zinc-400">{locale === "ar" ? analysis.marketConsensus.summaryAr : analysis.marketConsensus.summaryEn}</p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {analysis.marketConsensus.sources.map((s) => (
+                  <div key={s.id} className="flex justify-between rounded-lg bg-zinc-950/50 p-2 text-xs">
+                    <span>{locale === "ar" ? s.labelAr : s.labelEn}</span>
+                    <span>{s.direction.toUpperCase()} · {s.score.toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {analysis.whatMustChange?.length > 0 && (
+            <section className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
+              <h3 className="font-medium">{t.analysis.whatMustChangeTitle}</h3>
+              <ul className="mt-3 space-y-3">
+                {analysis.whatMustChange.map((rule) => (
+                  <li key={rule.id} className="text-sm">
+                    <p className="text-zinc-300">{locale === "ar" ? rule.conditionAr : rule.conditionEn}</p>
+                    <p className="text-emerald-400">↓ {rule.newRecommendation.toUpperCase()}</p>
+                    <p className="text-xs text-zinc-500">{locale === "ar" ? rule.triggerAr : rule.triggerEn}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
             <h3 className="font-medium">{t.analysis.explanation}</h3>
             <ol className="mt-3 list-decimal space-y-2 text-sm text-zinc-300">
@@ -113,10 +156,43 @@ export function AnalysisClient() {
                 <li key={i}>{e}</li>
               ))}
             </ol>
+            {analysis.explainability && (
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <ExplainRow label={t.analysis.explainTechnical} text={locale === "ar" ? analysis.explainability.technical.ar : analysis.explainability.technical.en} />
+                <ExplainRow label={t.analysis.explainFundamental} text={locale === "ar" ? analysis.explainability.fundamental.ar : analysis.explainability.fundamental.en} />
+                <ExplainRow label={t.analysis.explainNews} text={locale === "ar" ? analysis.explainability.news.ar : analysis.explainability.news.en} />
+                <ExplainRow label={t.analysis.explainSector} text={locale === "ar" ? analysis.explainability.sector.ar : analysis.explainability.sector.en} />
+                <ExplainRow label={t.analysis.explainMacro} text={locale === "ar" ? analysis.explainability.macro.ar : analysis.explainability.macro.en} />
+                <ExplainRow label={t.analysis.explainOil} text={locale === "ar" ? analysis.explainability.oilImpact.ar : analysis.explainability.oilImpact.en} />
+                <ExplainRow label={t.analysis.explainRates} text={locale === "ar" ? analysis.explainability.ratesImpact.ar : analysis.explainability.ratesImpact.en} />
+                <ExplainRow label={t.analysis.explainEconomic} text={locale === "ar" ? analysis.explainability.economicEvent.ar : analysis.explainability.economicEvent.en} />
+                <ExplainRow label={t.analysis.explainCorrelation} text={locale === "ar" ? analysis.explainability.correlation.ar : analysis.explainability.correlation.en} />
+                <ExplainRow label={t.analysis.explainRisk} text={locale === "ar" ? analysis.explainability.risk.ar : analysis.explainability.risk.en} />
+                <ExplainRow label={t.analysis.explainConfidence} text={locale === "ar" ? analysis.explainability.confidence.ar : analysis.explainability.confidence.en} />
+                <ExplainRow label={t.analysis.explainInvalidation} text={locale === "ar" ? analysis.explainability.invalidation.ar : analysis.explainability.invalidation.en} tone="amber" />
+                <ExplainRow label={t.analysis.explainMonitor} text={locale === "ar" ? analysis.explainability.monitorNext.ar : analysis.explainability.monitorNext.en} />
+              </div>
+            )}
+            {analysis.explainability && (
+              <p className="mt-4 text-xs text-zinc-500">
+                {t.analysis.reviewBy}: {new Date(analysis.explainability.reviewBy).toLocaleString(locale === "ar" ? "ar-SA" : "en-US")} ·{" "}
+                {analysis.explainability.dataSource === "demo" ? t.market.demoBadge : t.market.liveData}
+                {analysis.explainability.provider ? ` · ${analysis.explainability.provider}` : ""}
+              </p>
+            )}
             <p className="mt-4 text-xs text-amber-400/80">{analysis.complianceNote}</p>
           </section>
         </div>
       )}
+    </div>
+  );
+}
+
+function ExplainRow({ label, text, tone }: { label: string; text: string; tone?: "amber" }) {
+  return (
+    <div className={`rounded-lg p-3 text-sm ${tone === "amber" ? "border border-amber-500/20 bg-amber-500/5" : "bg-zinc-950/40"}`}>
+      <p className="text-xs font-medium text-zinc-500">{label}</p>
+      <p className="mt-1 text-zinc-300">{text}</p>
     </div>
   );
 }

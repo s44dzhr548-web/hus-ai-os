@@ -13,6 +13,9 @@ import { computeTechnical } from "@/lib/market/indicators";
 import { unifiedCandles, unifiedQuote } from "@/lib/market/unified";
 import { fetchEconomicCalendar, fetchNews } from "@/lib/market/providers/news";
 import { logRecommendation } from "@/lib/audit/log";
+import { buildExplainability } from "@/lib/intelligence/explainability";
+import { buildMarketConsensus, buildWhatMustChange, buildWhyNow } from "@/lib/intelligence/decision-engines";
+import { recordMemoryFromAnalysis } from "@/lib/learning/memory";
 
 function scoreToRecommendation(score: number): Recommendation {
   if (score >= 65) return "buy";
@@ -106,6 +109,40 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
     `الإشارة ${signal.score}/100 → ${recAr} · ثقة ${(signal.confidence * 100).toFixed(0)}% · مخاطر ${signal.riskLevel}. ${isDemo ? "بيانات تجريبية" : "بيانات حية"}. تداول ورقي فقط.`,
   ];
 
+  const explainability = buildExplainability(
+    {
+      symbol,
+      recommendation: signal.recommendation,
+      confidence: signal.confidence,
+      riskLevel: signal.riskLevel,
+      signalScore: signal.score,
+      technical,
+      newsImpact: newsResult.items,
+      sectorImpact,
+      macroFactors: { oilImpact, ratesImpact, economicEvents: economicResult.events },
+      marketCorrelation: correlations,
+    },
+    isDemo,
+    quoteResult.source
+  );
+
+  const engineCtx = {
+    symbol,
+    recommendation: signal.recommendation,
+    confidence: signal.confidence,
+    signalScore: signal.score,
+    technical,
+    newsSentiment,
+    sectorStrength: 50 + sectorImpact.impact * 30,
+    oilImpact,
+    ratesImpact,
+    nextEvent: economicResult.events[0]?.title,
+  };
+
+  const whyNow = buildWhyNow(engineCtx);
+  const whatMustChange = buildWhatMustChange(engineCtx);
+  const marketConsensus = buildMarketConsensus({ ...engineCtx, riskLevel: signal.riskLevel, aiScore: signal.score });
+
   logRecommendation({
     symbol,
     recommendation: signal.recommendation,
@@ -117,7 +154,7 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
     summary: explanationEn[explanationEn.length - 1],
   });
 
-  return {
+  const result: AIAnalysis = {
     symbol,
     assetClass: meta?.assetClass ?? quoteResult.data.assetClass,
     generatedAt: new Date().toISOString(),
@@ -130,11 +167,18 @@ export async function runAIAnalysis(symbol: string, locale: "ar" | "en" = "ar"):
     sectorImpact,
     marketCorrelation: correlations,
     macroFactors: { oilImpact, ratesImpact, economicEvents: economicResult.events },
+    explainability,
+    whyNow,
+    whatMustChange,
+    marketConsensus,
     explanation: locale === "ar" ? explanationAr : explanationEn,
     explanationAr,
     complianceNote: locale === "ar" ? COMPLIANCE_CONFIG.financialAdviceDisclaimerAr : COMPLIANCE_CONFIG.financialAdviceDisclaimer,
     complianceNoteAr: COMPLIANCE_CONFIG.financialAdviceDisclaimerAr,
   };
+
+  recordMemoryFromAnalysis(result, isDemo, quoteResult.data.price);
+  return result;
 }
 
 export async function scanAllSignals(symbols: string[]): Promise<AISignalScore[]> {

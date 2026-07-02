@@ -1,101 +1,14 @@
-import type { Alert, LearningRecord, LearningStats, Recommendation } from "@/types/trading";
+import type { Alert } from "@/types/trading";
 import { hashSymbol } from "@/lib/data/seed";
 
-const SEED_LEARNING: LearningRecord[] = [
-  {
-    id: "lr-001",
-    symbol: "AAPL",
-    recommendation: "buy",
-    predictedDirection: "up",
-    actualDirection: "up",
-    confidence: 0.72,
-    wasCorrect: true,
-    recordedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-    resolvedAt: new Date(Date.now() - 86400000 * 4).toISOString(),
-  },
-  {
-    id: "lr-002",
-    symbol: "TSLA",
-    recommendation: "sell",
-    predictedDirection: "down",
-    actualDirection: "up",
-    confidence: 0.61,
-    wasCorrect: false,
-    mistake: "Overweighted short-term volatility; missed earnings catalyst",
-    recordedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-    resolvedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    id: "lr-003",
-    symbol: "BTCUSD",
-    recommendation: "hold",
-    predictedDirection: "flat",
-    actualDirection: "flat",
-    confidence: 0.58,
-    wasCorrect: true,
-    recordedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
-    resolvedAt: new Date(Date.now() - 43200000).toISOString(),
-  },
-];
-
-let records: LearningRecord[] = [...SEED_LEARNING];
-
-export function recordPrediction(
-  symbol: string,
-  recommendation: Recommendation,
-  confidence: number,
-  predictedDirection: "up" | "down" | "flat"
-): LearningRecord {
-  const record: LearningRecord = {
-    id: `lr-${Date.now()}`,
-    symbol,
-    recommendation,
-    predictedDirection,
-    actualDirection: "flat",
-    confidence,
-    wasCorrect: false,
-    recordedAt: new Date().toISOString(),
-  };
-  records.unshift(record);
-  if (records.length > 100) records = records.slice(0, 100);
-  return record;
-}
-
-export function resolvePrediction(id: string, actualDirection: "up" | "down" | "flat"): LearningRecord | null {
-  const idx = records.findIndex((r) => r.id === id);
-  if (idx === -1) return null;
-  const predicted = records[idx].predictedDirection;
-  const wasCorrect = predicted === actualDirection;
-  records[idx] = {
-    ...records[idx],
-    actualDirection,
-    wasCorrect,
-    resolvedAt: new Date().toISOString(),
-    mistake: wasCorrect ? undefined : `Predicted ${predicted}, actual ${actualDirection}`,
-  };
-  return records[idx];
-}
-
-export function getLearningStats(): LearningStats {
-  const resolved = records.filter((r) => r.resolvedAt);
-  const correct = resolved.filter((r) => r.wasCorrect).length;
-  const recent = resolved.slice(0, 5);
-  const older = resolved.slice(5, 10);
-  const recentAcc = recent.length ? recent.filter((r) => r.wasCorrect).length / recent.length : 0;
-  const olderAcc = older.length ? older.filter((r) => r.wasCorrect).length / older.length : 0;
-
-  return {
-    totalPredictions: resolved.length,
-    correct,
-    accuracy: resolved.length ? Number(((correct / resolved.length) * 100).toFixed(1)) : 0,
-    recentMistakes: records.filter((r) => r.mistake).slice(0, 5),
-    improvementTrend: Number(((recentAcc - olderAcc) * 100).toFixed(1)),
-  };
-}
-
-export function getAllRecords(): LearningRecord[] {
-  return [...records];
-}
+export {
+  getAllMemoryRecords as getAllRecords,
+  getLearningStats,
+  recordMemoryFromAnalysis,
+  resolvePendingRecords,
+  getConfidenceAnalytics,
+  simulatePortfolioFollowingAI,
+} from "./memory";
 
 const SEED_ALERTS: Alert[] = [
   {
