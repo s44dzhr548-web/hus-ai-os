@@ -1,4 +1,5 @@
 import type { AssetClass, Recommendation, RiskLevel, TechnicalAnalysis } from "@/types/trading";
+import type { AssetFlowProfile } from "./smart-money-types";
 
 export type ProfileDataBadge = "live" | "cached" | "seeded" | "demo";
 
@@ -141,6 +142,7 @@ export interface CompanyIntelligenceProfile {
   risk: CompanyRiskAssessment;
   providers: ProviderLinkStatus[];
   related: RelatedAssetLink[];
+  moneyFlow?: AssetFlowProfile;
   executionMode: "paper_only";
   brokerEnabled: false;
   persistenceConfigured: boolean;

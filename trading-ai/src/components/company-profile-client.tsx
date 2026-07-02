@@ -112,7 +112,7 @@ export function CompanyProfileClient({ symbolParam }: { symbolParam: string }) {
   if (loading) return <p className="text-zinc-400">{cp.loading}</p>;
   if (!profile) return <p className="text-red-400">{cp.notFound}</p>;
 
-  const { overview, quote, ai, why, financials, announcements, news, technical, risk, providers, related } = profile;
+  const { overview, quote, ai, why, financials, announcements, news, technical, risk, providers, related, moneyFlow } = profile;
   const pct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
 
   return (
@@ -304,6 +304,28 @@ export function CompanyProfileClient({ symbolParam }: { symbolParam: string }) {
             <p>Position size: {risk.suggestedPositionPct}%</p>
           </div>
         </Section>
+
+        {moneyFlow && (
+          <Section title={t.smartMoney.moneyFlowSection}>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <p>{t.smartMoney.inflowOutflow}: <span className={moneyFlow.flowDirection === "inflow" ? "text-emerald-400" : moneyFlow.flowDirection === "outflow" ? "text-red-400" : "text-zinc-400"}>{moneyFlow.flowDirection}</span></p>
+              <p>{t.smartMoney.flowOpportunityScore}: {moneyFlow.opportunityScore}/100</p>
+              <p>{t.smartMoney.volumeAnomaly}: {moneyFlow.volumeAnomaly ? "Yes" : "No"} ({moneyFlow.volumeAnomalyScore})</p>
+              <p>{locale === "ar" ? "إشارة" : "Signal"}: {moneyFlow.institutionalSignal}</p>
+              <p className="col-span-2 text-xs text-zinc-400">{locale === "ar" ? moneyFlow.sectorRotationImpactAr : moneyFlow.sectorRotationImpactEn}</p>
+            </div>
+            <p className="mt-2 text-xs text-zinc-500">{locale === "ar" ? moneyFlow.explanationAr.whyMoving : moneyFlow.explanationEn.whyMoving}</p>
+            {moneyFlow.relatedAffected.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {moneyFlow.relatedAffected.map((r) => (
+                  <Link key={r.symbol} href={profilePathForSymbol(r.symbol, r.displaySymbol)} className="text-xs text-emerald-400 hover:underline">
+                    {r.displaySymbol}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Section>
+        )}
       </div>
 
       <Section title={cp.providers}>

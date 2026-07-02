@@ -28,6 +28,7 @@ import type {
   ProviderLinkStatus,
   RelatedAssetLink,
 } from "./company-types";
+import { buildAssetFlowProfile } from "./smart-money-engine";
 import { resolveProfileSymbol } from "./symbol-resolver";
 
 const DESCRIPTIONS: Record<string, string> = {
@@ -295,11 +296,12 @@ export async function getCompanyIntelligenceProfile(symbolInput: string, locale:
   const symbol = resolveProfileSymbol(symbolInput);
   if (!symbol || !getAssetBySymbol(symbol)) return null;
 
-  const [quote, analysis, newsPack, technical] = await Promise.all([
+  const [quote, analysis, newsPack, technical, moneyFlow] = await Promise.all([
     buildQuoteDetail(symbol),
     runAIAnalysis(symbol, locale),
     buildNewsItems(symbol),
     buildTechnical(symbol),
+    buildAssetFlowProfile(symbol),
   ]);
 
   const overview = buildOverview(symbol);
@@ -353,6 +355,7 @@ export async function getCompanyIntelligenceProfile(symbolInput: string, locale:
     risk,
     providers,
     related,
+    moneyFlow: moneyFlow ?? undefined,
     executionMode: "paper_only",
     brokerEnabled: false,
     persistenceConfigured: isSupabaseConfigured(),

@@ -23,7 +23,7 @@ const NAV_KEYS = [
   { href: "/dashboard/ai-debate", key: "aiDebate" as const },
   { href: "/dashboard/event-impact", key: "eventImpact" as const },
   { href: "/dashboard/market-health", key: "marketHealth" as const },
-  { href: "/dashboard/money-flow", key: "moneyFlow" as const },
+  { href: "/dashboard/smart-money", key: "smartMoney" as const },
   { href: "/dashboard/scenarios", key: "scenarios" as const },
   { href: "/dashboard/opportunities", key: "opportunities" as const },
   { href: "/dashboard/risk-guardian", key: "riskGuardian" as const },
