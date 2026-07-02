@@ -6,6 +6,7 @@ import {
   type MarketCategory,
   type MarketSortOption,
 } from "@/lib/market/markets-browser";
+import { UNIVERSE_STATS, getAssetsByMarketTab } from "@/lib/markets/asset-universe";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,12 +16,31 @@ export async function GET(request: Request) {
   const page = Number(searchParams.get("page") ?? 1);
   const pageSize = Number(searchParams.get("pageSize") ?? 12);
   const lang = searchParams.get("lang") === "ar" ? "ar" : "en";
+  const metaOnly = searchParams.get("meta") === "1";
 
   if (!MARKET_CATEGORIES.includes(category)) {
     return NextResponse.json({ error: "Invalid category" }, { status: 400 });
   }
   if (!MARKET_SORT_OPTIONS.includes(sort)) {
     return NextResponse.json({ error: "Invalid sort" }, { status: 400 });
+  }
+
+  if (metaOnly) {
+    const assets = getAssetsByMarketTab(category, search);
+    return NextResponse.json({
+      category,
+      total: assets.length,
+      universeTotal: UNIVERSE_STATS.total,
+      stats: UNIVERSE_STATS,
+      symbols: assets.map((a) => ({
+        symbol: a.symbol,
+        displaySymbol: a.displaySymbol,
+        name: a.name,
+        market: a.market,
+        category: a.category,
+        exchange: a.exchange,
+      })),
+    });
   }
 
   const result = await browseMarkets({ category, sort, search, page, pageSize });
@@ -32,6 +52,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ...result,
     items,
+    stats: UNIVERSE_STATS,
     categories: MARKET_CATEGORIES,
     sortOptions: MARKET_SORT_OPTIONS,
   });

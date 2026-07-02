@@ -1,26 +1,19 @@
-import type { AssetClass, Recommendation, RiskLevel } from "@/types/trading";
+import type { Recommendation, RiskLevel } from "@/types/trading";
 import { computeSignalScore } from "@/lib/ai/analysis-engine";
-import { MOCK_UNIVERSE } from "@/lib/data/mock-market";
+import { generateMockBars, getMockAsset } from "@/lib/data/mock-market";
 import { hashSymbol } from "@/lib/data/seed";
 import { computeTechnical } from "@/lib/market/indicators";
-import { SYMBOL_CATALOG, getCatalogEntry } from "@/lib/market/catalog";
-import { unifiedCandles, unifiedQuote } from "@/lib/market/unified";
+import {
+  MARKET_CATEGORIES,
+  getAllActiveSymbols,
+  getAssetBySymbol,
+  getAssetsByMarketTab,
+  universeCategoryToAssetClass,
+  type MarketCategory,
+} from "@/lib/markets/asset-universe";
+import { unifiedQuote } from "@/lib/market/unified";
 
-export const MARKET_CATEGORIES = [
-  "all",
-  "saudi",
-  "us",
-  "global",
-  "etf",
-  "crypto",
-  "forex",
-  "commodity",
-  "gold",
-  "oil",
-  "index",
-] as const;
-
-export type MarketCategory = (typeof MARKET_CATEGORIES)[number];
+export { MARKET_CATEGORIES, type MarketCategory };
 
 export const MARKET_SORT_OPTIONS = [
   "ai_opportunity",
@@ -46,10 +39,13 @@ export type MarketSortOption = (typeof MARKET_SORT_OPTIONS)[number];
 export type MarketBrowseItem = {
   rank: number;
   symbol: string;
+  displaySymbol: string;
   name: string;
-  category: AssetClass;
+  category: string;
   categoryLabel: string;
   market: string;
+  exchange: string;
+  sector: string;
   price: number;
   changePct: number;
   expectedReturnPct: number;
@@ -66,10 +62,7 @@ export type MarketBrowseItem = {
   riskLevel: RiskLevel;
 };
 
-const US_EXCHANGES = new Set(["NASDAQ", "NYSE", "AMEX"]);
-const GOLD_SYMBOLS = new Set(["GCUSD", "GLD", "GLDM"]);
-const OIL_SYMBOLS = new Set(["CLUSD", "USO", "BNO", "XLE"]);
-const DIVIDEND_SYMBOLS = new Set(["KO", "JPM", "XOM", "MSFT", "AAPL", "2222", "1120"]);
+const DIVIDEND_SYMBOLS = new Set(["KO", "JPM", "XOM", "MSFT", "AAPL", "2222", "1120", "1180"]);
 
 function riskLevelToScore(level: RiskLevel): number {
   if (level === "low") return 25;
@@ -78,57 +71,29 @@ function riskLevelToScore(level: RiskLevel): number {
   return 90;
 }
 
-function dataSourceBadge(isDemo: boolean, cached?: boolean): "live" | "demo" | "cached" {
-  if (cached) return "cached";
+function dataSourceBadge(isDemo: boolean): "live" | "demo" | "cached" {
   return isDemo ? "demo" : "live";
 }
 
 export function getAllCatalogSymbols(): string[] {
-  return Object.keys(MOCK_UNIVERSE);
+  return getAllActiveSymbols();
 }
 
 export function matchesCategory(symbol: string, category: MarketCategory): boolean {
-  if (category === "all") return true;
-  const entry = getCatalogEntry(symbol);
-  const meta = MOCK_UNIVERSE[symbol];
-  if (!entry || !meta) return false;
-
-  switch (category) {
-    case "saudi":
-      return meta.assetClass === "saudi" || meta.exchange === "Tadawul";
-    case "us":
-      return meta.assetClass === "stock" && US_EXCHANGES.has(meta.exchange);
-    case "global":
-      return meta.assetClass === "stock" && meta.region === "Global";
-    case "etf":
-      return meta.assetClass === "etf";
-    case "crypto":
-      return meta.assetClass === "crypto";
-    case "forex":
-      return meta.assetClass === "forex";
-    case "commodity":
-      return meta.assetClass === "commodity";
-    case "gold":
-      return GOLD_SYMBOLS.has(symbol) || /gold/i.test(meta.name);
-    case "oil":
-      return OIL_SYMBOLS.has(symbol) || /oil|crude|brent|energy select/i.test(meta.name);
-    case "index":
-      return meta.assetClass === "index";
-    default:
-      return true;
-  }
+  const asset = getAssetBySymbol(symbol);
+  if (!asset) return false;
+  return getAssetsByMarketTab(category).some((a) => a.symbol === asset.symbol);
 }
 
 export function matchesSearch(symbol: string, query: string): boolean {
+  const asset = getAssetBySymbol(symbol);
+  if (!asset) return false;
+  if (!query.trim()) return true;
   const q = query.trim().toUpperCase();
-  if (!q) return true;
-  const entry = getCatalogEntry(symbol);
-  if (!entry) return symbol.toUpperCase().includes(q);
   return (
-    entry.symbol.toUpperCase().includes(q) ||
-    entry.name.toUpperCase().includes(q) ||
-    entry.exchange.toUpperCase().includes(q) ||
-    entry.assetClass.toUpperCase().includes(q)
+    asset.symbol.toUpperCase().includes(q) ||
+    asset.displaySymbol.toUpperCase().includes(q) ||
+    asset.name.toUpperCase().includes(q)
   );
 }
 
@@ -161,41 +126,71 @@ function sortMetrics(item: MarketBrowseItem, technical: ReturnType<typeof comput
   };
 }
 
-export async function buildMarketBrowseItem(symbol: string): Promise<MarketBrowseItem & { _sort: ReturnType<typeof sortMetrics> }> {
-  const entry = getCatalogEntry(symbol);
-  const meta = MOCK_UNIVERSE[symbol];
-  const [candles, quote] = await Promise.all([unifiedCandles(symbol, "1Day", 60), unifiedQuote(symbol)]);
-  const bars = candles.data.map(({ source, isDemoData, ...bar }) => bar);
-  const signal = computeSignalScore(symbol, bars, quote.data.price, quote.data.changePct);
+function scoreAssetFast(symbol: string) {
+  const bars = generateMockBars(symbol, 60);
+  const mock = getMockAsset(symbol);
   const technical = computeTechnical(bars);
-  const why = buildWhySelected(symbol, signal, technical);
-  const expectedReturnPct = Number(((signal.score - 50) * 0.15 + signal.changePct * 0.6).toFixed(2));
-  const aiOpportunityScore = Number((signal.score * signal.confidence).toFixed(1));
+  const signal = computeSignalScore(symbol, bars, mock.price, mock.changePct);
+  return { bars, mock, technical, signal };
+}
+
+export async function buildMarketBrowseItem(
+  symbol: string,
+  precomputed?: ReturnType<typeof scoreAssetFast>
+): Promise<MarketBrowseItem & { _sort: ReturnType<typeof sortMetrics> }> {
+  const asset = getAssetBySymbol(symbol);
+  const fast = precomputed ?? scoreAssetFast(symbol);
+
+  let price = fast.mock.price;
+  let changePct = fast.mock.changePct;
+  let volume = fast.mock.volume;
+  let isDemo = true;
+  let quoteSource = "mock";
+
+  try {
+    const quote = await unifiedQuote(symbol);
+    price = quote.data.price;
+    changePct = quote.data.changePct;
+    volume = quote.data.volume ?? volume;
+    isDemo = quote.isDemoData;
+    quoteSource = quote.source;
+    fast.signal = computeSignalScore(symbol, fast.bars, price, changePct);
+  } catch {
+    /* keep mock quote */
+  }
+
+  const why = buildWhySelected(symbol, fast.signal, fast.technical);
+  const expectedReturnPct = Number(((fast.signal.score - 50) * 0.15 + changePct * 0.6).toFixed(2));
+  const aiOpportunityScore = Number((fast.signal.score * fast.signal.confidence).toFixed(1));
+  const assetClass = asset ? universeCategoryToAssetClass(asset) : fast.mock.assetClass;
 
   const item: MarketBrowseItem = {
     rank: 0,
     symbol,
-    name: entry?.name ?? meta?.name ?? symbol,
-    category: entry?.assetClass ?? meta?.assetClass ?? "stock",
-    categoryLabel: entry?.assetClass ?? meta?.assetClass ?? "stock",
-    market: entry?.exchange ?? meta?.exchange ?? "—",
-    price: quote.data.price,
-    changePct: quote.data.changePct,
+    displaySymbol: asset?.displaySymbol ?? symbol,
+    name: asset?.name ?? fast.mock.name,
+    category: assetClass,
+    categoryLabel: assetClass,
+    market: asset?.market ?? asset?.country ?? "—",
+    exchange: asset?.exchange ?? fast.mock.exchange,
+    sector: asset?.sector ?? "—",
+    price,
+    changePct,
     expectedReturnPct,
-    riskScore: riskLevelToScore(signal.riskLevel),
-    aiConfidence: signal.confidence,
+    riskScore: riskLevelToScore(fast.signal.riskLevel),
+    aiConfidence: fast.signal.confidence,
     aiOpportunityScore,
-    recommendation: signal.recommendation,
+    recommendation: fast.signal.recommendation,
     whySelected: why.en,
     whySelectedAr: why.ar,
-    dataSource: dataSourceBadge(quote.isDemoData || candles.isDemoData),
-    quoteSource: quote.source,
-    volume: quote.data.volume ?? 0,
-    signalScore: signal.score,
-    riskLevel: signal.riskLevel,
+    dataSource: dataSourceBadge(isDemo),
+    quoteSource,
+    volume,
+    signalScore: fast.signal.score,
+    riskLevel: fast.signal.riskLevel,
   };
 
-  return { ...item, _sort: sortMetrics(item, technical, symbol) };
+  return { ...item, _sort: sortMetrics(item, fast.technical, symbol) };
 }
 
 export function sortMarketItems<T extends MarketBrowseItem & { _sort?: ReturnType<typeof sortMetrics> }>(
@@ -245,6 +240,72 @@ export function sortMarketItems<T extends MarketBrowseItem & { _sort?: ReturnTyp
   return sorted.map((item, i) => ({ ...item, rank: i + 1 }));
 }
 
+/** Fast ranking pass using mock bars — live quotes fetched only for current page. */
+export function rankUniverseSymbols(symbols: string[], sort: MarketSortOption) {
+  const scored = symbols.map((symbol) => {
+    const fast = scoreAssetFast(symbol);
+    const asset = getAssetBySymbol(symbol);
+    const expectedReturnPct = Number(((fast.signal.score - 50) * 0.15 + fast.mock.changePct * 0.6).toFixed(2));
+    const item = {
+      rank: 0,
+      symbol,
+      displaySymbol: asset?.displaySymbol ?? symbol,
+      name: asset?.name ?? fast.mock.name,
+      category: asset ? universeCategoryToAssetClass(asset) : fast.mock.assetClass,
+      categoryLabel: asset ? universeCategoryToAssetClass(asset) : fast.mock.assetClass,
+      market: asset?.market ?? "—",
+      exchange: asset?.exchange ?? fast.mock.exchange,
+      sector: asset?.sector ?? "—",
+      price: fast.mock.price,
+      changePct: fast.mock.changePct,
+      expectedReturnPct,
+      riskScore: riskLevelToScore(fast.signal.riskLevel),
+      aiConfidence: fast.signal.confidence,
+      aiOpportunityScore: Number((fast.signal.score * fast.signal.confidence).toFixed(1)),
+      recommendation: fast.signal.recommendation,
+      whySelected: "",
+      whySelectedAr: "",
+      dataSource: "demo" as const,
+      quoteSource: "mock",
+      volume: fast.mock.volume,
+      signalScore: fast.signal.score,
+      riskLevel: fast.signal.riskLevel,
+      _sort: sortMetrics(
+        {
+          rank: 0,
+          symbol,
+          displaySymbol: symbol,
+          name: fast.mock.name,
+          category: "stock",
+          categoryLabel: "stock",
+          market: "—",
+          exchange: fast.mock.exchange,
+          sector: "—",
+          price: fast.mock.price,
+          changePct: fast.mock.changePct,
+          expectedReturnPct,
+          riskScore: riskLevelToScore(fast.signal.riskLevel),
+          aiConfidence: fast.signal.confidence,
+          aiOpportunityScore: fast.signal.score * fast.signal.confidence,
+          recommendation: fast.signal.recommendation,
+          whySelected: "",
+          whySelectedAr: "",
+          dataSource: "demo",
+          quoteSource: "mock",
+          volume: fast.mock.volume,
+          signalScore: fast.signal.score,
+          riskLevel: fast.signal.riskLevel,
+        },
+        fast.technical,
+        symbol
+      ),
+      _fast: fast,
+    };
+    return item;
+  });
+  return sortMarketItems(scored, sort);
+}
+
 export async function browseMarkets(opts: {
   category?: MarketCategory;
   sort?: MarketSortOption;
@@ -259,6 +320,7 @@ export async function browseMarkets(opts: {
   hasMore: boolean;
   category: MarketCategory;
   sort: MarketSortOption;
+  universeTotal: number;
 }> {
   const category = opts.category ?? "all";
   const sort = opts.sort ?? "ai_opportunity";
@@ -266,28 +328,41 @@ export async function browseMarkets(opts: {
   const page = Math.max(1, opts.page ?? 1);
   const pageSize = Math.min(50, Math.max(6, opts.pageSize ?? 12));
 
-  let symbols = getAllCatalogSymbols().filter((s) => matchesCategory(s, category) && matchesSearch(s, search));
+  const assets = getAssetsByMarketTab(category, search);
+  const symbols = assets.map((a) => a.symbol);
 
   if (symbols.length === 0) {
-    return { items: [], page, pageSize, total: 0, hasMore: false, category, sort };
+    return {
+      items: [],
+      page,
+      pageSize,
+      total: 0,
+      hasMore: false,
+      category,
+      sort,
+      universeTotal: getAllActiveSymbols().length,
+    };
   }
 
-  const built = await Promise.all(symbols.map((s) => buildMarketBrowseItem(s)));
-  const ranked = sortMarketItems(built, sort).map(({ _sort, ...item }) => item);
-
+  const ranked = rankUniverseSymbols(symbols, sort);
   const total = ranked.length;
   const start = (page - 1) * pageSize;
-  const items = ranked.slice(start, start + pageSize);
+  const pageSlice = ranked.slice(start, start + pageSize);
+
+  const items = await Promise.all(pageSlice.map((row) => buildMarketBrowseItem(row.symbol, row._fast)));
+  const withRanks = items.map((item, i) => {
+    const { _sort: _ignored, ...rest } = item;
+    return { ...rest, rank: start + i + 1 };
+  });
 
   return {
-    items,
+    items: withRanks,
     page,
     pageSize,
     total,
     hasMore: start + pageSize < total,
     category,
     sort,
+    universeTotal: getAllActiveSymbols().length,
   };
 }
-
-export { SYMBOL_CATALOG };

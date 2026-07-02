@@ -1,56 +1,8 @@
 import type { AssetClass, MarketAsset, MarketBar } from "@/types/trading";
+import { buildMockUniverseMap } from "@/lib/markets/asset-universe";
 import { hashSymbol, seededRandom } from "./seed";
 
-export const MOCK_UNIVERSE: Record<
-  string,
-  {
-    name: string;
-    assetClass: AssetClass;
-    exchange: string;
-    currency: string;
-    basePrice: number;
-    region?: "US" | "SA" | "Global";
-  }
-> = {
-  AAPL: { name: "Apple Inc.", assetClass: "stock", exchange: "NASDAQ", currency: "USD", basePrice: 178, region: "US" },
-  MSFT: { name: "Microsoft", assetClass: "stock", exchange: "NASDAQ", currency: "USD", basePrice: 415, region: "US" },
-  GOOGL: { name: "Alphabet", assetClass: "stock", exchange: "NASDAQ", currency: "USD", basePrice: 175, region: "US" },
-  TSLA: { name: "Tesla", assetClass: "stock", exchange: "NASDAQ", currency: "USD", basePrice: 248, region: "US" },
-  NVDA: { name: "NVIDIA", assetClass: "stock", exchange: "NASDAQ", currency: "USD", basePrice: 875, region: "US" },
-  AMZN: { name: "Amazon", assetClass: "stock", exchange: "NASDAQ", currency: "USD", basePrice: 185, region: "US" },
-  META: { name: "Meta Platforms", assetClass: "stock", exchange: "NASDAQ", currency: "USD", basePrice: 480, region: "US" },
-  JPM: { name: "JPMorgan Chase", assetClass: "stock", exchange: "NYSE", currency: "USD", basePrice: 195, region: "US" },
-  KO: { name: "Coca-Cola", assetClass: "stock", exchange: "NYSE", currency: "USD", basePrice: 62, region: "US" },
-  XOM: { name: "Exxon Mobil", assetClass: "stock", exchange: "NYSE", currency: "USD", basePrice: 110, region: "US" },
-  SPY: { name: "S&P 500 ETF", assetClass: "etf", exchange: "NYSE", currency: "USD", basePrice: 520, region: "US" },
-  BTCUSD: { name: "Bitcoin", assetClass: "crypto", exchange: "Crypto", currency: "USD", basePrice: 67000 },
-  ETHUSD: { name: "Ethereum", assetClass: "crypto", exchange: "Crypto", currency: "USD", basePrice: 3500 },
-  SOLUSD: { name: "Solana", assetClass: "crypto", exchange: "Crypto", currency: "USD", basePrice: 145 },
-  EURUSD: { name: "Euro / US Dollar", assetClass: "forex", exchange: "FX", currency: "USD", basePrice: 1.08 },
-  GBPUSD: { name: "British Pound / USD", assetClass: "forex", exchange: "FX", currency: "USD", basePrice: 1.27 },
-  USDJPY: { name: "USD / Japanese Yen", assetClass: "forex", exchange: "FX", currency: "JPY", basePrice: 157 },
-  2222: { name: "Saudi Aramco", assetClass: "saudi", exchange: "Tadawul", currency: "SAR", basePrice: 28.5, region: "SA" },
-  1120: { name: "Al Rajhi Bank", assetClass: "saudi", exchange: "Tadawul", currency: "SAR", basePrice: 92, region: "SA" },
-  2010: { name: "SABIC", assetClass: "saudi", exchange: "Tadawul", currency: "SAR", basePrice: 88, region: "SA" },
-  1180: { name: "Saudi National Bank", assetClass: "saudi", exchange: "Tadawul", currency: "SAR", basePrice: 38, region: "SA" },
-  QQQ: { name: "Invesco QQQ Trust", assetClass: "etf", exchange: "NASDAQ", currency: "USD", basePrice: 440, region: "US" },
-  IWM: { name: "Russell 2000 ETF", assetClass: "etf", exchange: "AMEX", currency: "USD", basePrice: 210, region: "US" },
-  GLD: { name: "SPDR Gold Shares", assetClass: "etf", exchange: "NYSE", currency: "USD", basePrice: 215, region: "US" },
-  GLDM: { name: "SPDR Gold MiniShares", assetClass: "etf", exchange: "NYSE", currency: "USD", basePrice: 42, region: "US" },
-  XLE: { name: "Energy Select Sector SPDR", assetClass: "etf", exchange: "NYSE", currency: "USD", basePrice: 92, region: "US" },
-  USO: { name: "United States Oil Fund", assetClass: "etf", exchange: "NYSE", currency: "USD", basePrice: 72, region: "US" },
-  BNO: { name: "United States Brent Oil", assetClass: "etf", exchange: "NYSE", currency: "USD", basePrice: 28, region: "US" },
-  CLUSD: { name: "Crude Oil WTI", assetClass: "commodity", exchange: "COMEX", currency: "USD", basePrice: 78 },
-  GCUSD: { name: "Gold Spot", assetClass: "commodity", exchange: "COMEX", currency: "USD", basePrice: 2350 },
-  SIUSD: { name: "Silver Spot", assetClass: "commodity", exchange: "COMEX", currency: "USD", basePrice: 28 },
-  BP: { name: "BP plc", assetClass: "stock", exchange: "LSE", currency: "GBP", basePrice: 480, region: "Global" },
-  SAP: { name: "SAP SE", assetClass: "stock", exchange: "XETRA", currency: "EUR", basePrice: 180, region: "Global" },
-  TM: { name: "Toyota Motor", assetClass: "stock", exchange: "TSE", currency: "JPY", basePrice: 2800, region: "Global" },
-  SPX: { name: "S&P 500 Index", assetClass: "index", exchange: "NYSE", currency: "USD", basePrice: 5200, region: "US" },
-  DJI: { name: "Dow Jones Industrial", assetClass: "index", exchange: "NYSE", currency: "USD", basePrice: 39000, region: "US" },
-  IXIC: { name: "NASDAQ Composite", assetClass: "index", exchange: "NASDAQ", currency: "USD", basePrice: 16500, region: "US" },
-  TASI: { name: "Tadawul All Share", assetClass: "index", exchange: "Tadawul", currency: "SAR", basePrice: 11800, region: "SA" },
-};
+export const MOCK_UNIVERSE = buildMockUniverseMap();
 
 export const DEFAULT_WATCHLIST = ["AAPL", "MSFT", "NVDA", "BTCUSD", "2222", "EURUSD", "SPX", "CLUSD", "QQQ"];
 

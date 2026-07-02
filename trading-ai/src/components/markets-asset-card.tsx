@@ -21,7 +21,7 @@ export function MarketsAssetCard({ item }: { item: MarketBrowseItem }) {
           </span>
           <div>
             <Link href={`/dashboard/analysis?symbol=${item.symbol}`} className="font-semibold hover:text-emerald-300">
-              {item.symbol}
+              {item.displaySymbol ?? item.symbol}
             </Link>
             <p className="text-xs text-zinc-500">{item.name}</p>
           </div>

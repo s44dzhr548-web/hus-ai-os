@@ -34,7 +34,7 @@ async function run(baseUrl) {
     steps.push(
       step(
         `Browse category ${category}`,
-        r.ok && Array.isArray(r.data.items) && (category === "all" ? r.data.total >= 30 : true),
+        r.ok && Array.isArray(r.data.items) && (category === "all" ? r.data.total >= 75 : category === "saudi" ? r.data.total >= 8 : r.data.total >= 1),
         r.ok ? `${r.data.total} assets · first=${r.data.items[0]?.symbol ?? "—"}` : `HTTP ${r.status}`
       )
     );
