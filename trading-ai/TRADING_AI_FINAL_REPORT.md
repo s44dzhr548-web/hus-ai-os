@@ -1,102 +1,114 @@
-# Trading AI — Competitive Intelligence Platform Final Report
+# Trading AI — REAL MARKET DATA MODE Report
 
 **Date:** June 30, 2026  
 **Production URL:** https://trading-ai-beta.vercel.app  
 **GitHub:** https://github.com/s44dzhr548-web/hus-ai-os  
+**Mode:** `MARKET_DATA_MODE=live` (default) · Paper trading only · Broker **DISABLED**
 
 ---
 
-## Completed
+## What Changed
 
-| Area | Status |
+Trading AI now runs in **Real Market Data mode** by default:
+
+- Live providers are tried **first** for every quote, candle, news, and calendar request
+- **Mock/demo fallback** only when all live sources fail (or `MARKET_DATA_MODE=demo`)
+- **No broker** connected · **No real trades** · paper portfolio only
+- Adding API keys in Vercel auto-enables premium providers on next deploy
+
+---
+
+## Connected Providers (Live — No API Key Required)
+
+| Provider | Markets | Status |
+|----------|---------|--------|
+| **Yahoo Finance** | US stocks, ETFs, indices, commodities, Saudi (.SR), forex, crypto | Live |
+| **CoinGecko** | Crypto (BTC, ETH) | Live |
+| **Binance Public** | Crypto | Live |
+| **Frankfurter ECB** | Forex (EUR, GBP, JPY pairs) | Live |
+| **Yahoo Finance RSS** | Market news headlines | Live |
+| **FairEconomy Calendar** | Economic events this week | Live |
+
+Verify: `GET /api/market/providers/verify`
+
+---
+
+## Missing API Keys (Optional Upgrades)
+
+These keys are **not required** to build or run. Add in Vercel → Environment Variables:
+
+| Env Variable | Unlocks |
+|--------------|---------|
+| `FINNHUB_API_KEY` | Premium US stock data + search |
+| `POLYGON_API_KEY` | Polygon.io equities/crypto |
+| `ALPHA_VANTAGE_API_KEY` | Alpha Vantage stocks/forex/commodities |
+| `TWELVE_DATA_API_KEY` | Twelve Data multi-asset |
+| `FOREX_PROVIDER_KEY` | Keyed forex feed |
+| `TADAWUL_PROVIDER_KEY` | Official Saudi market API |
+| `NEWS_API_KEY` | NewsAPI.org (replaces Yahoo RSS) |
+| `ECONOMIC_CALENDAR_API_KEY` | TradingEconomics calendar |
+
+**Auto-switch:** When keys are added and redeployed, keyed providers join the live chain automatically.
+
+---
+
+## Live Markets Available (via public providers)
+
+| Market | Probe Symbol | Primary Live Source |
+|--------|--------------|---------------------|
+| US Stocks | AAPL | Yahoo Finance |
+| Saudi / Tadawul | 2222 | Yahoo Finance (2222.SR) |
+| Crypto | BTCUSD | CoinGecko / Binance |
+| Forex | EURUSD | Frankfurter / Yahoo |
+| Commodities | CLUSD | Yahoo (CL=F) |
+| Indices | SPX | Yahoo (^GSPC) |
+| ETFs | SPY | Yahoo Finance |
+| News | AAPL | Yahoo RSS |
+| Economic Calendar | Global | FairEconomy JSON |
+
+Check runtime status: `GET /api/market/providers/status`
+
+---
+
+## Demo Markets Remaining
+
+Demo fallback activates **only when**:
+
+- All live provider probes fail for a symbol (network/API outage)
+- `MARKET_DATA_MODE=demo` is set
+- Keyed-only provider requested without key **and** free sources failed
+
+The dashboard shows **LIVE DATA** / **MIXED DATA** / **Demo Data** badges per runtime verification.
+
+---
+
+## Safety (Unchanged)
+
+| Rule | Status |
 |------|--------|
-| Unified MarketDataProvider + registry + fallback chain | ✅ |
-| Cache layer + rate-limit protection | ✅ |
-| 20+ market API endpoints | ✅ |
-| Real-data AI analysis (demo fallback) | ✅ |
-| Backtesting + paper trading | ✅ |
-| Competitors intelligence (`/competitors`) | ✅ |
-| Comparison matrix + gap analysis + roadmap | ✅ |
-| Bilingual AR/EN + RTL/LTR | ✅ |
-| Compliance locked · broker OFF | ✅ |
-| Tests 23/23 · Build passing | ✅ |
+| Real broker execution | **DISABLED** |
+| Paper trading only | **YES** |
+| Compliance mode locked | **YES** |
+| Alpaca keys | Data-only if set; execution blocked |
 
 ---
 
-## Real Providers Implemented
+## Tests & Deploy
 
-| Provider | Env Key | Without Key | With Key |
-|----------|---------|-------------|----------|
-| Mock | — | Demo fallback | Always available |
-| CoinGecko | — | **Live** (public) | Live |
-| Binance Public | — | **Live** (public) | Live |
-| Yahoo Finance | — | **Live** (unofficial) | Live |
-| Finnhub | `FINNHUB_API_KEY` | Demo | Live |
-| Polygon.io | `POLYGON_API_KEY` | Demo | Live |
-| Alpha Vantage | `ALPHA_VANTAGE_API_KEY` | Demo | Live |
-| Twelve Data | `TWELVE_DATA_API_KEY` | Demo | Live |
-| Forex | `FOREX_PROVIDER_KEY` | Demo | Live |
-| Tadawul/Saudi | `TADAWUL_PROVIDER_KEY` | Yahoo .SR | Live |
-| NewsAPI | `NEWS_API_KEY` | Mock news | Live |
-| Economic Calendar | `ECONOMIC_CALENDAR_API_KEY` | Mock events | Live |
+- **31/31** Vitest tests passing
+- TypeScript build clean
+- New endpoint: `/api/market/providers/verify`
 
 ---
 
-## Markets
+## Remaining Human Actions
 
-| Market | Live path | Demo fallback |
-|--------|-----------|---------------|
-| US Stocks | Finnhub/Polygon/Yahoo | Mock |
-| Saudi/Tadawul | Yahoo .SR / Tadawul key | Mock |
-| Crypto | CoinGecko/Binance | Mock |
-| Forex | Forex provider/Alpha Vantage | Mock |
-| Commodities | Polygon/Yahoo | Mock |
-| Indices | Finnhub/Yahoo | Mock |
-| ETFs | Finnhub/Polygon/Yahoo | Mock |
+1. Add optional API keys in Vercel for premium data feeds
+2. Set `MARKET_DATA_MODE=live` in Vercel (recommended, default in `.env.example`)
+3. SMTP / WhatsApp for alert delivery (optional)
+
+**No OAuth, payment, or KYC required for live market data.**
 
 ---
 
-## Competitors Added (20)
-
-TradingView · Bloomberg Terminal · Trade Ideas · TrendSpider · Tickeron · MetaTrader 5 · NinjaTrader · QuantConnect · Interactive Brokers · eToro · Seeking Alpha · Stock Rover · Koyfin · Finviz · MarketSmith · 3Commas · Cryptohopper · Coinrule · AlphaSense · Thinkorswim
-
-**Page:** https://trading-ai-beta.vercel.app/competitors
-
----
-
-## HUSAI Gaps (High Priority)
-
-- Advanced interactive charting workspace
-- Deep fundamental data (US + Tadawul financials)
-
-## HUSAI Advantages
-
-- **Arabic-first** AI explanations (default RTL)
-- **Saudi market** specialization (Tadawul, oil/rates macro)
-- **Paper-only by default** — broker execution disabled & locked
-- **Unified multi-market** data in one platform
-- **Audit trail** for every AI recommendation
-
----
-
-## API Endpoints to Verify
-
-- `GET /api/health` → 200
-- `GET /api/market/providers/status` → provider health
-- `GET /api/market/search?q=AAPL` → symbols
-- `GET /api/market/quotes?symbols=AAPL,BTCUSD` → batch quotes
-- `GET /api/market/news?symbol=AAPL` → news
-- `GET /api/market/economic-calendar` → macro events
-- `GET /api/competitors` → intelligence JSON
-
----
-
-## Remaining Human Approvals Only
-
-- API keys (Finnhub, Polygon, Alpha Vantage, Twelve Data, News, Forex, Tadawul, Economic Calendar)
-- SMTP / WhatsApp for alert delivery
-- Legal/KYC for real-money trading (**permanently disabled in app**)
-
----
-
-*Paper trading only · Not financial advice · Demo badge when keys missing*
+*Not financial advice · Educational use only · Paper trading simulation*

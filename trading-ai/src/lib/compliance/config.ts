@@ -1,5 +1,5 @@
 import type { ComplianceConfig, RiskSettings } from "@/types/trading";
-import { getDataMode } from "@/lib/market/config";
+import { getDataMode, isRealMarketDataMode } from "@/lib/market/config";
 
 export const COMPLIANCE_CONFIG: ComplianceConfig = {
   paperTradingOnly: true,
@@ -13,7 +13,7 @@ export const COMPLIANCE_CONFIG: ComplianceConfig = {
     "Users are responsible for compliance with local regulations. Real-money trading requires separate broker authorization and KYC.",
   jurisdictionNoticeAr:
     "المستخدم مسؤول عن الامتثال للأنظمة المحلية. التداول بأموال حقيقية يتطلب ترخيص وسيط وKYC منفصل.",
-  dataMode: getDataMode(),
+  dataMode: isRealMarketDataMode() ? getDataMode() : "mock",
 };
 
 export const DEFAULT_RISK_SETTINGS: RiskSettings = {

@@ -7,6 +7,7 @@ import { twelveDataProvider } from "./providers/twelve-data";
 import { polygonProvider } from "./providers/polygon";
 import { yahooProvider } from "./providers/yahoo";
 import { forexProvider } from "./providers/forex";
+import { frankfurterProvider } from "./providers/frankfurter";
 import { tadawulProvider } from "./providers/tadawul";
 import { mockProvider } from "./providers/mock";
 
@@ -20,6 +21,7 @@ export const PROVIDER_REGISTRY: MarketDataProvider[] = [
   twelveDataProvider,
   alphaVantageProvider,
   forexProvider,
+  frankfurterProvider,
   tadawulProvider,
 ];
 

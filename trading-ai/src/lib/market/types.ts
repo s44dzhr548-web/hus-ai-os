@@ -11,6 +11,7 @@ export type ProviderId =
   | "coingecko"
   | "binance"
   | "forex"
+  | "frankfurter"
   | "tadawul"
   | "news"
   | "economic_calendar";
