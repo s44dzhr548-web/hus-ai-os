@@ -1,7 +1,14 @@
+import { checkRateLimit, rateLimitKey } from "./rate-limit";
+import { cachedFetch } from "./cache";
+
 export async function safeFetch(
   url: string,
-  init?: RequestInit & { timeoutMs?: number }
+  init?: RequestInit & { timeoutMs?: number; rateLimitProvider?: string }
 ): Promise<Response | null> {
+  if (init?.rateLimitProvider) {
+    const rl = checkRateLimit(rateLimitKey(init.rateLimitProvider, "fetch"));
+    if (!rl.allowed) return null;
+  }
   const timeoutMs = init?.timeoutMs ?? 8000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -21,12 +28,21 @@ export async function safeFetch(
   }
 }
 
-export async function fetchJson<T>(url: string, init?: RequestInit & { timeoutMs?: number }): Promise<T | null> {
-  const res = await safeFetch(url, init);
-  if (!res) return null;
-  try {
-    return (await res.json()) as T;
-  } catch {
-    return null;
+export async function fetchJson<T>(
+  url: string,
+  init?: RequestInit & { timeoutMs?: number; rateLimitProvider?: string; cacheKey?: string; cacheTtlMs?: number }
+): Promise<T | null> {
+  const fetcher = async () => {
+    const res = await safeFetch(url, init);
+    if (!res) return null;
+    try {
+      return (await res.json()) as T;
+    } catch {
+      return null;
+    }
+  };
+  if (init?.cacheKey) {
+    return cachedFetch(init.cacheKey, init.cacheTtlMs ?? 60_000, fetcher);
   }
+  return fetcher();
 }

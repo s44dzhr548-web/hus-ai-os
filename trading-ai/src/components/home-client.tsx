@@ -26,6 +26,12 @@ export function HomeClient() {
             {t.home.openDashboard}
           </Link>
           <Link
+            href="/competitors"
+            className="rounded-lg border border-zinc-700 px-5 py-2.5 text-sm hover:border-zinc-500"
+          >
+            {t.nav.competitors}
+          </Link>
+          <Link
             href="/api/health"
             className="rounded-lg border border-zinc-700 px-5 py-2.5 text-sm hover:border-zinc-500"
           >

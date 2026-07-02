@@ -15,6 +15,7 @@ const NAV_KEYS = [
   { href: "/dashboard/risk", key: "risk" as const },
   { href: "/dashboard/learning", key: "learning" as const },
   { href: "/dashboard/alerts", key: "alerts" as const },
+  { href: "/competitors", key: "competitors" as const },
   { href: "/dashboard/reports", key: "reports" as const },
   { href: "/dashboard/settings", key: "settings" as const },
 ];
