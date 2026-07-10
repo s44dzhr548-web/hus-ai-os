@@ -14,6 +14,7 @@ enum StaffRole {
   OWNER
   ADMIN
   MANAGER
+  RECEPTION
   CASHIER
   KITCHEN
   WAITER
@@ -98,6 +99,77 @@ enum TableRequestStatus {
   NEW
   SEEN
   DONE
+}
+
+enum TableSessionStatus {
+  AVAILABLE
+  WAITING
+  SEATED
+  ORDERING
+  FOOD_PREPARING
+  SERVING
+  PAID
+  COMPLETED
+}
+
+enum TableOperationalStatus {
+  AVAILABLE
+  RESERVED
+  OCCUPIED
+  CLEANING
+  OUT_OF_SERVICE
+}
+
+enum ReservationStatus {
+  PENDING
+  APPROVED
+  CONFIRMED
+  REJECTED
+  ARRIVED
+  SEATED
+  COMPLETED
+  CANCELLED
+  CONVERTED
+  NO_SHOW
+}
+
+enum WaitingListStatus {
+  WAITING
+  NOTIFIED
+  SEATED
+  CANCELLED
+}
+
+enum TableAssignmentType {
+  ASSIGN
+  MOVE
+  MERGE
+  SPLIT
+}
+
+enum DepositStatus {
+  PENDING
+  PAID
+  REFUNDED
+  WAIVED
+}
+
+enum TableIcon {
+  REGULAR
+  VIP
+  FAMILY
+  OUTDOOR
+  SOFA
+  WINDOW
+  BIRTHDAY
+  BUSINESS
+  PRIVATE_ROOM
+}
+
+enum VisitStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
 }
 
 enum OptionGroupType {
@@ -194,11 +266,19 @@ model Restaurant {
   descriptionEn String? @map("description_en")
   logoUrl     String?  @map("logo_url")
   coverUrl    String?  @map("cover_url")
-  primaryColor    String? @default("#047857") @map("primary_color")
-  secondaryColor  String? @default("#065f46") @map("secondary_color")
-  backgroundColor String? @default("#f9fafb") @map("background_color")
-  buttonColor     String? @default("#047857") @map("button_color")
-  textColor       String? @default("#111827") @map("text_color")
+  heroVideoUrl  String? @map("hero_video_url")
+  heroImageUrl  String? @map("hero_image_url")
+  welcomeText   String? @map("welcome_text")
+  welcomeTextEn String? @map("welcome_text_en")
+  ctaText       String? @default("استكشف المنيو") @map("cta_text")
+  ctaTextEn     String? @default("Explore Menu") @map("cta_text_en")
+  cardStyle     String? @default("glass") @map("card_style")
+  homepageSections Json? @map("homepage_sections")
+  primaryColor    String? @default("#d4af37") @map("primary_color")
+  secondaryColor  String? @default("#8b6914") @map("secondary_color")
+  backgroundColor String? @default("#0c0a09") @map("background_color")
+  buttonColor     String? @default("#c9a227") @map("button_color")
+  textColor       String? @default("#faf7f2") @map("text_color")
   categoryColor   String? @default("#047857") @map("category_color")
   fontFamily      String? @default("cairo") @map("font_family")
   qrCode      String?  @map("qr_code")
@@ -221,6 +301,8 @@ model Restaurant {
   stripeSecretKey        String? @map("stripe_secret_key")
   paymentTestMode        Boolean @default(true) @map("payment_test_mode")
   whatsappNumber         String? @map("whatsapp_number")
+  receptionDepositEnabled Boolean @default(false) @map("reception_deposit_enabled")
+  receptionDepositAmount  Decimal? @map("reception_deposit_amount")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -235,9 +317,17 @@ model Restaurant {
   subscription   Subscription?
   billingPayments SubscriptionBillingPayment[]
   favorites      CustomerFavorite[]
-  tableRequests  TableRequest[]
-  optionGroups   MenuItemOptionGroup[]
-  auditLogs      AuditLog[]
+  tableRequests     TableRequest[]
+  optionGroups      MenuItemOptionGroup[]
+  auditLogs         AuditLog[]
+  customerProfiles  CustomerProfile[]
+  customerVisits    CustomerVisit[]
+  tableSessions     TableSession[]
+  reservations      Reservation[]
+  waitingList       WaitingListEntry[]
+  tableAssignments  TableAssignment[]
+  receptionNotifications ReceptionNotification[]
+  sessionAuditLogs    SessionAuditLog[]
 
   @@index([ownerId])
   @@map("restaurants")
@@ -259,10 +349,13 @@ model Branch {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  restaurant Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  tables     DiningTable[]
-  orders     Order[]
-  staff      Staff[]
+  restaurant   Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tables       DiningTable[]
+  orders       Order[]
+  staff        Staff[]
+  tableSessions TableSession[]
+  reservations Reservation[]
+  waitingList   WaitingListEntry[]
 
   @@index([restaurantId])
   @@map("branches")
@@ -290,19 +383,29 @@ model Staff {
 }
 
 model DiningTable {
-  id        String   @id @default(cuid())
-  branchId  String   @map("branch_id")
-  number    Int
-  tableCode String?  @unique @map("table_code")
-  label     String?
-  capacity  Int      @default(4)
-  qrCode    String?  @map("qr_code")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                 String                 @id @default(cuid())
+  branchId           String                 @map("branch_id")
+  number             Int
+  tableCode          String?                @unique @map("table_code")
+  label              String?
+  tableIcon          TableIcon              @default(REGULAR) @map("table_icon")
+  capacity           Int                    @default(4)
+  minimumSpendAmount Decimal?               @map("minimum_spend_amount")
+  sortOrder          Int                    @default(0) @map("sort_order")
+  notes              String?
+  qrCode             String?                @map("qr_code")
+  isActive           Boolean                @default(true) @map("is_active")
+  operationalStatus  TableOperationalStatus @default(AVAILABLE) @map("operational_status")
+  floorMapX          Int?                   @map("floor_map_x")
+  floorMapY          Int?                   @map("floor_map_y")
+  floorZone          String?                @map("floor_zone")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
 
-  branch Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  orders Order[]
+  branch        Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  orders        Order[]
+  tableSessions TableSession[]
+  reservations  Reservation[]
 
   @@unique([branchId, number])
   @@index([branchId])
@@ -376,27 +479,36 @@ model MenuItem {
 }
 
 model Order {
-  id           String      @id @default(cuid())
-  branchId     String      @map("branch_id")
-  tableId      String?     @map("table_id")
-  customerId   String?     @map("customer_id")
-  orderNumber  Int         @map("order_number")
-  status       OrderStatus @default(NEW)
-  subtotal     Decimal     @default(0)
-  tipAmount    Decimal     @default(0) @map("tip_amount")
-  discountAmount Decimal   @default(0) @map("discount_amount")
-  totalAmount  Decimal     @default(0) @map("total_amount")
-  couponCode   String?     @map("coupon_code")
-  notes        String?
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
-  completedAt  DateTime?   @map("completed_at")
+  id                 String      @id @default(cuid())
+  branchId           String      @map("branch_id")
+  tableId            String?     @map("table_id")
+  customerId         String?     @map("customer_id")
+  customerProfileId  String?     @map("customer_profile_id")
+  tableSessionId     String?     @map("table_session_id")
+  tableNumber        Int?        @map("table_number")
+  tableLabel         String?     @map("table_label")
+  tableIcon          String?     @map("table_icon")
+  minimumSpendAmount Decimal?    @map("minimum_spend_amount")
+  customerName       String?     @map("customer_name")
+  orderNumber        Int         @map("order_number")
+  status             OrderStatus @default(NEW)
+  subtotal           Decimal     @default(0)
+  tipAmount          Decimal     @default(0) @map("tip_amount")
+  discountAmount     Decimal     @default(0) @map("discount_amount")
+  totalAmount        Decimal     @default(0) @map("total_amount")
+  couponCode         String?     @map("coupon_code")
+  notes              String?
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  completedAt        DateTime?   @map("completed_at")
 
-  branch   Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  table    DiningTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
-  customer Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  items    OrderItem[]
-  payments Payment[]
+  branch          Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  table           DiningTable?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  customer        Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerProfile CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: SetNull)
+  tableSession    TableSession?    @relation(fields: [tableSessionId], references: [id], onDelete: SetNull)
+  items           OrderItem[]
+  payments        Payment[]
 
   @@unique([branchId, orderNumber])
   @@index([branchId, status, createdAt])
@@ -643,4 +755,225 @@ model AuditLog {
 
   @@index([restaurantId, createdAt])
   @@map("audit_logs")
+}
+
+model CustomerProfile {
+  id            String    @id @default(cuid())
+  restaurantId  String    @map("restaurant_id")
+  customerName  String    @map("customer_name")
+  customerPhone String?   @map("customer_phone")
+  email         String?
+  gender        String?
+  birthday      DateTime?
+  isVip         Boolean   @default(false) @map("is_vip")
+  visitCount    Int       @default(0) @map("visit_count")
+  totalSpending Decimal   @default(0) @map("total_spending")
+  lastVisitAt   DateTime? @map("last_visit_at")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  visits       CustomerVisit[]
+  reservations Reservation[]
+  orders       Order[]
+
+  @@index([restaurantId, customerPhone])
+  @@map("customer_profiles")
+}
+
+model CustomerVisit {
+  id                String   @id @default(cuid())
+  restaurantId      String   @map("restaurant_id")
+  customerProfileId String?  @map("customer_profile_id")
+  customerName      String   @map("customer_name")
+  customerPhone     String?  @map("customer_phone")
+  guestCount        Int      @default(1) @map("guest_count")
+  gender            String?
+  occasion          String?
+  notes             String?
+  tableNumber        Int?             @map("table_number")
+  tableDisplayNumber String?          @map("table_display_number")
+  tableLabel         String?          @map("table_label")
+  tableIcon          TableIcon?       @map("table_icon")
+  tableZone          String?          @map("table_zone")
+  minimumSpendAmount Decimal?         @map("minimum_spend_amount")
+  previousTables     Json?            @map("previous_tables")
+  closedByStaffName  String?          @map("closed_by_staff_name")
+  arrivalTime        DateTime?        @map("arrival_time")
+  endTime           DateTime?        @map("end_time")
+  totalBill         Decimal          @default(0) @map("total_bill")
+  ordersCount       Int              @default(0) @map("orders_count")
+  visitStatus       VisitStatus      @default(ACTIVE) @map("visit_status")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  restaurant      Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerProfile CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: SetNull)
+  tableSessions   TableSession[]
+
+  @@index([restaurantId, createdAt])
+  @@map("customer_visits")
+}
+
+model TableSession {
+  id                 String             @id @default(cuid())
+  restaurantId       String             @map("restaurant_id")
+  branchId           String             @map("branch_id")
+  tableId            String             @map("table_id")
+  tableNumber        Int                @map("table_number")
+  tableDisplayNumber String?            @map("table_display_number")
+  tableLabel         String?            @map("table_label")
+  tableIcon          TableIcon?         @map("table_icon")
+  tableZone          String?            @map("table_zone")
+  tableCapacity      Int?               @map("table_capacity")
+  customerVisitId    String?            @map("customer_visit_id")
+  reservationId      String?            @unique @map("reservation_id")
+  customerName       String             @map("customer_name")
+  customerPhone      String?            @map("customer_phone")
+  guestCount         Int                @default(1) @map("guest_count")
+  gender             String?
+  occasion           String?
+  staffMemberId      String?            @map("staff_member_id")
+  staffMemberName    String?            @map("staff_member_name")
+  minimumSpendAmount Decimal?           @map("minimum_spend_amount")
+  status             TableSessionStatus @default(WAITING)
+  notes              String?
+  totalBill          Decimal?           @map("total_bill")
+  ordersCount        Int?               @map("orders_count")
+  startedAt          DateTime           @default(now()) @map("started_at")
+  endedAt            DateTime?          @map("ended_at")
+
+  restaurant       Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch           Branch            @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  table            DiningTable       @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  customerVisit    CustomerVisit?    @relation(fields: [customerVisitId], references: [id], onDelete: SetNull)
+  reservation      Reservation?      @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  tableAssignments TableAssignment[]
+  orders           Order[]
+  auditLogs        SessionAuditLog[]
+
+  @@index([restaurantId, status])
+  @@index([tableId, endedAt])
+  @@map("table_sessions")
+}
+
+model Reservation {
+  id                String            @id @default(cuid())
+  restaurantId      String            @map("restaurant_id")
+  branchId          String?           @map("branch_id")
+  customerProfileId String?           @map("customer_profile_id")
+  customerName      String            @map("customer_name")
+  customerPhone     String            @map("customer_phone")
+  guestCount        Int               @default(2) @map("guest_count")
+  gender            String?
+  date              DateTime
+  time              String
+  occasion          String?
+  notes             String?
+  preferredArea     String?           @map("preferred_area")
+  tableId           String?           @map("table_id")
+  tableNumber       Int?              @map("table_number")
+  tableLabel        String?           @map("table_label")
+  tableIcon         TableIcon?        @map("table_icon")
+  tableZone         String?           @map("table_zone")
+  minimumSpendAmount Decimal?         @map("minimum_spend_amount")
+  status            ReservationStatus @default(PENDING)
+  depositAmount     Decimal?          @map("deposit_amount")
+  depositStatus     DepositStatus?    @map("deposit_status")
+  depositPaymentId  String?           @map("deposit_payment_id")
+  arrivedAt         DateTime?         @map("arrived_at")
+  completedAt       DateTime?         @map("completed_at")
+  cancelledAt       DateTime?         @map("cancelled_at")
+  noShowAt          DateTime?         @map("no_show_at")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  restaurant      Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  table           DiningTable?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  customerProfile CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: SetNull)
+  tableSession    TableSession?
+
+  @@index([restaurantId, status, date])
+  @@map("reservations")
+}
+
+model WaitingListEntry {
+  id                   String            @id @default(cuid())
+  restaurantId         String            @map("restaurant_id")
+  branchId             String?           @map("branch_id")
+  customerProfileId    String?           @map("customer_profile_id")
+  customerName         String            @map("customer_name")
+  customerPhone        String?           @map("customer_phone")
+  guestCount           Int               @default(2) @map("guest_count")
+  gender               String?
+  occasion             String?
+  notes                String?
+  estimatedWaitMinutes Int               @default(15) @map("estimated_wait_minutes")
+  status               WaitingListStatus @default(WAITING)
+  tableSessionId       String?           @map("table_session_id")
+  notifiedAt           DateTime?         @map("notified_at")
+  seatedAt             DateTime?         @map("seated_at")
+  createdAt            DateTime          @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch     Branch?    @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, status, createdAt])
+  @@map("waiting_list")
+}
+
+model TableAssignment {
+  id           String              @id @default(cuid())
+  restaurantId String              @map("restaurant_id")
+  sessionId    String              @map("session_id")
+  type         TableAssignmentType
+  fromTableId  String?             @map("from_table_id")
+  toTableId    String?             @map("to_table_id")
+  staffName    String?             @map("staff_name")
+  notes        String?
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  session    TableSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("table_assignments")
+}
+
+model SessionAuditLog {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  sessionId    String   @map("session_id")
+  field        String
+  oldValue     String?  @map("old_value")
+  newValue     String?  @map("new_value")
+  staffUserId  String?  @map("staff_user_id")
+  staffName    String?  @map("staff_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  session    TableSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([restaurantId, createdAt])
+  @@map("session_audit_logs")
+}
+
+model ReceptionNotification {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  type         String
+  title        String
+  message      String
+  entityType   String?  @map("entity_type")
+  entityId     String?  @map("entity_id")
+  isRead       Boolean  @default(false) @map("is_read")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, isRead, createdAt])
+  @@map("reception_notifications")
 }

@@ -1,6 +1,6 @@
 {
   "name": "restaurant-os",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Multi-location restaurant operating system — Restaurant OS",
   "scripts": {
@@ -24,6 +24,13 @@
     "r2:setup-cors": "tsx scripts/r2-setup-cors.ts",
     "test:media-upload": "tsx scripts/production-media-upload-qa.ts",
     "test:permissions": "tsx scripts/permissions-test.ts",
+    "test:reception": "tsx scripts/reception-reservations-test.ts",
+    "test:tables": "tsx scripts/reception-tables-test.ts",
+    "test:reception:edit": "tsx scripts/reception-edit-test.ts",
+    "test:reception:full": "tsx scripts/reception-full-test.ts",
+    "test:customers": "tsx scripts/customer-history-test.ts",
+    "test:staff": "tsx scripts/staff-accounts-test.ts",
+    "test:phase1:prod": "node scripts/production-verify.mjs && npm run test:smoke && npm run test:reception && npm run test:customers && npm run test:staff && npm run test:permissions",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && prisma migrate deploy && next build"
