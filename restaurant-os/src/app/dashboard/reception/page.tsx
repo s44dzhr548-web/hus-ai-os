@@ -126,6 +126,81 @@ function tableCardTitle(table: TableCard["table"], session: TableCard["session"]
   return `${icon} ${display}`;
 }
 
+function WalkInTableInput({
+  tableNumber,
+  onTableNumberChange,
+  tableId,
+  onTableIdChange,
+  availableTables,
+  showPicker,
+  onTogglePicker,
+}: {
+  tableNumber: string;
+  onTableNumberChange: (v: string) => void;
+  tableId: string;
+  onTableIdChange: (id: string) => void;
+  availableTables: TableCard[];
+  showPicker: boolean;
+  onTogglePicker: () => void;
+}) {
+  return (
+    <div className="space-y-2" data-testid="walkin-table-input">
+      <label className="block text-sm font-medium text-gray-700">
+        رقم الطاولة *
+        <input
+          required={!tableId}
+          type="text"
+          inputMode="text"
+          autoComplete="off"
+          placeholder="1 · 15 · A12 · VIP-01 · Garden-5"
+          value={tableNumber}
+          onChange={(e) => {
+            onTableNumberChange(e.target.value);
+            if (tableId) onTableIdChange("");
+          }}
+          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base"
+          data-testid="manual-table-number"
+        />
+      </label>
+      <button
+        type="button"
+        onClick={onTogglePicker}
+        className="text-sm font-medium text-emerald-700 underline-offset-2 hover:underline"
+        data-testid="pick-existing-table-btn"
+      >
+        {showPicker ? "إخفاء قائمة الطاولات" : "اختيار من الطاولات"}
+      </button>
+      {showPicker && (
+        <label className="block text-sm font-medium text-gray-700">
+          الطاولة من القائمة
+          <select
+            value={tableId}
+            onChange={(e) => {
+              onTableIdChange(e.target.value);
+              const picked = availableTables.find((c) => c.table.id === e.target.value);
+              if (picked) {
+                onTableNumberChange(
+                  picked.table.label?.trim() || String(picked.table.number)
+                );
+              }
+            }}
+            className="mt-1 w-full rounded-lg border px-3 py-2.5 text-base"
+            data-testid="existing-table-select"
+          >
+            <option value="">— اختر طاولة —</option>
+            {availableTables.map((c) => (
+              <option key={c.table.id} value={c.table.id}>
+                {c.table.tableIconEmoji || "🪑"} طاولة {c.table.number}
+                {c.table.label ? ` — ${c.table.label}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    </div>
+  );
+}
+
 function TableModeToggle({
   mode,
   onChange,
@@ -274,7 +349,8 @@ export default function ReceptionPage() {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [walkInOpen, setWalkInOpen] = useState(false);
-  const [tableMode, setTableMode] = useState<TableMode>("existing");
+  const [showTablePicker, setShowTablePicker] = useState(false);
+  const [tableMode, setTableMode] = useState<TableMode>("manual");
   const [editTarget, setEditTarget] = useState<{ card: TableCard; mode: EditModal } | null>(null);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
   const [auditLogs, setAuditLogs] = useState<
@@ -448,12 +524,10 @@ export default function ReceptionPage() {
       branchId,
     };
 
-    if (tableMode === "manual") {
-      if (!manualTable.tableNumber.trim()) {
-        setError("رقم الطاولة مطلوب");
-        setSaving(false);
-        return;
-      }
+    if (form.tableId) {
+      payload.tableId = form.tableId;
+      payload.minimumSpendAmount = form.minimumSpendAmount || undefined;
+    } else if (manualTable.tableNumber.trim()) {
       payload.manualTable = {
         number: manualTable.tableNumber.trim(),
         label: manualTable.label || undefined,
@@ -470,13 +544,9 @@ export default function ReceptionPage() {
         payload.minimumSpendAmount = form.minimumSpendAmount;
       }
     } else {
-      if (!form.tableId) {
-        setError("اختر طاولة موجودة أو استخدم الإدخال اليدوي");
-        setSaving(false);
-        return;
-      }
-      payload.tableId = form.tableId;
-      payload.minimumSpendAmount = form.minimumSpendAmount || undefined;
+      setError("رقم الطاولة مطلوب");
+      setSaving(false);
+      return;
     }
 
     const res = await fetch("/api/reception", {
@@ -491,7 +561,8 @@ export default function ReceptionPage() {
       return;
     }
     setWalkInOpen(false);
-    setTableMode("existing");
+    setShowTablePicker(false);
+    setTableMode("manual");
     setForm({
       customerName: "",
       customerPhone: "",
@@ -509,6 +580,44 @@ export default function ReceptionPage() {
     if (!confirm("إنهاء الجلسة وتحرير الطاولة؟")) return;
     await fetch(`/api/reception/${sessionId}`, { method: "DELETE" });
     load();
+  }
+
+  function openWalkInModal(preselectedTableId?: string) {
+    setError("");
+    setShowTablePicker(!!preselectedTableId);
+    setTableMode("manual");
+    if (preselectedTableId) {
+      const picked = cards.find((c) => c.table.id === preselectedTableId);
+      setForm((f) => ({
+        ...f,
+        tableId: preselectedTableId,
+        customerName: "",
+        customerPhone: "",
+        guestCount: 2,
+        notes: "",
+        minimumSpendAmount: "",
+        status: "SEATED",
+      }));
+      setManualTable({
+        ...emptyManualTable,
+        capacity: picked?.table.capacity ?? 4,
+        tableNumber: picked
+          ? picked.table.label?.trim() || String(picked.table.number)
+          : "",
+      });
+    } else {
+      setForm({
+        customerName: "",
+        customerPhone: "",
+        guestCount: 2,
+        tableId: "",
+        notes: "",
+        minimumSpendAmount: "",
+        status: "SEATED",
+      });
+      setManualTable({ ...emptyManualTable, capacity: 4 });
+    }
+    setWalkInOpen(true);
   }
 
   const filteredCards = branchId ? cards.filter((c) => c.table.branchId === branchId) : cards;
@@ -529,7 +638,7 @@ export default function ReceptionPage() {
       <PageHeader
         title="الاستقبال"
         description="تسجيل العملاء وتعيين الطاولات"
-        action={<Button onClick={() => setWalkInOpen(true)}>تسجيل عميل جديد</Button>}
+        action={<Button onClick={() => openWalkInModal()}>تسجيل عميل جديد</Button>}
       />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
@@ -635,14 +744,7 @@ export default function ReceptionPage() {
                 ) : (
                   <div className="flex flex-1 flex-col justify-between gap-3">
                     <p className="text-sm text-gray-500">سعة {table.capacity} · متاحة</p>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setForm((f) => ({ ...f, tableId: table.id }));
-                        setTableMode("existing");
-                        setWalkInOpen(true);
-                      }}
-                    >
+                    <Button size="sm" onClick={() => openWalkInModal(table.id)}>
                       تسجيل عميل
                     </Button>
                   </div>
@@ -685,48 +787,29 @@ export default function ReceptionPage() {
             />
           </label>
 
-          <TableModeToggle mode={tableMode} onChange={setTableMode} idPrefix="walkin" />
+          <WalkInTableInput
+            tableNumber={manualTable.tableNumber}
+            onTableNumberChange={(v) =>
+              setManualTable({ ...manualTable, tableNumber: v })
+            }
+            tableId={form.tableId}
+            onTableIdChange={(id) => setForm({ ...form, tableId: id })}
+            availableTables={availableTables}
+            showPicker={showTablePicker}
+            onTogglePicker={() => setShowTablePicker((v) => !v)}
+          />
 
-          {tableMode === "existing" ? (
-            <label className="block text-sm font-medium">
-              الطاولة *
-              <select
-                required
-                value={form.tableId}
-                onChange={(e) => setForm({ ...form, tableId: e.target.value })}
-                className="mt-1 w-full rounded-lg border px-3 py-2.5 text-base"
-                data-testid="existing-table-select"
-              >
-                <option value="">— اختر طاولة —</option>
-                {availableTables.map((c) => (
-                  <option key={c.table.id} value={c.table.id}>
-                    {c.table.tableIconEmoji || "🪑"} طاولة {c.table.number}
-                    {c.table.label ? ` — ${c.table.label}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <ManualTableFields
-              idPrefix="walkin"
-              value={manualTable}
-              onChange={(v) => setManualTable({ ...v, capacity: v.capacity ?? manualTable.capacity })}
+          <label className="block text-sm font-medium">
+            الحد الأدنى للجلسة (ريال)
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.minimumSpendAmount}
+              onChange={(e) => setForm({ ...form, minimumSpendAmount: e.target.value })}
+              className="mt-1 w-full rounded-lg border px-3 py-2.5 text-base"
             />
-          )}
-
-          {tableMode === "existing" && (
-            <label className="block text-sm font-medium">
-              الحد الأدنى للجلسة (ريال)
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.minimumSpendAmount}
-                onChange={(e) => setForm({ ...form, minimumSpendAmount: e.target.value })}
-                className="mt-1 w-full rounded-lg border px-3 py-2.5 text-base"
-              />
-            </label>
-          )}
+          </label>
 
           <label className="block text-sm font-medium">
             ملاحظات الجلسة
