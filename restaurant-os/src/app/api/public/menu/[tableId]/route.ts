@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getActiveSessionForTable, serializePublicSession } from "@/lib/reception";
+import { effectiveMinimumSpend, tableIconEmoji } from "@/lib/table-meta";
 
 export const dynamic = "force-dynamic";
 
@@ -106,11 +108,57 @@ export async function GET(
     .slice(0, 6)
     .map(mapItem);
 
+  const activeSession = await getActiveSessionForTable(tableId);
+
+  const tableMinSpend =
+    table.minimumSpendAmount != null ? Number(table.minimumSpendAmount) : null;
+  const sessionMinSpend =
+    activeSession?.minimumSpendAmount != null
+      ? Number(activeSession.minimumSpendAmount)
+      : null;
+  const effectiveMin = effectiveMinimumSpend(sessionMinSpend, tableMinSpend);
+
+  let reservationDetails = null;
+  if (activeSession?.reservationId) {
+    const res = await prisma.reservation.findUnique({
+      where: { id: activeSession.reservationId },
+      select: {
+        date: true,
+        time: true,
+        occasion: true,
+        guestCount: true,
+        preferredArea: true,
+        status: true,
+        minimumSpendAmount: true,
+        tableLabel: true,
+        tableIcon: true,
+      },
+    });
+    if (res) {
+      reservationDetails = {
+        date: res.date.toISOString(),
+        time: res.time,
+        occasion: res.occasion,
+        guestCount: res.guestCount,
+        preferredArea: res.preferredArea,
+        status: res.status,
+        minimumSpendAmount:
+          res.minimumSpendAmount != null ? Number(res.minimumSpendAmount) : null,
+        tableLabel: res.tableLabel,
+        tableIcon: res.tableIcon,
+      };
+    }
+  }
+
   const response = NextResponse.json({
     table: {
       id: table.id,
       number: table.number,
-      label: table.label,
+      label: activeSession?.tableLabel ?? table.label,
+      tableIcon: activeSession?.tableIcon ?? table.tableIcon,
+      tableIconEmoji: tableIconEmoji(activeSession?.tableIcon ?? table.tableIcon),
+      zone: activeSession?.tableZone ?? table.floorZone,
+      minimumSpendAmount: effectiveMin,
     },
     branch: {
       id: table.branch.id,
@@ -130,6 +178,10 @@ export async function GET(
       textColor: restaurant.textColor,
       categoryColor: restaurant.categoryColor,
       fontFamily: restaurant.fontFamily,
+      heroVideoUrl: restaurant.heroVideoUrl,
+      heroImageUrl: restaurant.heroImageUrl,
+      welcomeText: restaurant.welcomeText,
+      welcomeTextEn: restaurant.welcomeTextEn,
     },
     categories: restaurant.menuCategories.map((cat) => ({
       id: cat.id,
@@ -160,6 +212,10 @@ export async function GET(
       })),
     })),
     suggestedItems: suggested,
+    activeSession: activeSession
+      ? serializePublicSession(activeSession)
+      : null,
+    reservation: reservationDetails,
   });
   response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
   return response;
