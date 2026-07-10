@@ -55,6 +55,7 @@ export interface PlanLimits {
   loyalty: boolean;
   kitchenScreen: boolean;
   reports: boolean;
+  reception: boolean;
   label: string;
   price: number;
   features: string[];
@@ -77,6 +78,7 @@ export interface LimitOverrides {
   loyalty?: boolean;
   kitchenScreen?: boolean;
   reports?: boolean;
+  reception?: boolean;
 }
 
 export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
@@ -97,6 +99,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     loyalty: false,
     kitchenScreen: true,
     reports: false,
+    reception: false,
     label: "مجاني",
     price: 0,
     features: [
@@ -123,12 +126,13 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     loyalty: false,
     kitchenScreen: true,
     reports: false,
+    reception: true,
     label: "Starter",
     price: 49,
     features: [
       "فرع واحد · 50 طاولة",
       "20 تصنيف · 100 منتج",
-      "فيديو + مدفوعات",
+      "فيديو + مدفوعات + استقبال",
       "500 MB تخزين",
     ],
   },
@@ -149,12 +153,13 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     loyalty: false,
     kitchenScreen: true,
     reports: false,
+    reception: true,
     label: "Starter",
     price: 49,
     features: [
       "فرع واحد · 50 طاولة",
       "20 تصنيف · 100 منتج",
-      "فيديو + مدفوعات",
+      "فيديو + مدفوعات + استقبال",
       "500 MB تخزين",
     ],
   },
@@ -175,6 +180,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     loyalty: true,
     kitchenScreen: true,
     reports: true,
+    reception: true,
     label: "Pro",
     price: 149,
     features: [
@@ -201,6 +207,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     loyalty: true,
     kitchenScreen: true,
     reports: true,
+    reception: true,
     label: "Business",
     price: 299,
     features: [
@@ -227,6 +234,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     loyalty: true,
     kitchenScreen: true,
     reports: true,
+    reception: true,
     label: "Enterprise",
     price: 0,
     features: [
@@ -256,7 +264,8 @@ export type FeatureFlag =
   | "customDomain"
   | "loyalty"
   | "kitchenScreen"
-  | "reports";
+  | "reports"
+  | "reception";
 
 export interface RestaurantUsage {
   branches: number;
@@ -313,6 +322,7 @@ export function getEffectiveLimits(
     loyalty: o.loyalty ?? base.loyalty,
     kitchenScreen: o.kitchenScreen ?? base.kitchenScreen,
     reports: o.reports ?? base.reports,
+    reception: o.reception ?? base.reception,
     label: base.label,
     price: base.price,
   };
@@ -380,6 +390,7 @@ const FEATURE_MESSAGES: Record<FeatureFlag, string> = {
   loyalty: "برنامج الولاء غير متاح في باقتك الحالية",
   kitchenScreen: "شاشة المطبخ غير متاحة في bاقتك الحالية",
   reports: "التقارير غير متاحة في باقتك الحالية",
+  reception: "ميزة الاستقبال والحجوزات غير متاحة في باقتك الحالية",
 };
 
 export async function checkFeature(
@@ -504,6 +515,7 @@ export function serializeLimits(limits: EffectiveLimits) {
     loyalty: limits.loyalty,
     kitchenScreen: limits.kitchenScreen,
     reports: limits.reports,
+    reception: limits.reception,
   };
 }
 

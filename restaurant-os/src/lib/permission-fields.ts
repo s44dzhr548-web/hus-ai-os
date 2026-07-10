@@ -39,6 +39,7 @@ export const FEATURE_FIELDS: {
   { key: "loyalty", label: "برنامج الولاء" },
   { key: "kitchenScreen", label: "شاشة المطبخ" },
   { key: "reports", label: "التقارير" },
+  { key: "reception", label: "الاستقبال والحجوزات" },
 ];
 
 export const PERMISSION_FIELD_LABELS: Record<PermissionKey, string> = {
@@ -58,6 +59,7 @@ export const PERMISSION_FIELD_LABELS: Record<PermissionKey, string> = {
   loyalty: "برنامج الولاء",
   kitchenScreen: "شاشة المطبخ",
   reports: "التقارير",
+  reception: "الاستقبال والحجوزات",
 };
 
 export interface PermissionChange {
