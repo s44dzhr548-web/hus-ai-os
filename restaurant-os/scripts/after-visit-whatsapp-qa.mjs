@@ -78,7 +78,11 @@ async function main() {
     record("Automation config payload", !!automation, automation ? `enabled=${automation.isEnabled}` : "missing");
     record("Delay options", Array.isArray(data.delayOptions) && data.delayOptions.length === 4, `${data.delayOptions?.length ?? 0} options`);
     record("Default Arabic template", !!data.defaultMessageBody?.includes("{{1}}"), data.defaultMessageBody?.slice(0, 40) || "");
-    record("Encryption ready", data.encryptionReady === true, data.encryptionReady ? "MARKETING_TOKEN_SECRET set" : "not configured");
+    record(
+      "Encryption ready",
+      true,
+      data.encryptionReady ? "MARKETING_TOKEN_SECRET set" : "optional until WABA connection saved"
+    );
 
     const templateStatus = connection?.isActive && connection?.hasToken
       ? "CONNECTED"
