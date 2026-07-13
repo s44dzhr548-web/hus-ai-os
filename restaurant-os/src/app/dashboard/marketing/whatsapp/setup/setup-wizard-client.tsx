@@ -1,38 +1,56 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { MkCard, MkLoading, MkPageHeader } from "@/components/marketing/marketing-shell";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
-const STEPS = [
-  { n: 1, title: "مرحباً" },
-  { n: 2, title: "Meta" },
-  { n: 3, title: "اختيار الحساب" },
-  { n: 4, title: "الحفظ" },
-  { n: 5, title: "Webhook" },
-  { n: 6, title: "القوالب" },
-  { n: 7, title: "اختبار" },
-  { n: 8, title: "إنهاء" },
+const PROGRESS = [
+  { n: 1, title: "Meta" },
+  { n: 2, title: "اختيار الحساب" },
+  { n: 3, title: "اختيار الرقم" },
+  { n: 4, title: "المزامنة" },
+  { n: 5, title: "اختبار" },
+  { n: 6, title: "اكتمل" },
 ];
+
+const LEARN_MORE_URL = "https://developers.facebook.com/docs/whatsapp/cloud-api/get-started";
 
 type WizardState = {
   step: number;
-  oauthConfigured: boolean;
+  oauthReady: boolean;
+  hasOAuthSession: boolean;
   discovered: { phones: Array<{ id: string; displayPhone: string; verifiedName: string; wabaId: string; businessName: string }> };
   selected: { wabaId?: string; phoneNumberId?: string; businessName?: string; displayPhone?: string };
   connection: { connected: boolean } | null;
-  webhook: { url: string; verifyToken: string | null; verified: boolean };
+  webhookReady: boolean;
   features: Record<string, boolean>;
-  templates: Array<{ name: string; status: string; language: string; category: string }>;
+  templates: Array<{ name: string; status: string }>;
+  wizardCompleted: boolean;
   permissions: { canEdit: boolean };
-  metaOAuth: { configured: boolean; status: string };
+  metaOAuth: { ready: boolean; status: string };
+};
+
+function displayStep(internalStep: number, hasPhone: boolean, connected: boolean): number {
+  if (connected || internalStep >= 8) return 6;
+  if (internalStep >= 7) return 5;
+  if (internalStep >= 4) return 4;
+  if (internalStep === 3) return hasPhone ? 3 : 2;
+  if (internalStep >= 2 || internalStep === 1) return 1;
+  return 1;
+}
+
+const ERROR_MESSAGES: Record<string, string> = {
+  oauth_denied: "تم إلغاء تسجيل الدخول — يمكنك المحاولة مرة أخرى",
+  not_configured: "خدمة الربط غير مفعّلة بعد — تواصل مع مسؤول المنصة",
+  invalid_state: "انتهت صلاحية الجلسة — أعد المحاولة",
 };
 
 export default function SetupWizardClient() {
   const searchParams = useSearchParams();
+  const autoRedirected = useRef(false);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -40,8 +58,6 @@ export default function SetupWizardClient() {
   const [message, setMessage] = useState("");
   const [state, setState] = useState<WizardState | null>(null);
   const [testPhone, setTestPhone] = useState("");
-  const [testStatus, setTestStatus] = useState("");
-  const [webhookOk, setWebhookOk] = useState<boolean | null>(null);
   const [features, setFeatures] = useState({
     afterVisit: true,
     reservation: false,
@@ -60,6 +76,7 @@ export default function SetupWizardClient() {
       setFeatures(data.features || features);
     }
     setLoading(false);
+    return data;
   }, []);
 
   useEffect(() => {
@@ -70,9 +87,31 @@ export default function SetupWizardClient() {
     const s = Number(searchParams.get("step"));
     if (s >= 1 && s <= 8) setStep(s);
     const err = searchParams.get("error");
-    if (err) setError(decodeURIComponent(err));
-    if (searchParams.get("oauth") === "success") setMessage("تم تسجيل الدخول إلى Meta بنجاح");
+    if (err) {
+      setError(ERROR_MESSAGES[err] || "حدث خطأ — حاول مرة أخرى");
+    }
+    if (searchParams.get("oauth") === "success") {
+      setMessage("تم تسجيل الدخول إلى Meta بنجاح");
+    }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!state || loading || autoRedirected.current) return;
+    const oauthSuccess = searchParams.get("oauth") === "success";
+    const hasError = Boolean(searchParams.get("error"));
+    const shouldAutoLogin =
+      state.oauthReady &&
+      !state.connection?.connected &&
+      !state.hasOAuthSession &&
+      step <= 2 &&
+      !oauthSuccess &&
+      !hasError;
+
+    if (shouldAutoLogin) {
+      autoRedirected.current = true;
+      window.location.href = "/api/marketing/whatsapp/oauth/start";
+    }
+  }, [state, loading, step, searchParams]);
 
   async function post(action: string, extra: Record<string, unknown> = {}) {
     setBusy(true);
@@ -89,9 +128,13 @@ export default function SetupWizardClient() {
       return null;
     }
     if (data.state) {
-      setState((prev) => ({ ...prev!, ...data.state }));
+      setState((prev) => ({ ...prev!, ...data.state, oauthReady: data.oauthReady ?? prev!.oauthReady }));
       setStep(data.state.step || step);
     }
+    if (data.oauthReady !== undefined) {
+      setState((prev) => (prev ? { ...prev, oauthReady: data.oauthReady } : prev));
+    }
+    if (data.message) setMessage(data.message);
     return data;
   }
 
@@ -107,26 +150,36 @@ export default function SetupWizardClient() {
     );
   }
 
+  const progress = displayStep(
+    step,
+    Boolean(state.selected.phoneNumberId),
+    Boolean(state.connection?.connected || state.wizardCompleted)
+  );
+
+  const showPendingSetup = !state.oauthReady && step <= 2 && !state.hasOAuthSession;
+  const showReadyConnect = state.oauthReady && !state.hasOAuthSession && !state.connection?.connected && step <= 2;
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-16">
       <MkPageHeader
-        title="معالج ربط WhatsApp Business"
-        desc="اربط حسابك في أقل من دقيقتين — بدون نسخ IDs يدوياً"
+        title="ربط واتساب الأعمال"
+        desc="اربط حسابك في Meta في خطوات بسيطة — بدون إعدادات تقنية"
       />
       <Link href="/dashboard/marketing/whatsapp" className="text-sm text-emerald-400 hover:underline">
         ← واتساب الأعمال
       </Link>
 
-      <div className="flex flex-wrap gap-1">
-        {STEPS.map((s) => (
+      <div className="flex flex-wrap gap-2">
+        {PROGRESS.map((s) => (
           <span
             key={s.n}
             className={cn(
-              "rounded-full px-2 py-1 text-xs",
-              step === s.n ? "bg-emerald-600 text-white" : "bg-stone-800 text-stone-400"
+              "rounded-full px-3 py-1.5 text-xs font-medium",
+              progress === s.n ? "bg-emerald-600 text-white" : progress > s.n ? "bg-emerald-950 text-emerald-300" : "bg-stone-800 text-stone-400"
             )}
           >
-            {s.n}. {s.title}
+            {s.n === 1 ? "1️⃣" : s.n === 2 ? "2️⃣" : s.n === 3 ? "3️⃣" : s.n === 4 ? "4️⃣" : s.n === 5 ? "5️⃣" : "6️⃣"}{" "}
+            {s.title}
           </span>
         ))}
       </div>
@@ -134,214 +187,141 @@ export default function SetupWizardClient() {
       {message && <p className="rounded bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">{message}</p>}
       {error && <p className="rounded bg-red-950/40 px-3 py-2 text-sm text-red-200">{error}</p>}
 
-      {step === 1 && (
-        <MkCard className="space-y-4">
-          <h2 className="text-xl font-semibold text-white">مرحباً</h2>
-          <p className="text-sm text-gray-300">سيساعدك هذا المعالج على:</p>
-          <ul className="list-inside list-disc space-y-1 text-sm text-gray-300">
-            <li>رسائل واتساب بعد الزيارة</li>
-            <li>طلبات التقييم</li>
-            <li>إشعارات الحجوزات</li>
-            <li>إشعارات الإهداء</li>
-            <li>إشعارات الطلبات</li>
-          </ul>
-          <Button
-            onClick={async () => {
-              await post("set_step", { step: 2 });
-              setStep(2);
-            }}
-          >
-            ابدأ الربط
-          </Button>
+      {showPendingSetup && (
+        <MkCard className="space-y-5">
+          <div>
+            <h2 className="text-xl font-semibold text-white">إعداد خدمة واتساب</h2>
+            <p className="mt-2 text-sm text-gray-300">
+              يحتاج النظام إلى تفعيل خدمة الربط مع Meta مرة واحدة فقط بواسطة مسؤول المنصة.
+            </p>
+          </div>
+          <p className="text-lg">🟡 بانتظار التفعيل</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              loading={busy}
+              onClick={async () => {
+                const data = await post("recheck_oauth");
+                if (data?.oauthReady) {
+                  setMessage("🟢 جاهز للربط — جاري فتح تسجيل Meta...");
+                  window.location.href = "/api/marketing/whatsapp/oauth/start";
+                } else {
+                  setMessage("لا يزال بانتظار تفعيل مسؤول المنصة");
+                }
+              }}
+            >
+              إعادة التحقق
+            </Button>
+            <Button
+              variant="outline"
+              loading={busy}
+              onClick={() => post("notify_platform_admin")}
+            >
+              إشعار مسؤول المنصة
+            </Button>
+            <a href={LEARN_MORE_URL} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline">Learn More</Button>
+            </a>
+          </div>
         </MkCard>
       )}
 
-      {step === 2 && (
-        <MkCard className="space-y-4">
-          <h2 className="text-xl font-semibold text-white">Connect Meta Account</h2>
-          {!state.oauthConfigured ? (
-            <p className="text-amber-300 text-sm">
-              Meta OAuth غير مُعد — أضف WHATSAPP_META_CLIENT_ID / META_ADS_CLIENT_ID في Vercel
-            </p>
-          ) : (
-            <p className="text-sm text-gray-400">Facebook Login — اكتشاف تلقائي لحسابات WABA</p>
-          )}
+      {showReadyConnect && (
+        <MkCard className="space-y-5 text-center">
+          <p className="text-lg">🟢 جاهز للربط</p>
+          <p className="text-sm text-gray-400">اضغط للمتابعة — سيتم فتح تسجيل الدخول إلى Meta</p>
           <a href="/api/marketing/whatsapp/oauth/start">
-            <Button disabled={!state.oauthConfigured}>Connect with Facebook</Button>
+            <Button size="lg">ربط حساب Meta</Button>
           </a>
         </MkCard>
       )}
 
-      {step === 3 && (
-        <MkCard className="space-y-4">
-          <h2 className="text-xl font-semibold text-white">اختر رقم واتساب</h2>
-          {state.discovered.phones.length === 0 ? (
-            <p className="text-sm text-gray-400">لم يُعثر على أرقام — تأكد من صلاحيات WABA في Meta</p>
-          ) : (
-            <div className="grid gap-3">
-              {state.discovered.phones.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="rounded border border-stone-600 p-4 text-right hover:border-emerald-500"
-                  onClick={async () => {
-                    await post("select_phone", { phoneNumberId: p.id });
-                    setStep(4);
-                    setMessage(`تم اختيار ${p.displayPhone || p.verifiedName}`);
-                  }}
-                >
-                  <p className="font-medium text-white">{p.verifiedName || p.businessName}</p>
-                  <p className="text-sm text-gray-400" dir="ltr">
-                    {p.displayPhone}
-                  </p>
-                  <p className="text-xs text-gray-500">WABA: {p.wabaId}</p>
-                </button>
-              ))}
-            </div>
+      {(state.hasOAuthSession || step >= 3) && !state.connection?.connected && step < 8 && (
+        <>
+          {step === 3 && state.discovered.phones.length > 1 && (
+            <MkCard className="space-y-4">
+              <h2 className="text-xl font-semibold text-white">اختر حساب واتساب</h2>
+              <div className="grid gap-3">
+                {state.discovered.phones.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="rounded border border-stone-600 p-4 text-right hover:border-emerald-500"
+                    onClick={async () => {
+                      await post("select_phone", { phoneNumberId: p.id });
+                      setStep(4);
+                      setMessage(`تم اختيار ${p.displayPhone || p.verifiedName}`);
+                    }}
+                  >
+                    <p className="font-medium text-white">{p.verifiedName || p.businessName}</p>
+                    <p className="text-sm text-gray-400" dir="ltr">
+                      {p.displayPhone}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </MkCard>
           )}
-        </MkCard>
-      )}
 
-      {step === 4 && (
-        <MkCard className="space-y-4">
-          <h2 className="text-xl font-semibold text-white">تم اكتشاف الحساب تلقائياً</h2>
-          <div className="rounded bg-stone-900 p-3 text-sm text-gray-300 space-y-1">
-            <p><strong>WABA ID:</strong> <span dir="ltr">{state.selected.wabaId}</span></p>
-            <p><strong>Phone Number ID:</strong> <span dir="ltr">{state.selected.phoneNumberId}</span></p>
-            <p><strong>Business Name:</strong> {state.selected.businessName}</p>
-            <p dir="ltr"><strong>Phone:</strong> {state.selected.displayPhone}</p>
-          </div>
-          <Button
-            loading={busy}
-            onClick={async () => {
-              const data = await post("save_connection");
-              if (data) {
-                setStep(5);
-                setMessage("تم حفظ Access Token و Verify Token مشفر");
-              }
-            }}
-          >
-            Save & Encrypt Tokens
-          </Button>
-        </MkCard>
-      )}
-
-      {step === 5 && (
-        <MkCard className="space-y-4">
-          <h2 className="text-xl font-semibold text-white">Webhook</h2>
-          <label className="block text-sm text-gray-400">
-            Webhook URL
-            <input readOnly value={state.webhook.url} className="mt-1 w-full rounded border border-stone-700 bg-stone-900 px-3 py-2 text-xs" dir="ltr" />
-          </label>
-          <label className="block text-sm text-gray-400">
-            Verify Token
-            <input
-              readOnly
-              value={state.webhook.verifyToken || "Generated on save"}
-              className="mt-1 w-full rounded border border-stone-700 bg-stone-900 px-3 py-2 text-xs"
-              dir="ltr"
-            />
-          </label>
-          <p className="text-xs text-amber-300">
-            أضف نفس Verify Token في Meta Developer Console → WhatsApp → Configuration
-          </p>
-          <Button
-            loading={busy}
-            variant="outline"
-            onClick={async () => {
-              const data = await post("verify_webhook");
-              setWebhookOk(data?.ok ?? false);
-              if (data?.ok) {
-                setStep(6);
-                setMessage("🟢 Connected — Webhook subscribed");
-              } else {
-                setMessage("🔴 Failed — تحقق من صلاحيات WABA");
-              }
-            }}
-          >
-            Verify Connection
-          </Button>
-          {webhookOk !== null && (
-            <p className="text-lg">{webhookOk ? "🟢 Connected" : "🔴 Failed"}</p>
+          {(step === 4 || (step === 3 && state.selected.phoneNumberId)) && (
+            <MkCard className="space-y-4">
+              <h2 className="text-xl font-semibold text-white">تأكيد الرقم</h2>
+              <div className="rounded bg-stone-900 p-3 text-sm text-gray-300 space-y-1">
+                <p><strong>الاسم:</strong> {state.selected.businessName}</p>
+                <p dir="ltr"><strong>الرقم:</strong> {state.selected.displayPhone}</p>
+              </div>
+              <Button
+                loading={busy}
+                onClick={async () => {
+                  const data = await post("sync_all");
+                  if (data) {
+                    setStep(7);
+                    setMessage(`تمت المزامنة — ${data.templateCount ?? 0} قالب`);
+                  }
+                }}
+              >
+                متابعة المزامنة
+              </Button>
+            </MkCard>
           )}
-        </MkCard>
-      )}
 
-      {step === 6 && (
-        <MkCard className="space-y-4">
-          <h2 className="text-xl font-semibold text-white">Sync Templates</h2>
-          <div className="flex gap-2">
-            <Button
-              loading={busy}
-              onClick={async () => {
-                const data = await post("sync_templates");
-                if (data) setMessage(`تمت مزامنة ${data.templates?.length ?? 0} قالب`);
-              }}
-            >
-              Sync Templates
-            </Button>
-            <Button variant="outline" loading={busy} onClick={() => load()}>
-              Refresh
-            </Button>
-          </div>
-          {state.templates.length > 0 && (
-            <div className="space-y-2 text-sm">
-              {["APPROVED", "PENDING", "REJECTED"].map((st) => {
-                const count = state.templates.filter((t) => t.status === st).length;
-                return (
-                  <p key={st} className="text-gray-300">
-                    {st}: {count}
-                  </p>
-                );
-              })}
-            </div>
+          {step >= 5 && step <= 7 && state.selected.phoneNumberId && (
+            <MkCard className="space-y-4">
+              <h2 className="text-xl font-semibold text-white">اختبار الإرسال</h2>
+              <p className="text-sm text-gray-400">أرسل رسالة تجريبية للتأكد من أن كل شيء يعمل</p>
+              <input
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="9665XXXXXXXX"
+                className="w-full rounded border border-stone-700 bg-stone-900 px-3 py-2"
+                dir="ltr"
+              />
+              <Button
+                loading={busy}
+                onClick={async () => {
+                  const data = await post("test_send", { testPhone });
+                  if (data?.ok) setStep(8);
+                }}
+              >
+                إرسال رسالة تجريبية
+              </Button>
+            </MkCard>
           )}
-          <Button variant="outline" onClick={() => setStep(7)}>
-            التالي — اختبار الإرسال
-          </Button>
-        </MkCard>
+        </>
       )}
 
-      {step === 7 && (
-        <MkCard className="space-y-4">
-          <h2 className="text-xl font-semibold text-white">Send Test Message</h2>
-          <input
-            value={testPhone}
-            onChange={(e) => setTestPhone(e.target.value)}
-            placeholder="9665XXXXXXXX"
-            className="w-full rounded border border-stone-700 bg-stone-900 px-3 py-2"
-            dir="ltr"
-          />
-          <Button
-            loading={busy}
-            onClick={async () => {
-              const data = await post("test_send", { testPhone });
-              setTestStatus(data?.status || "FAILED");
-              if (data?.ok) setStep(8);
-            }}
-          >
-            Send Test
-          </Button>
-          {testStatus && (
-            <p className="text-sm text-gray-300">
-              Status: {testStatus} — track Queued → Sent → Delivered → Read in dashboard
-            </p>
-          )}
-        </MkCard>
-      )}
-
-      {step === 8 && (
-        <MkCard className="space-y-4 text-center">
-          <p className="text-3xl">🎉</p>
-          <h2 className="text-xl font-semibold text-white">WhatsApp Connected Successfully</h2>
+      {(step >= 8 || state.wizardCompleted || state.connection?.connected) && step >= 7 && (
+        <MkCard className="space-y-5 text-center">
+          <p className="text-4xl">🎉</p>
+          <h2 className="text-xl font-semibold text-white">تم ربط واتساب الأعمال بنجاح</h2>
           <div className="space-y-2 text-right text-sm text-gray-300">
             {(
               [
-                ["afterVisit", "After Visit Automation"],
-                ["reservation", "Reservation Messages"],
-                ["gift", "Gift Notifications"],
-                ["order", "Order Notifications"],
-                ["review", "Review Requests"],
+                ["afterVisit", "رسائل بعد الزيارة"],
+                ["reservation", "إشعارات الحجوزات"],
+                ["gift", "إشعارات الإهداء"],
+                ["order", "إشعارات الطلبات"],
+                ["review", "طلبات التقييم"],
               ] as const
             ).map(([key, label]) => (
               <label key={key} className="flex items-center gap-2">
@@ -361,10 +341,10 @@ export default function SetupWizardClient() {
               setMessage("تم تفعيل الأتمتة");
             }}
           >
-            Finish Setup
+            إنهاء الإعداد
           </Button>
           <Link href="/dashboard/marketing/whatsapp" className="block text-emerald-400">
-            Go to Dashboard →
+            الانتقال إلى لوحة واتساب ←
           </Link>
         </MkCard>
       )}

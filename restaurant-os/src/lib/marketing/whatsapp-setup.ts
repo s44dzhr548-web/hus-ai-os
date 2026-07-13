@@ -9,9 +9,10 @@ import {
   type DiscoveredAccounts,
   type DiscoveredPhone,
 } from "@/lib/marketing/whatsapp-oauth";
-import { syncTemplatesFromMeta, testWhatsAppConnection, whatsAppWebhookUrl } from "@/lib/marketing/whatsapp-business";
+import { syncTemplatesFromMeta, testWhatsAppConnection } from "@/lib/marketing/whatsapp-business";
 import { getOrCreateAutomation } from "@/lib/after-visit-whatsapp/service";
 import { DEFAULT_AUTOMATION } from "@/lib/after-visit-whatsapp/types";
+import { isMetaOAuthReady, resolveMetaCredentials } from "@/lib/platform/meta-config";
 
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 
@@ -45,19 +46,13 @@ export async function fetchWizardState(restaurantId: string) {
   ]);
 
   const discovered = (session.discoveredJson as DiscoveredAccounts | null) || { phones: [] };
-
-  let verifyTokenDisplay: string | null = null;
-  if (profile.verifyTokenEnc && canEncryptTokens()) {
-    try {
-      verifyTokenDisplay = decryptToken(profile.verifyTokenEnc);
-    } catch {
-      verifyTokenDisplay = null;
-    }
-  }
+  const oauthReady = await isMetaOAuthReady();
+  const hasOAuthSession = Boolean(session.accessTokenEnc);
 
   return {
     step: session.step,
-    oauthConfigured: Boolean(process.env.WHATSAPP_META_CLIENT_ID || process.env.META_ADS_CLIENT_ID),
+    oauthReady,
+    hasOAuthSession,
     discovered,
     selected: {
       wabaId: session.selectedWabaId,
@@ -73,11 +68,7 @@ export async function fetchWizardState(restaurantId: string) {
           businessPhone: connection.businessPhone,
         }
       : null,
-    webhook: {
-      url: whatsAppWebhookUrl(),
-      verifyToken: verifyTokenDisplay || process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || null,
-      verified: Boolean(profile.webhookVerifiedAt),
-    },
+    webhookReady: Boolean(profile.webhookVerifiedAt),
     features: {
       afterVisit: profile.featureAfterVisit,
       reservation: profile.featureReservation,
@@ -271,7 +262,8 @@ export async function runWhatsAppHealthCheck(restaurantId: string) {
     }
   }
 
-  if (!process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN && !profile?.verifyTokenEnc) {
+  const creds = await resolveMetaCredentials();
+  if (!creds.webhookVerifyToken && !profile?.verifyTokenEnc) {
     issues.push("Verify Token غير مضبوط");
     ok = false;
   }

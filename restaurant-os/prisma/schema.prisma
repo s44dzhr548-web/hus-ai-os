@@ -1964,3 +1964,28 @@ model WhatsAppOwnerNotification {
   @@index([restaurantId, isRead])
   @@map("whatsapp_owner_notifications")
 }
+
+model PlatformMetaConfig {
+  id                    String   @id @default("default")
+  facebookAppName       String?  @map("facebook_app_name")
+  clientId              String?  @map("client_id")
+  clientSecretEnc       String?  @map("client_secret_enc")
+  webhookVerifyTokenEnc String?  @map("webhook_verify_token_enc")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  updatedByUserId       String?  @map("updated_by_user_id")
+
+  @@map("platform_meta_config")
+}
+
+model PlatformAdminAlert {
+  id           String   @id @default(cuid())
+  kind         String
+  restaurantId String?  @map("restaurant_id")
+  title        String
+  message      String
+  isRead       Boolean  @default(false) @map("is_read")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([kind, isRead])
+  @@map("platform_admin_alerts")
+}

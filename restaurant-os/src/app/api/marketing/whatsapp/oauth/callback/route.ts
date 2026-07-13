@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${setupUrl}?step=2&error=oauth_denied`);
   }
 
-  if (!whatsAppOAuthConfigured() || !canEncryptTokens()) {
+  if (!(await whatsAppOAuthConfigured()) || !canEncryptTokens()) {
     return NextResponse.redirect(`${setupUrl}?step=2&error=not_configured`);
   }
 

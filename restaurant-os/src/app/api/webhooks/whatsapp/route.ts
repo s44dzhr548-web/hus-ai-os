@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { resolveMetaCredentials } from "@/lib/platform/meta-config";
 
 export const dynamic = "force-dynamic";
 
@@ -8,9 +9,9 @@ export async function GET(req: NextRequest) {
   const mode = req.nextUrl.searchParams.get("hub.mode");
   const token = req.nextUrl.searchParams.get("hub.verify_token");
   const challenge = req.nextUrl.searchParams.get("hub.challenge");
-  const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+  const { webhookVerifyToken } = await resolveMetaCredentials();
 
-  if (mode === "subscribe" && token && verifyToken && token === verifyToken && challenge) {
+  if (mode === "subscribe" && token && webhookVerifyToken && token === webhookVerifyToken && challenge) {
     return new NextResponse(challenge, { status: 200 });
   }
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -62,10 +62,18 @@ async function main() {
   record("Setup API", setupApi.ok, `HTTP ${setupApi.status}`);
 
   if (setupApi.ok) {
-    record("Meta OAuth configured", setup.metaOAuth?.configured === true || setup.oauthConfigured === false,
-      setup.metaOAuth?.configured ? "credentials present" : "env pending — manual fallback available");
-    record("Meta OAuth status", true, setup.metaOAuth?.status || "NOT_CONNECTED");
+    record("OAuth ready (owner-safe)", typeof setup.oauthReady === "boolean", setup.oauthReady ? "ready" : "pending");
+    record("Meta OAuth status", true, setup.metaOAuth?.status || "PENDING");
+    record("No env var names in setup API", !JSON.stringify(setup).includes("WHATSAPP_META"), "owner-safe payload");
     record("Wizard step payload", setup.step >= 1, `step=${setup.step}`);
+  }
+
+  const metaAdmin = await fetch(`${BASE}/api/platform/meta`, { headers: { Cookie: cookie } });
+  record("Platform meta admin API", metaAdmin.status === 200 || metaAdmin.status === 403, `HTTP ${metaAdmin.status}`);
+  if (metaAdmin.ok) {
+    const meta = await json(metaAdmin);
+    record("Platform health check", Array.isArray(meta.health), `${meta.health?.length ?? 0} items`);
+    record("OAuth health item", meta.health?.some((h) => h.id === "oauth"), meta.health?.find((h) => h.id === "oauth")?.ok ? "PASS" : "PENDING");
   }
 
   const dashPage = await fetch(`${BASE}/dashboard/marketing/whatsapp`, {
@@ -88,10 +96,15 @@ async function main() {
     headers: { Cookie: cookie },
     redirect: "manual",
   });
+  const ownerGate =
+    oauthStart.status === 307 ||
+    oauthStart.status === 302 ||
+    oauthStart.status === 503 ||
+    oauthStart.status === 403;
   record(
     "OAuth start route",
-    oauthStart.status === 307 || oauthStart.status === 302 || oauthStart.status === 503,
-    `HTTP ${oauthStart.status}`
+    ownerGate,
+    oauthStart.status === 403 ? "HTTP 403 — owner-only (expected for non-owner QA user)" : `HTTP ${oauthStart.status}`
   );
 
   const tables = await fetch(`${BASE}/api/tables`, { headers: { Cookie: cookie } });

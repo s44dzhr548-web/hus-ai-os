@@ -14,7 +14,7 @@ import {
 } from "@/lib/marketing/whatsapp-setup";
 import { syncTemplatesFromMeta } from "@/lib/marketing/whatsapp-business";
 import { sendTestWhatsAppMessage } from "@/lib/after-visit-whatsapp/service";
-import { whatsAppOAuthConfigured } from "@/lib/marketing/whatsapp-oauth";
+import { isMetaOAuthReady, notifyPlatformAdminMetaSetup } from "@/lib/platform/meta-config";
 
 export const dynamic = "force-dynamic";
 
@@ -22,20 +22,22 @@ export async function GET() {
   const { error, restaurantId, canEdit } = await requireWhatsAppBusinessReadAccess();
   if (error) return error;
 
-  const [state, notifications] = await Promise.all([
+  const [state, notifications, oauthReady] = await Promise.all([
     fetchWizardState(restaurantId!),
     prisma.whatsAppOwnerNotification.findMany({
       where: { restaurantId: restaurantId!, isRead: false },
       orderBy: { createdAt: "desc" },
       take: 10,
     }),
+    isMetaOAuthReady(),
   ]);
 
   return NextResponse.json({
     ...state,
+    oauthReady,
     metaOAuth: {
-      configured: whatsAppOAuthConfigured(),
-      status: state.connection?.connected ? "CONNECTED" : "NOT_CONNECTED",
+      ready: oauthReady,
+      status: state.connection?.connected ? "CONNECTED" : oauthReady ? "READY" : "PENDING",
     },
     notifications,
     permissions: { canEdit },
@@ -116,6 +118,37 @@ export async function POST(req: NextRequest) {
       });
     }
     return NextResponse.json({ ok: true });
+  }
+
+  if (action === "notify_platform_admin") {
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurantId! },
+      select: { name: true, nameAr: true },
+    });
+    const name = restaurant?.nameAr || restaurant?.name || "مطعم";
+    await notifyPlatformAdminMetaSetup(restaurantId!, name);
+    return NextResponse.json({ ok: true, message: "تم إرسال إشعار لمسؤول المنصة" });
+  }
+
+  if (action === "recheck_oauth") {
+    const ready = await isMetaOAuthReady();
+    return NextResponse.json({ oauthReady: ready });
+  }
+
+  if (action === "sync_all") {
+    await finalizeWizardConnection(restaurantId!, session?.user?.id).catch(() => null);
+    const webhook = await verifyWizardWebhook(restaurantId!).catch(() => ({ ok: false }));
+    const templates = await syncTemplatesFromMeta(restaurantId!).catch(() => []);
+    await prisma.whatsAppWizardSession.update({
+      where: { restaurantId: restaurantId! },
+      data: { step: 7 },
+    });
+    return NextResponse.json({
+      ok: true,
+      webhookOk: webhook.ok,
+      templateCount: templates.length,
+      state: await fetchWizardState(restaurantId!),
+    });
   }
 
   return NextResponse.json({ error: "إجراء غير مدعوم" }, { status: 400 });

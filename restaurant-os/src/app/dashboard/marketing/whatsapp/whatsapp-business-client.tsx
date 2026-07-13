@@ -358,8 +358,8 @@ export default function WhatsAppBusinessPage() {
               readOnly
               value={
                 webhookVerifyToken
-                  ? "Configured in server env"
-                  : "WHATSAPP_WEBHOOK_VERIFY_TOKEN not set"
+                  ? "مُعدّ بواسطة المنصة"
+                  : "بانتظار إعداد مسؤول المنصة"
               }
               className={inputCls}
             />

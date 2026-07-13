@@ -8,19 +8,22 @@ export async function GET() {
   const { error, restaurantId } = await requireWhatsAppBusinessOwnerAccess();
   if (error) return error;
 
-  if (!whatsAppOAuthConfigured()) {
+  if (!(await whatsAppOAuthConfigured())) {
     return NextResponse.json(
       {
-        error: "Meta OAuth غير مُعد — أضف WHATSAPP_META_CLIENT_ID أو META_ADS_CLIENT_ID",
-        configured: false,
+        error: "خدمة الربط مع Meta غير مفعّلة بعد — تواصل مع مسؤول المنصة",
+        oauthReady: false,
       },
       { status: 503 }
     );
   }
 
-  const url = getWhatsAppOAuthStartUrl(restaurantId!);
+  const url = await getWhatsAppOAuthStartUrl(restaurantId!);
   if (!url) {
-    return NextResponse.json({ error: "OAuth URL unavailable" }, { status: 503 });
+    return NextResponse.json(
+      { error: "تعذّر بدء تسجيل الدخول — راجع إعدادات المنصة", oauthReady: false },
+      { status: 503 }
+    );
   }
 
   return NextResponse.redirect(url);

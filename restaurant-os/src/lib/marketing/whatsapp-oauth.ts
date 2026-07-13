@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { encryptToken, decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
-import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
+import { resolveMetaCredentials, getMetaOAuthRedirectUri, isMetaOAuthReady } from "@/lib/platform/meta-config";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -10,20 +10,12 @@ export const WHATSAPP_OAUTH_SCOPES = [
   "whatsapp_business_messaging",
 ].join(",");
 
-export function whatsAppOAuthConfigured(): boolean {
-  return Boolean(getClientId() && getClientSecret());
-}
-
-function getClientId() {
-  return process.env.WHATSAPP_META_CLIENT_ID || process.env.META_ADS_CLIENT_ID;
-}
-
-function getClientSecret() {
-  return process.env.WHATSAPP_META_CLIENT_SECRET || process.env.META_ADS_CLIENT_SECRET;
+export async function whatsAppOAuthConfigured(): Promise<boolean> {
+  return isMetaOAuthReady();
 }
 
 export function getWhatsAppOAuthRedirectUri(): string {
-  return `${resolveAppBaseUrl()}/api/marketing/whatsapp/oauth/callback`;
+  return getMetaOAuthRedirectUri();
 }
 
 export function buildWhatsAppOAuthState(restaurantId: string, returnStep = 2): string {
@@ -40,8 +32,8 @@ export function parseWhatsAppOAuthState(state: string): { restaurantId: string; 
   }
 }
 
-export function getWhatsAppOAuthStartUrl(restaurantId: string): string | null {
-  const clientId = getClientId();
+export async function getWhatsAppOAuthStartUrl(restaurantId: string): Promise<string | null> {
+  const { clientId } = await resolveMetaCredentials();
   if (!clientId) return null;
   const params = new URLSearchParams({
     client_id: clientId,
@@ -54,9 +46,8 @@ export function getWhatsAppOAuthStartUrl(restaurantId: string): string | null {
 }
 
 export async function exchangeOAuthCode(code: string): Promise<{ accessToken: string; expiresIn?: number }> {
-  const clientId = getClientId();
-  const clientSecret = getClientSecret();
-  if (!clientId || !clientSecret) throw new Error("Meta OAuth credentials not configured");
+  const { clientId, clientSecret } = await resolveMetaCredentials();
+  if (!clientId || !clientSecret) throw new Error("خدمة الربط مع Meta غير مفعّلة بعد");
 
   const tokenRes = await fetch(`${GRAPH}/oauth/access_token`, {
     method: "POST",
@@ -71,7 +62,7 @@ export async function exchangeOAuthCode(code: string): Promise<{ accessToken: st
   });
   const short = (await tokenRes.json()) as { access_token?: string; error?: { message?: string } };
   if (!tokenRes.ok || !short.access_token) {
-    throw new Error(short.error?.message || "Token exchange failed");
+    throw new Error(short.error?.message || "فشل تسجيل الدخول إلى Meta");
   }
 
   const longRes = await fetch(
@@ -193,4 +184,4 @@ export async function checkWabaSubscription(wabaId: string, accessToken: string)
   }
 }
 
-export { getClientId, getClientSecret, GRAPH, encryptToken, decryptToken, canEncryptTokens };
+export { GRAPH, encryptToken, decryptToken, canEncryptTokens, resolveMetaCredentials };
