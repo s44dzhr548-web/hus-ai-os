@@ -371,6 +371,7 @@ export default function ReceptionPage() {
     notes: "",
     minimumSpendAmount: "",
     status: "SEATED",
+    marketingConsent: false,
   });
   const [manualTable, setManualTable] = useState({
     ...emptyManualTable,
@@ -522,6 +523,7 @@ export default function ReceptionPage() {
       notes: form.notes,
       status: form.status,
       branchId,
+      marketingConsent: form.marketingConsent,
     };
 
     if (form.tableId) {
@@ -571,6 +573,7 @@ export default function ReceptionPage() {
       notes: "",
       minimumSpendAmount: "",
       status: "SEATED",
+      marketingConsent: false,
     });
     setManualTable({ ...emptyManualTable, capacity: 4 });
     load();
@@ -597,6 +600,7 @@ export default function ReceptionPage() {
         notes: "",
         minimumSpendAmount: "",
         status: "SEATED",
+        marketingConsent: false,
       }));
       setManualTable({
         ...emptyManualTable,
@@ -614,6 +618,7 @@ export default function ReceptionPage() {
         notes: "",
         minimumSpendAmount: "",
         status: "SEATED",
+        marketingConsent: false,
       });
       setManualTable({ ...emptyManualTable, capacity: 4 });
     }
@@ -775,6 +780,19 @@ export default function ReceptionPage() {
               dir="ltr"
               inputMode="tel"
             />
+          </label>
+          <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+            <input
+              type="checkbox"
+              checked={form.marketingConsent}
+              onChange={(e) =>
+                setForm({ ...form, marketingConsent: e.target.checked })
+              }
+              className="mt-1 h-4 w-4 rounded border-gray-300"
+            />
+            <span>
+              أوافق على استقبال رسائل متعلقة بزيارتي وتقييم الخدمة عبر واتساب.
+            </span>
           </label>
           <label className="block text-sm font-medium">
             عدد الضيوف

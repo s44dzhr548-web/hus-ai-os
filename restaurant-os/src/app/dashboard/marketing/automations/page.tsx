@@ -16,6 +16,18 @@ export default function AutomationsPage() {
     <div>
       <MkPageHeader title="Automation Center" desc="All rules OFF until enabled — no execution" />
       <p className="mb-4 rounded border border-amber-800/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">جميع الأتمتة متوقفة حتى التفعيل الصريح</p>
+      <MkCard className="mb-4 flex items-center justify-between border-emerald-800/40 bg-emerald-950/20">
+        <div>
+          <p className="font-medium text-emerald-100">أتمتة واتساب بعد الزيارة</p>
+          <p className="text-xs text-emerald-200/80">SESSION_COMPLETED — شكر + تقييم بعد إنهاء الجلسة</p>
+        </div>
+        <a
+          href="/dashboard/marketing/automations/after-visit"
+          className="rounded border border-emerald-600 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-900/40"
+        >
+          إعداد
+        </a>
+      </MkCard>
       <div className="space-y-2">
         {rules.map((r) => (
           <MkCard key={r.id} className="flex items-center justify-between">

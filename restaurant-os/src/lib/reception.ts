@@ -14,6 +14,7 @@ import {
   LEGACY_UNAVAILABLE,
 } from "@/lib/timezone";
 import { onSessionCompleted } from "@/lib/visit-tracking";
+import { triggerAfterVisitWhatsApp } from "@/lib/after-visit-whatsapp/service";
 
 export const TABLE_SESSION_STATUSES: TableSessionStatus[] = [
   "WAITING",
@@ -123,11 +124,19 @@ export async function syncTableOperationalStatus(tableId: string) {
 export async function upsertCustomerProfile(
   restaurantId: string,
   customerName: string,
-  customerPhone?: string | null
+  customerPhone?: string | null,
+  marketingConsent?: boolean
 ) {
+  const consentData =
+    marketingConsent === true
+      ? { marketingConsent: true, marketingConsentAt: new Date() }
+      : marketingConsent === false
+        ? { marketingConsent: false, marketingConsentAt: null }
+        : {};
+
   if (!customerPhone) {
     return prisma.customerProfile.create({
-      data: { restaurantId, customerName, customerPhone: null },
+      data: { restaurantId, customerName, customerPhone: null, ...consentData },
     });
   }
 
@@ -138,12 +147,18 @@ export async function upsertCustomerProfile(
   if (existing) {
     return prisma.customerProfile.update({
       where: { id: existing.id },
-      data: { customerName },
+      data: { customerName, ...consentData },
     });
   }
 
   return prisma.customerProfile.create({
-    data: { restaurantId, customerName, customerPhone },
+    data: {
+      restaurantId,
+      customerName,
+      customerPhone,
+      marketingConsent: marketingConsent === true,
+      marketingConsentAt: marketingConsent === true ? new Date() : null,
+    },
   });
 }
 
@@ -205,6 +220,13 @@ export async function finalizeTableSession(
         userId: closedBy?.staffUserId,
         name: closedBy?.staffName ?? tableSession.staffMemberName,
       },
+    });
+
+    triggerAfterVisitWhatsApp({
+      restaurantId: tableSession.restaurantId,
+      branchId: tableSession.branchId,
+      visitId: tableSession.customerVisitId,
+      sessionId: tableSession.id,
     });
 
     await prisma.customerVisit.update({

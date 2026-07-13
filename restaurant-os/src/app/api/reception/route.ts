@@ -118,6 +118,7 @@ export async function POST(req: NextRequest) {
     notes,
     minimumSpendAmount,
     status = "SEATED",
+    marketingConsent = false,
   } = body;
 
   if (!customerName?.trim()) {
@@ -167,7 +168,8 @@ export async function POST(req: NextRequest) {
   const profile = await upsertCustomerProfile(
     restaurantId!,
     customerName.trim(),
-    customerPhone?.trim() || null
+    customerPhone?.trim() || null,
+    Boolean(marketingConsent)
   );
 
   const now = new Date();

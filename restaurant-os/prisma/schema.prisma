@@ -381,6 +381,9 @@ model Restaurant {
   ownerNotifications       OwnerNotification[]
   tableGifts               TableGift[]
   staffAuditEvents         StaffAuditEvent[]
+  whatsAppBusinessConnection WhatsAppBusinessConnection?
+  afterVisitWhatsAppAutomation AfterVisitWhatsAppAutomation?
+  whatsAppMessageDeliveries WhatsAppMessageDelivery[]
 
   @@index([ownerId])
   @@map("restaurants")
@@ -413,6 +416,7 @@ model Branch {
   waitingList   WaitingListEntry[]
   tableGifts    TableGift[]
   customerVisits CustomerVisit[]
+  afterVisitWhatsAppAutomations AfterVisitWhatsAppAutomation[]
 
   @@index([restaurantId])
   @@map("branches")
@@ -845,6 +849,7 @@ model CustomerProfile {
   visits       CustomerVisit[]
   reservations Reservation[]
   orders       Order[]
+  whatsAppMessageDeliveries WhatsAppMessageDelivery[]
 
   @@index([restaurantId, customerPhone])
   @@map("customer_profiles")
@@ -896,6 +901,7 @@ model CustomerVisit {
   tableSessions   TableSession[]
   table           DiningTable?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
   branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  whatsAppMessageDelivery WhatsAppMessageDelivery?
 
   @@index([restaurantId, createdAt])
   @@index([restaurantId, enteredAt])
@@ -1812,4 +1818,88 @@ model MarketingSettings {
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@map("marketing_settings")
+}
+
+enum WhatsAppDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  OPTED_OUT
+  SKIPPED_NO_CONSENT
+  SKIPPED_NO_PHONE
+  SKIPPED_NO_CONNECTION
+  SKIPPED_DISABLED
+  SKIPPED_DUPLICATE
+}
+
+model WhatsAppBusinessConnection {
+  id              String   @id @default(cuid())
+  restaurantId    String   @unique @map("restaurant_id")
+  phoneNumberId   String   @map("phone_number_id")
+  wabaId          String?  @map("waba_id")
+  businessPhone   String?  @map("business_phone")
+  accessTokenEnc  String   @map("access_token_enc")
+  templateName    String   @default("after_visit_thank_you") @map("template_name")
+  templateLanguage String  @default("ar") @map("template_language")
+  isActive        Boolean  @default(true) @map("is_active")
+  connectedAt     DateTime @default(now()) @map("connected_at")
+  connectedByUserId String? @map("connected_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_business_connections")
+}
+
+model AfterVisitWhatsAppAutomation {
+  id              String   @id @default(cuid())
+  restaurantId    String   @unique @map("restaurant_id")
+  branchId        String?  @map("branch_id")
+  isEnabled       Boolean  @default(false) @map("is_enabled")
+  delayMinutes    Int      @default(5) @map("delay_minutes")
+  templateName    String   @default("after_visit_thank_you") @map("template_name")
+  messageBody     String?  @map("message_body")
+  reviewLinkBase  String?  @map("review_link_base")
+  testPhone       String?  @map("test_phone")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch     Branch?    @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@map("after_visit_whatsapp_automation")
+}
+
+model WhatsAppMessageDelivery {
+  id                String                 @id @default(cuid())
+  restaurantId      String                 @map("restaurant_id")
+  customerProfileId String?                @map("customer_profile_id")
+  visitId           String                 @unique @map("visit_id")
+  sessionId         String?                @map("session_id")
+  phone             String
+  templateName      String                 @map("template_name")
+  status            WhatsAppDeliveryStatus @default(QUEUED)
+  eventType         String                 @default("SESSION_COMPLETED") @map("event_type")
+  reviewUrl         String?                @map("review_url")
+  queuedAt          DateTime               @default(now()) @map("queued_at")
+  scheduledFor      DateTime               @map("scheduled_for")
+  sentAt            DateTime?              @map("sent_at")
+  deliveredAt       DateTime?              @map("delivered_at")
+  readAt            DateTime?              @map("read_at")
+  failedReason      String?                @map("failed_reason")
+  providerMessageId String?                @map("provider_message_id")
+  attemptCount      Int                    @default(0) @map("attempt_count")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+
+  restaurant      Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerProfile CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: SetNull)
+  visit           CustomerVisit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, status, scheduledFor])
+  @@index([sessionId])
+  @@map("whatsapp_message_deliveries")
 }
