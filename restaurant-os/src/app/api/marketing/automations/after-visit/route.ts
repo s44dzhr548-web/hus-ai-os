@@ -6,6 +6,7 @@ import {
   getOrCreateAutomation,
   automationFromRow,
   sendTestWhatsAppMessage,
+  processWhatsAppQueue,
 } from "@/lib/after-visit-whatsapp/service";
 import { DEFAULT_AUTOMATION, DEFAULT_MESSAGE_BODY, DELAY_OPTIONS } from "@/lib/after-visit-whatsapp/types";
 import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
@@ -15,6 +16,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const { error, restaurantId } = await requireMarketingAccess();
   if (error) return error;
+
+  void processWhatsAppQueue(20).catch(console.error);
 
   const [automation, connection, deliveries, branches, restaurant] = await Promise.all([
     getOrCreateAutomation(restaurantId!),
