@@ -382,6 +382,9 @@ model Restaurant {
   tableGifts               TableGift[]
   staffAuditEvents         StaffAuditEvent[]
   whatsAppBusinessConnection WhatsAppBusinessConnection?
+  whatsAppBusinessProfile    WhatsAppBusinessProfile?
+  whatsAppWizardSession      WhatsAppWizardSession?
+  whatsAppOwnerNotifications WhatsAppOwnerNotification[]
   afterVisitWhatsAppAutomation AfterVisitWhatsAppAutomation?
   whatsAppMessageDeliveries WhatsAppMessageDelivery[]
 
@@ -1902,4 +1905,62 @@ model WhatsAppMessageDelivery {
   @@index([restaurantId, status, scheduledFor])
   @@index([sessionId])
   @@map("whatsapp_message_deliveries")
+}
+
+model WhatsAppBusinessProfile {
+  id                 String    @id @default(cuid())
+  restaurantId       String    @unique @map("restaurant_id")
+  businessName       String?   @map("business_name")
+  verifyTokenEnc     String?   @map("verify_token_enc")
+  webhookVerifiedAt  DateTime? @map("webhook_verified_at")
+  oauthConnectedAt   DateTime? @map("oauth_connected_at")
+  featureAfterVisit  Boolean   @default(true) @map("feature_after_visit")
+  featureReservation Boolean   @default(false) @map("feature_reservation")
+  featureGift        Boolean   @default(false) @map("feature_gift")
+  featureOrder       Boolean   @default(false) @map("feature_order")
+  featureReview      Boolean   @default(true) @map("feature_review")
+  lastHealthCheckAt  DateTime? @map("last_health_check_at")
+  lastHealthOk       Boolean?  @map("last_health_ok")
+  healthIssues       Json?     @map("health_issues")
+  wizardCompletedAt  DateTime? @map("wizard_completed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_business_profiles")
+}
+
+model WhatsAppWizardSession {
+  id                    String   @id @default(cuid())
+  restaurantId          String   @unique @map("restaurant_id")
+  step                  Int      @default(1)
+  accessTokenEnc        String?  @map("access_token_enc")
+  discoveredJson        Json?    @map("discovered_json")
+  selectedWabaId        String?  @map("selected_waba_id")
+  selectedPhoneNumberId String?  @map("selected_phone_number_id")
+  selectedBusinessName  String?  @map("selected_business_name")
+  selectedDisplayPhone  String?  @map("selected_display_phone")
+  expiresAt             DateTime @map("expires_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_wizard_sessions")
+}
+
+model WhatsAppOwnerNotification {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  kind         String
+  titleAr      String   @map("title_ar")
+  messageAr    String   @map("message_ar")
+  isRead       Boolean  @default(false) @map("is_read")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, isRead])
+  @@map("whatsapp_owner_notifications")
 }

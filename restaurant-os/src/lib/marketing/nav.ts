@@ -4,6 +4,7 @@
 export const WHATSAPP_MARKETING_NAV = [
   { href: "/dashboard/marketing/automations", label: "الرسائل التلقائية" },
   { href: "/dashboard/marketing/whatsapp", label: "واتساب الأعمال" },
+  { href: "/dashboard/marketing/whatsapp/setup", label: "معالج الربط" },
   { href: "/dashboard/marketing/whatsapp?tab=templates", label: "القوالب" },
   { href: "/dashboard/marketing/campaigns", label: "الحملات" },
   { href: "/dashboard/marketing/whatsapp?tab=delivery", label: "نتائج الإرسال" },

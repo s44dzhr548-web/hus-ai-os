@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { MkCard, MkLoading, MkPageHeader } from "@/components/marketing/marketing-shell";
@@ -101,6 +102,19 @@ export default function WhatsAppBusinessPage() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookVerifyToken, setWebhookVerifyToken] = useState(false);
   const [encryptionReady, setEncryptionReady] = useState(false);
+  const [dashboardSummary, setDashboardSummary] = useState({
+    connectionStatus: "NOT_CONNECTED",
+    businessName: "—",
+    phoneNumber: "—",
+    templateCount: 0,
+    deliveryPercent: 0,
+    messagesToday: 0,
+    failures: 0,
+    healthOk: null as boolean | null,
+  });
+  const [notifications, setNotifications] = useState<
+    Array<{ id: string; titleAr: string; messageAr: string }>
+  >([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,6 +154,8 @@ export default function WhatsAppBusinessPage() {
       setWebhookUrl(data.webhookUrl || "");
       setWebhookVerifyToken(data.webhookVerifyToken);
       setEncryptionReady(data.encryptionReady);
+      if (data.dashboardSummary) setDashboardSummary(data.dashboardSummary);
+      if (data.notifications) setNotifications(data.notifications);
     }
     setLoading(false);
   }, []);
@@ -219,6 +235,45 @@ export default function WhatsAppBusinessPage() {
         title="واتساب الأعمال"
         desc="مركز إعداد WhatsApp Business Cloud API — الاتصال، القوالب، الأتمتة، والتسليم"
       />
+
+      {canEdit && (
+        <Link
+          href="/dashboard/marketing/whatsapp/setup"
+          className="inline-flex rounded-lg border border-emerald-600 bg-emerald-950/30 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-900/40"
+        >
+          ⚡ معالج الإعداد السريع — ابدأ الربط
+        </Link>
+      )}
+
+      {notifications.length > 0 && (
+        <div className="space-y-2">
+          {notifications.map((n) => (
+            <div
+              key={n.id}
+              className="rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-100"
+            >
+              <strong>{n.titleAr}</strong> — {n.messageAr}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
+        {[
+          ["Connection", dashboardSummary.connectionStatus === "CONNECTED" ? "🟢" : "🔴"],
+          ["Business", dashboardSummary.businessName],
+          ["Phone", dashboardSummary.phoneNumber],
+          ["Templates", String(dashboardSummary.templateCount)],
+          ["Delivery %", `${dashboardSummary.deliveryPercent}%`],
+          ["Today", String(dashboardSummary.messagesToday)],
+          ["Failures", String(dashboardSummary.failures)],
+        ].map(([label, val]) => (
+          <MkCard key={label as string} className="text-center">
+            <p className="text-[10px] uppercase text-gray-500">{label}</p>
+            <p className="truncate text-sm font-semibold text-white">{val}</p>
+          </MkCard>
+        ))}
+      </div>
 
       {!canEdit && (
         <p className="rounded border border-amber-800/40 bg-amber-950/30 px-3 py-2 text-sm text-amber-200">

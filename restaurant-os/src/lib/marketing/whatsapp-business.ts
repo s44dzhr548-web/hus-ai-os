@@ -9,6 +9,7 @@ import {
 } from "@/lib/after-visit-whatsapp/service";
 import { DEFAULT_AUTOMATION, DEFAULT_MESSAGE_BODY, DELAY_OPTIONS } from "@/lib/after-visit-whatsapp/types";
 import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
+import { runWhatsAppHealthCheck } from "@/lib/marketing/whatsapp-setup";
 
 export type WhatsAppTemplateRow = {
   name: string;
@@ -40,7 +41,7 @@ export function whatsAppWebhookUrl(): string {
 export async function fetchWhatsAppHubData(restaurantId: string) {
   void processWhatsAppQueue(20).catch(console.error);
 
-  const [automation, connection, deliveries, branches, restaurant, statusCounts] =
+  const [automation, connection, deliveries, branches, restaurant, statusCounts, profile, notifications] =
     await Promise.all([
       getOrCreateAutomation(restaurantId),
       prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } }),
@@ -65,7 +66,15 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
         where: { restaurantId },
         _count: { status: true },
       }),
+      prisma.whatsAppBusinessProfile.findUnique({ where: { restaurantId } }),
+      prisma.whatsAppOwnerNotification.findMany({
+        where: { restaurantId, isRead: false },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }),
     ]);
+
+  void runWhatsAppHealthCheck(restaurantId).catch(console.error);
 
   const countMap = Object.fromEntries(
     statusCounts.map((r) => [r.status, r._count.status])
@@ -134,7 +143,12 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
     ];
   }
 
-  const health = buildHealthChecks(connection, templates.length);
+  const today = new Date().toISOString().slice(0, 10);
+  const messagesToday = deliveries.filter(
+    (d) => d.sentAt && d.sentAt.toISOString().slice(0, 10) === today
+  ).length;
+
+  const health = buildHealthChecks(connection, templates.length, profile);
 
   return {
     automation: automationFromRow(automation),
@@ -169,6 +183,31 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
     },
     templates,
     health,
+    profile: profile
+      ? {
+          businessName: profile.businessName,
+          wizardCompleted: Boolean(profile.wizardCompletedAt),
+          lastHealthOk: profile.lastHealthOk,
+          features: {
+            afterVisit: profile.featureAfterVisit,
+            reservation: profile.featureReservation,
+            gift: profile.featureGift,
+            order: profile.featureOrder,
+            review: profile.featureReview,
+          },
+        }
+      : null,
+    notifications,
+    dashboardSummary: {
+      connectionStatus: connection?.isActive && connection.accessTokenEnc ? "CONNECTED" : "NOT_CONNECTED",
+      businessName: profile?.businessName || restaurant?.nameAr || restaurant?.name || "—",
+      phoneNumber: connection?.businessPhone || "—",
+      templateCount: templates.length,
+      deliveryPercent: rates.deliveryRate,
+      messagesToday,
+      failures: stats.failed,
+      healthOk: profile?.lastHealthOk ?? null,
+    },
   };
 }
 
@@ -179,9 +218,12 @@ function buildHealthChecks(
     phoneNumberId: string;
     wabaId: string | null;
   } | null,
-  templateCount: number
+  templateCount: number,
+  profile: { verifyTokenEnc: string | null; webhookVerifiedAt: Date | null } | null
 ): WhatsAppHealthCheck[] {
-  const webhookOk = Boolean(process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN);
+  const webhookOk = Boolean(
+    process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || profile?.verifyTokenEnc || profile?.webhookVerifiedAt
+  );
   const connected = Boolean(connection?.isActive && connection?.accessTokenEnc);
 
   return [

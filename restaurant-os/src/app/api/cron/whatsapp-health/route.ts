@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { processWhatsAppQueue } from "@/lib/after-visit-whatsapp/service";
 import { runWhatsAppHealthCheck } from "@/lib/marketing/whatsapp-setup";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +7,7 @@ export const dynamic = "force-dynamic";
 function authorizeCron(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return process.env.NODE_ENV !== "production";
-  const auth = req.headers.get("authorization");
-  return auth === `Bearer ${secret}`;
+  return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -17,25 +15,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const results = await processWhatsAppQueue(30);
-  const processed = results.filter(Boolean).length;
-
   const connections = await prisma.whatsAppBusinessConnection.findMany({
     where: { isActive: true },
     select: { restaurantId: true },
   });
-  const healthResults = [];
+
+  const results = [];
   for (const c of connections) {
-    healthResults.push(await runWhatsAppHealthCheck(c.restaurantId));
+    results.push({
+      restaurantId: c.restaurantId,
+      ...(await runWhatsAppHealthCheck(c.restaurantId)),
+    });
   }
 
   return NextResponse.json({
     ok: true,
-    processed,
-    healthChecked: healthResults.length,
-    healthOk: healthResults.filter((h) => h.ok).length,
+    checked: results.length,
+    results,
     ranAt: new Date().toISOString(),
-    note: "Daily maintenance (queue + health). Hourly on Vercel Pro.",
+    note: "Vercel Hobby: daily schedule. Hourly requires Pro plan.",
   });
 }
 
