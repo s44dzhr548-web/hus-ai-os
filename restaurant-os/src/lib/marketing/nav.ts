@@ -1,6 +1,16 @@
 /** Full Marketing Command Center navigation — /dashboard/marketing/* only */
 
+/** WhatsApp-focused marketing navigation (sidebar section under التسويق) */
+export const WHATSAPP_MARKETING_NAV = [
+  { href: "/dashboard/marketing/automations", label: "الرسائل التلقائية" },
+  { href: "/dashboard/marketing/whatsapp", label: "واتساب الأعمال" },
+  { href: "/dashboard/marketing/whatsapp?tab=templates", label: "القوالب" },
+  { href: "/dashboard/marketing/campaigns", label: "الحملات" },
+  { href: "/dashboard/marketing/whatsapp?tab=delivery", label: "نتائج الإرسال" },
+] as const;
+
 export const MARKETING_NAV = [
+  ...WHATSAPP_MARKETING_NAV,
   { href: "/dashboard/marketing/command-center", label: "مركز القيادة" },
   { href: "/dashboard/marketing/goals", label: "أهداف المطعم" },
   { href: "/dashboard/marketing/budget", label: "الميزانية الذكية" },
@@ -8,13 +18,11 @@ export const MARKETING_NAV = [
   { href: "/dashboard/marketing/simulation", label: "المحاكاة" },
   { href: "/dashboard/marketing/opportunities", label: "الفرص" },
   { href: "/dashboard/marketing/decisions", label: "قرارات AI" },
-  { href: "/dashboard/marketing/campaigns", label: "الحملات" },
   { href: "/dashboard/marketing/creative", label: "الإبداع" },
   { href: "/dashboard/marketing/copywriting", label: "الكتابة" },
   { href: "/dashboard/marketing/audiences", label: "الجمهور" },
   { href: "/dashboard/marketing/customer-journey", label: "رحلة العميل" },
   { href: "/dashboard/marketing/analytics", label: "التحليلات" },
-  { href: "/dashboard/marketing/automations", label: "الأتمتة" },
   { href: "/dashboard/marketing/reports", label: "التقارير" },
   { href: "/dashboard/marketing/assistant", label: "مساعد AI" },
   { href: "/dashboard/marketing/ai-brain", label: "AI Brain" },

@@ -79,7 +79,7 @@ export const restaurantNavItems: NavItem[] = [
   { href: "/dashboard/menu/categories", label: "المنيو", icon: UtensilsCrossed, roles: ["OWNER", "ADMIN", "MANAGER"] },
   { href: "/dashboard/branding", label: "Landing Page Builder", icon: Palette, roles: ["OWNER", "ADMIN"] },
   { href: "/dashboard/media", label: "مركز الوسائط", icon: Images, roles: ["OWNER", "ADMIN", "MANAGER"] },
-  { href: "/dashboard/marketing", label: "التسويق الذكي", icon: Megaphone, roles: ["OWNER", "ADMIN", "MARKETING"] },
+  { href: "/dashboard/marketing", label: "التسويق الذكي", icon: Megaphone, roles: ["OWNER", "ADMIN", "MARKETING", "MANAGER"] },
   { href: "/dashboard/menu/options", label: "الخيارات والإضافات", icon: ListTree, roles: ["OWNER", "ADMIN", "MANAGER"] },
   { href: "/dashboard/orders", label: "الطلبات", icon: ClipboardList, roles: ["OWNER", "ADMIN", "MANAGER", "CASHIER", "KITCHEN", "WAITER"] },
   { href: "/dashboard/kitchen", label: "المطبخ", icon: ChefHat, roles: ["OWNER", "ADMIN", "MANAGER", "KITCHEN"] },
@@ -90,6 +90,19 @@ export const restaurantNavItems: NavItem[] = [
   { href: "/dashboard/billing", label: "الفوترة", icon: CreditCard, roles: ["OWNER", "ADMIN"] },
   { href: "/dashboard/subscription", label: "الاشتراك", icon: CreditCard, roles: ["OWNER", "ADMIN"] },
 ];
+
+/** Manager read-only WhatsApp marketing routes */
+export const MANAGER_WHATSAPP_MARKETING_ROUTES = [
+  "/dashboard/marketing/whatsapp",
+  "/dashboard/marketing/automations",
+  "/dashboard/marketing/campaigns",
+];
+
+function managerWhatsAppMarketingAllowed(pathname: string): boolean {
+  return MANAGER_WHATSAPP_MARKETING_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
 
 function isMarketingStaff(role?: DashboardRole) {
   return role === "MARKETING";
@@ -165,6 +178,10 @@ export function isRouteAllowedForUser(
         pathname === item.href ||
         (item.href !== "/dashboard" && pathname.startsWith(item.href))
     );
+  }
+
+  if (opts.role === "MANAGER" && pathname.startsWith("/dashboard/marketing")) {
+    return managerWhatsAppMarketingAllowed(pathname);
   }
 
   if (isMarketingStaff(opts.role)) {

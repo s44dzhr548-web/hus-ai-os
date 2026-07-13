@@ -44,7 +44,7 @@ async function login() {
 
 async function main() {
   console.log(`\n=== After-Visit WhatsApp QA @ ${BASE} ===\n`);
-  console.log(`Automation URL: ${BASE}/dashboard/marketing/automations/after-visit\n`);
+  console.log(`Automation URL: ${BASE}/dashboard/marketing/whatsapp\n`);
 
   let cookie = "";
   try {
@@ -55,13 +55,13 @@ async function main() {
     process.exit(1);
   }
 
-  const pageRes = await fetch(`${BASE}/dashboard/marketing/automations/after-visit`, {
+  const pageRes = await fetch(`${BASE}/dashboard/marketing/whatsapp`, {
     headers: { Cookie: cookie },
     redirect: "manual",
   });
   record("After-visit dashboard page", pageRes.status === 200, `HTTP ${pageRes.status}`);
 
-  const apiRes = await fetch(`${BASE}/api/marketing/automations/after-visit`, {
+  const apiRes = await fetch(`${BASE}/api/marketing/whatsapp/business`, {
     headers: { Cookie: cookie },
   });
   record("After-visit settings API", apiRes.ok, `HTTP ${apiRes.status}`);
@@ -145,7 +145,7 @@ async function main() {
 
   const passed = results.filter((r) => r.ok).length;
   console.log(`\n=== ${passed}/${results.length} PASS ===`);
-  console.log(`\nWhatsApp automation URL: ${BASE}/dashboard/marketing/automations/after-visit`);
+  console.log(`\nWhatsApp automation URL: ${BASE}/dashboard/marketing/whatsapp`);
   console.log(`Template status: ${connection?.isActive && connection?.hasToken ? "CONNECTED" : "NOT_CONFIGURED — add WABA credentials in dashboard"}`);
   console.log(`Test phone: ${automation?.testPhone || "(not set)"}`);
   console.log(`Delivery: ${sentOrQueued.length ? "PASS (messages queued/sent)" : deliveries.length ? "PARTIAL (skipped/failed rows only)" : "PENDING (no session completed yet)"}`);

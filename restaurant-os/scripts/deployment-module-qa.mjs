@@ -25,7 +25,7 @@ const MODULES = [
   ["Customer Visit Tracking", "/dashboard/customers?tab=visits", true],
   ["Visit Tracking API", "/api/staff-activity?scope=audit", true],
   ["Media Center", "/dashboard/media", true],
-  ["After-Visit WhatsApp", "/dashboard/marketing/automations/after-visit", true],
+  ["After-Visit WhatsApp", "/dashboard/marketing/whatsapp", true],
   ["Public Gifts API", "/api/public/gifts?tableId=" + DEMO_TABLE_ID, false],
 ];
 

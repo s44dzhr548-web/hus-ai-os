@@ -22,10 +22,10 @@ export default function AutomationsPage() {
           <p className="text-xs text-emerald-200/80">SESSION_COMPLETED — شكر + تقييم بعد إنهاء الجلسة</p>
         </div>
         <a
-          href="/dashboard/marketing/automations/after-visit"
+          href="/dashboard/marketing/whatsapp?tab=automation"
           className="rounded border border-emerald-600 px-3 py-1.5 text-sm text-emerald-300 hover:bg-emerald-900/40"
         >
-          إعداد
+          إعداد في واتساب الأعمال
         </a>
       </MkCard>
       <div className="space-y-2">
