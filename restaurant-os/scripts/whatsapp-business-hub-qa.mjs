@@ -61,13 +61,25 @@ async function main() {
 
   if (apiRes.ok) {
     const data = await apiRes.json();
-    record("Permissions payload", data.permissions != null, `canEdit=${data.permissions?.canEdit}`);
+    record("Permissions payload", data.permissions != null, `canEdit=${data.permissions?.canEdit}, role=${data.permissions?.role}`);
     record("Connection section", data.connection !== undefined, data.connection ? "configured" : "empty");
     record("Automation section", !!data.automation, `enabled=${data.automation?.isEnabled}`);
     record("Templates array", Array.isArray(data.templates), `${data.templates?.length ?? 0} templates`);
     record("Delivery stats", !!data.stats, `queued=${data.stats?.queued ?? 0}`);
     record("Health checks", Array.isArray(data.health) && data.health.length === 6, `${data.health?.length} checks`);
     record("Webhook URL", !!data.webhookUrl, data.webhookUrl?.slice(0, 40) || "");
+
+    const patchRes = await fetch(`${BASE}/api/marketing/whatsapp/business`, {
+      method: "PATCH",
+      headers: { Cookie: cookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ isEnabled: false }),
+    });
+    const ownerOnly = data.permissions?.canEdit === true;
+    record(
+      "Permission: owner write gate",
+      ownerOnly ? patchRes.ok : patchRes.status === 403,
+      ownerOnly ? `PATCH HTTP ${patchRes.status}` : "non-owner correctly blocked (403)"
+    );
   }
 
   const legacyRes = await fetch(`${BASE}/dashboard/marketing/automations/after-visit`, {
@@ -85,13 +97,6 @@ async function main() {
     redirect: "manual",
   });
   record("Automations hub (الرسائل التلقائية)", navRes.status === 200, `HTTP ${navRes.status}`);
-
-  const patchRes = await fetch(`${BASE}/api/marketing/whatsapp/business`, {
-    method: "PATCH",
-    headers: { Cookie: cookie, "Content-Type": "application/json" },
-    body: JSON.stringify({ isEnabled: false }),
-  });
-  record("Owner can PATCH automation", patchRes.ok, `HTTP ${patchRes.status}`);
 
   const tablesRes = await fetch(`${BASE}/api/tables`, { headers: { Cookie: cookie } });
   if (tablesRes.ok) {
