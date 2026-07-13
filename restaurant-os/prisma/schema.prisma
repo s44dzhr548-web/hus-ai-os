@@ -14,6 +14,7 @@ enum StaffRole {
   OWNER
   ADMIN
   MANAGER
+  MARKETING
   RECEPTION
   CASHIER
   KITCHEN
@@ -167,9 +168,27 @@ enum TableIcon {
 }
 
 enum VisitStatus {
+  REGISTERED
+  WAITING
+  SEATED
   ACTIVE
   COMPLETED
   CANCELLED
+  NO_SHOW
+}
+
+enum TableGiftStatus {
+  PENDING_ACCEPTANCE
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  PAYMENT_PENDING
+  PAID
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+  REFUNDED
 }
 
 enum OptionGroupType {
@@ -209,6 +228,7 @@ model User {
   accounts    Account[]
   sessions    Session[]
   staff       Staff[]
+  staffActivityLogs StaffActivityLog[]
   restaurants Restaurant[] @relation("RestaurantOwner")
 
   @@map("users")
@@ -274,6 +294,7 @@ model Restaurant {
   ctaTextEn     String? @default("Explore Menu") @map("cta_text_en")
   cardStyle     String? @default("glass") @map("card_style")
   homepageSections Json? @map("homepage_sections")
+  landingPageConfig Json? @map("landing_page_config")
   primaryColor    String? @default("#d4af37") @map("primary_color")
   secondaryColor  String? @default("#8b6914") @map("secondary_color")
   backgroundColor String? @default("#0c0a09") @map("background_color")
@@ -303,6 +324,9 @@ model Restaurant {
   whatsappNumber         String? @map("whatsapp_number")
   receptionDepositEnabled Boolean @default(false) @map("reception_deposit_enabled")
   receptionDepositAmount  Decimal? @map("reception_deposit_amount")
+  monitoringSettingsJson  Json?    @map("monitoring_settings_json")
+  tableGiftsEnabled       Boolean  @default(false) @map("table_gifts_enabled")
+  tableGiftsSettingsJson  Json?    @map("table_gifts_settings_json")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -328,6 +352,35 @@ model Restaurant {
   tableAssignments  TableAssignment[]
   receptionNotifications ReceptionNotification[]
   sessionAuditLogs    SessionAuditLog[]
+  marketingAdConnections MarketingAdConnection[]
+  marketingCampaigns     MarketingCampaign[]
+  marketingCreatives     MarketingCreative[]
+  marketingMetrics       MarketingMetricsSnapshot[]
+  marketingRecommendations MarketingAiRecommendation[]
+  marketingChatMessages  MarketingChatMessage[]
+  marketingWhatsAppCampaigns MarketingWhatsAppCampaign[]
+  marketingAuditLogs     MarketingAuditLog[]
+  marketingEvents        MarketingEvent[]
+  mcBudgets              MarketingBudget[]
+  mcRecommendations      MarketingRecommendation[]
+  mcGoals                MarketingGoal[]
+  mcPlatforms            McPlatformConfig[]
+  mcDecisions            MarketingDecision[]
+  mcAnalytics            MarketingAnalytics[]
+  mcSimulations          MarketingSimulation[]
+  mcReports              MarketingReport[]
+  marketingAiProviders   MarketingAiProviderConnection[]
+  marketingProviderRouting MarketingProviderRouting?
+  marketingAiCostSettings  MarketingAiCostSettings?
+  marketingAiUsageLogs     MarketingAiUsageLog[]
+  marketingAutomationRules MarketingAutomationRule[]
+  marketingJourneyMetrics  MarketingJourneyMetric[]
+  marketingCommandSnapshots MarketingCommandSnapshot[]
+  marketingSettings        MarketingSettings?
+  staffActivityLogs        StaffActivityLog[]
+  ownerNotifications       OwnerNotification[]
+  tableGifts               TableGift[]
+  staffAuditEvents         StaffAuditEvent[]
 
   @@index([ownerId])
   @@map("restaurants")
@@ -345,6 +398,8 @@ model Branch {
   phone        String?
   qrCode       String?  @map("qr_code")
   workingHours Json?    @map("working_hours")
+  floorPlanJson  Json?   @map("floor_plan_json")
+  tableSectionsJson Json? @map("table_sections_json")
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -356,6 +411,8 @@ model Branch {
   tableSessions TableSession[]
   reservations Reservation[]
   waitingList   WaitingListEntry[]
+  tableGifts    TableGift[]
+  customerVisits CustomerVisit[]
 
   @@index([restaurantId])
   @@map("branches")
@@ -369,6 +426,7 @@ model Staff {
   role         StaffRole @default(WAITER)
   name         String
   phone        String?
+  permissionsJson Json?  @map("permissions_json")
   isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
@@ -376,6 +434,7 @@ model Staff {
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   branch     Branch?    @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  activityLogs StaffActivityLog[]
 
   @@unique([userId, restaurantId])
   @@index([restaurantId, role])
@@ -399,6 +458,8 @@ model DiningTable {
   floorMapX          Int?                   @map("floor_map_x")
   floorMapY          Int?                   @map("floor_map_y")
   floorZone          String?                @map("floor_zone")
+  isArchived         Boolean                @default(false) @map("is_archived")
+  archivedAt         DateTime?              @map("archived_at")
   createdAt          DateTime               @default(now()) @map("created_at")
   updatedAt          DateTime               @updatedAt @map("updated_at")
 
@@ -406,6 +467,9 @@ model DiningTable {
   orders        Order[]
   tableSessions TableSession[]
   reservations  Reservation[]
+  giftsSent     TableGift[] @relation("GiftSenderTable")
+  giftsReceived TableGift[] @relation("GiftReceiverTable")
+  customerVisits CustomerVisit[]
 
   @@unique([branchId, number])
   @@index([branchId])
@@ -473,6 +537,7 @@ model MenuItem {
   orderItems OrderItem[]
   favorites  CustomerFavorite[]
   optionGroups MenuItemOptionGroup[]
+  tableGifts   TableGift[]
 
   @@index([categoryId, sortOrder])
   @@map("menu_items")
@@ -509,6 +574,7 @@ model Order {
   tableSession    TableSession?    @relation(fields: [tableSessionId], references: [id], onDelete: SetNull)
   items           OrderItem[]
   payments        Payment[]
+  tableGift       TableGift?
 
   @@unique([branchId, orderNumber])
   @@index([branchId, status, createdAt])
@@ -770,6 +836,8 @@ model CustomerProfile {
   totalSpending Decimal   @default(0) @map("total_spending")
   lastVisitAt   DateTime? @map("last_visit_at")
   notes         String?
+  marketingConsent   Boolean   @default(false) @map("marketing_consent")
+  marketingConsentAt DateTime? @map("marketing_consent_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -800,6 +868,21 @@ model CustomerVisit {
   minimumSpendAmount Decimal?         @map("minimum_spend_amount")
   previousTables     Json?            @map("previous_tables")
   closedByStaffName  String?          @map("closed_by_staff_name")
+  enteredAt          DateTime?        @map("entered_at")
+  registeredAt       DateTime?        @map("registered_at")
+  seatedAt           DateTime?        @map("seated_at")
+  sessionStartedAt   DateTime?        @map("session_started_at")
+  sessionEndedAt     DateTime?        @map("session_ended_at")
+  exitedAt           DateTime?        @map("exited_at")
+  sessionDurationMinutes Int?           @map("session_duration_minutes")
+  visitDate          DateTime?          @map("visit_date") @db.Date
+  tableId            String?            @map("table_id")
+  branchId           String?            @map("branch_id")
+  source             String?
+  registeredByUserId String?            @map("registered_by_user_id")
+  assignedByUserId   String?            @map("assigned_by_user_id")
+  startedByUserId    String?            @map("started_by_user_id")
+  closedByUserId     String?            @map("closed_by_user_id")
   arrivalTime        DateTime?        @map("arrival_time")
   endTime           DateTime?        @map("end_time")
   totalBill         Decimal          @default(0) @map("total_bill")
@@ -811,8 +894,11 @@ model CustomerVisit {
   restaurant      Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   customerProfile CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: SetNull)
   tableSessions   TableSession[]
+  table           DiningTable?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@index([restaurantId, createdAt])
+  @@index([restaurantId, enteredAt])
   @@map("customer_visits")
 }
 
@@ -852,10 +938,67 @@ model TableSession {
   tableAssignments TableAssignment[]
   orders           Order[]
   auditLogs        SessionAuditLog[]
+  giftsSent        TableGift[] @relation("GiftSenderSession")
+  giftsReceived    TableGift[] @relation("GiftReceiverSession")
 
   @@index([restaurantId, status])
   @@index([tableId, endedAt])
   @@map("table_sessions")
+}
+
+model TableGift {
+  id                  String           @id @default(cuid())
+  restaurantId        String           @map("restaurant_id")
+  branchId            String?          @map("branch_id")
+
+  senderSessionId     String           @map("sender_session_id")
+  senderTableId       String           @map("sender_table_id")
+  senderTableNumber   String           @map("sender_table_number")
+
+  receiverSessionId   String           @map("receiver_session_id")
+  receiverTableId     String           @map("receiver_table_id")
+  receiverTableNumber String           @map("receiver_table_number")
+
+  productId           String           @map("product_id")
+  productName         String           @map("product_name")
+  productImageUrl     String?          @map("product_image_url")
+
+  quantity            Int              @default(1)
+  unitPrice           Decimal          @default(0) @map("unit_price") @db.Decimal(10, 2)
+  totalAmount         Decimal          @default(0) @map("total_amount") @db.Decimal(10, 2)
+
+  giftMessage         String?          @map("gift_message")
+  senderDisplayName   String?          @map("sender_display_name")
+  isAnonymous         Boolean          @default(false) @map("is_anonymous")
+
+  status              TableGiftStatus  @default(PENDING_ACCEPTANCE)
+  paymentStatus       String           @default("unpaid") @map("payment_status")
+
+  orderId             String?          @unique @map("order_id")
+
+  expiresAt           DateTime         @map("expires_at")
+  acceptedAt          DateTime?        @map("accepted_at")
+  rejectedAt          DateTime?        @map("rejected_at")
+  expiredAt           DateTime?        @map("expired_at")
+  paidAt              DateTime?        @map("paid_at")
+  deliveredAt         DateTime?        @map("delivered_at")
+
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  restaurant      Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch          Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  senderSession   TableSession @relation("GiftSenderSession", fields: [senderSessionId], references: [id], onDelete: Cascade)
+  receiverSession TableSession @relation("GiftReceiverSession", fields: [receiverSessionId], references: [id], onDelete: Cascade)
+  senderTable     DiningTable  @relation("GiftSenderTable", fields: [senderTableId], references: [id], onDelete: Cascade)
+  receiverTable   DiningTable  @relation("GiftReceiverTable", fields: [receiverTableId], references: [id], onDelete: Cascade)
+  product         MenuItem     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  order           Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, status])
+  @@index([receiverSessionId, status])
+  @@index([expiresAt])
+  @@map("table_gifts")
 }
 
 model Reservation {
@@ -961,6 +1104,77 @@ model SessionAuditLog {
   @@map("session_audit_logs")
 }
 
+model StaffActivityLog {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  userId       String?  @map("user_id")
+  staffId      String?  @map("staff_id")
+  staffName    String?  @map("staff_name")
+  action       String
+  metadata     Json?
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  loginSuccess Boolean? @default(true) @map("login_success")
+  failureReason String? @map("failure_reason")
+  endReason    String?  @map("end_reason")
+  sessionDurationMinutes Int? @map("session_duration_minutes")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user       User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  staff      Staff?     @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, createdAt])
+  @@index([userId, createdAt])
+  @@map("staff_activity_logs")
+}
+
+model StaffAuditEvent {
+  id                String   @id @default(cuid())
+  restaurantId      String   @map("restaurant_id")
+  branchId          String?  @map("branch_id")
+  staffUserId       String?  @map("staff_user_id")
+  staffName         String?  @map("staff_name")
+  customerProfileId String?  @map("customer_profile_id")
+  customerVisitId   String?  @map("customer_visit_id")
+  reservationId     String?  @map("reservation_id")
+  sessionId         String?  @map("session_id")
+  orderId           String?  @map("order_id")
+  tableId           String?  @map("table_id")
+  action            String
+  previousValue     String?  @map("previous_value") @db.Text
+  newValue          String?  @map("new_value") @db.Text
+  result            String   @default("success")
+  requestId         String?  @map("request_id")
+  ipAddress         String?  @map("ip_address")
+  userAgent         String?  @map("user_agent")
+  metadata          Json?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@index([staffUserId, createdAt])
+  @@index([action])
+  @@map("staff_audit_events")
+}
+
+model OwnerNotification {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  type         String
+  title        String
+  message      String
+  metadata     Json?
+  isRead       Boolean  @default(false) @map("is_read")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("owner_notifications")
+}
+
 model ReceptionNotification {
   id           String   @id @default(cuid())
   restaurantId String   @map("restaurant_id")
@@ -976,4 +1190,626 @@ model ReceptionNotification {
 
   @@index([restaurantId, isRead, createdAt])
   @@map("reception_notifications")
+}
+
+// ─── Marketing AI Module (additive — does not modify existing flows) ───
+
+enum MarketingCampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  ARCHIVED
+  COMPLETED
+}
+
+enum MarketingPlatform {
+  META
+  INSTAGRAM
+  FACEBOOK
+  MESSENGER
+  TIKTOK
+  SNAPCHAT
+  GOOGLE
+  YOUTUBE
+  X
+}
+
+enum MarketingCreativeType {
+  FOOD_IMAGE
+  POSTER
+  STORY
+  INSTAGRAM_POST
+  TIKTOK_COVER
+  FACEBOOK_AD
+  SNAPCHAT_AD
+  FLYER
+  SEASONAL_RAMADAN
+  SEASONAL_EID
+  SEASONAL_NATIONAL_DAY
+  SEASONAL_SUMMER
+  SEASONAL_WINTER
+  VIDEO_15S
+  VIDEO_30S
+  VIDEO_60S
+  VIDEO_REEL
+  VIDEO_TIKTOK
+  VIDEO_SNAP_STORY
+  VIDEO_INTRO
+  MENU_VIDEO
+}
+
+enum MarketingCampaignGoal {
+  INCREASE_SALES
+  INCREASE_RESERVATIONS
+  INCREASE_WHATSAPP
+  PROMOTE_OFFER
+  PROMOTE_NEW_MENU
+  PROMOTE_EVENT
+  INCREASE_FOLLOWERS
+}
+
+enum MarketingWhatsAppType {
+  OFFER
+  COUPON
+  EVENT
+  BIRTHDAY
+  RESERVATION
+  ANNOUNCEMENT
+}
+
+enum MarketingSegment {
+  VIP
+  RETURNING
+  INACTIVE
+  BIRTHDAY
+  FAMILIES
+  BREAKFAST
+  LUNCH
+  DINNER
+  COFFEE
+  CORPORATE
+}
+
+model MarketingAdConnection {
+  id                String            @id @default(cuid())
+  restaurantId      String            @map("restaurant_id")
+  platform          MarketingPlatform
+  accountId         String?           @map("account_id")
+  accountName       String?           @map("account_name")
+  accessTokenEnc    String?           @map("access_token_enc")
+  refreshTokenEnc   String?           @map("refresh_token_enc")
+  tokenExpiresAt    DateTime?         @map("token_expires_at")
+  scopes            String[]          @default([])
+  isActive          Boolean           @default(true) @map("is_active")
+  connectedAt       DateTime?         @map("connected_at")
+  connectedByUserId String?           @map("connected_by_user_id")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, platform])
+  @@map("marketing_ad_connections")
+}
+
+model MarketingCampaign {
+  id              String                  @id @default(cuid())
+  restaurantId    String                  @map("restaurant_id")
+  name            String
+  goal            MarketingCampaignGoal
+  status          MarketingCampaignStatus @default(DRAFT)
+  platform        MarketingPlatform?
+  budget          Decimal?                @default(0)
+  spent           Decimal?                @default(0)
+  scheduleStart   DateTime?               @map("schedule_start")
+  scheduleEnd     DateTime?               @map("schedule_end")
+  audienceJson    Json?                   @map("audience_json")
+  locationsJson   Json?                   @map("locations_json")
+  ageMin          Int?                    @map("age_min")
+  ageMax          Int?                    @map("age_max")
+  languages       String[]                @default([])
+  radiusKm        Float?                  @map("radius_km")
+  headline        String?
+  primaryText     String?                 @map("primary_text")
+  cta             String?
+  copyAr          String?                 @map("copy_ar")
+  copyEn          String?                 @map("copy_en")
+  hashtags        String[]                @default([])
+  captions        String?
+  aiScore         Float?                  @map("ai_score")
+  externalId      String?                 @map("external_id")
+  createdByUserId String?                 @map("created_by_user_id")
+  archivedAt      DateTime?               @map("archived_at")
+  deletedAt       DateTime?               @map("deleted_at")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+
+  restaurant  Restaurant              @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  creatives   MarketingCreative[]
+  metrics     MarketingMetricsSnapshot[]
+  recommendations MarketingAiRecommendation[]
+
+  @@index([restaurantId, status])
+  @@index([restaurantId, createdAt])
+  @@map("marketing_campaigns")
+}
+
+model MarketingCreative {
+  id           String                @id @default(cuid())
+  restaurantId String                @map("restaurant_id")
+  campaignId   String?               @map("campaign_id")
+  type         MarketingCreativeType
+  title        String?
+  prompt       String?
+  assetUrl     String?               @map("asset_url")
+  metadataJson Json?                 @map("metadata_json")
+  season       String?
+  durationSec  Int?                  @map("duration_sec")
+  voiceOver    String?               @map("voice_over")
+  subtitles    String?
+  createdAt    DateTime              @default(now()) @map("created_at")
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  campaign   MarketingCampaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, type])
+  @@map("marketing_creatives")
+}
+
+model MarketingMetricsSnapshot {
+  id             String   @id @default(cuid())
+  restaurantId   String   @map("restaurant_id")
+  campaignId     String?  @map("campaign_id")
+  capturedAt     DateTime @default(now()) @map("captured_at")
+  ctr            Float?
+  cpc            Float?
+  cpm            Float?
+  reach          Int?
+  frequency      Float?
+  conversions    Int?
+  reservations   Int?
+  orders         Int?
+  whatsappClicks Int?     @map("whatsapp_clicks")
+  phoneCalls     Int?     @map("phone_calls")
+  roas           Float?
+  roi            Float?
+  spend          Decimal? @default(0)
+  revenue        Decimal? @default(0)
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  campaign   MarketingCampaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, capturedAt])
+  @@index([campaignId, capturedAt])
+  @@map("marketing_metrics_snapshots")
+}
+
+model MarketingAiRecommendation {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  campaignId   String?  @map("campaign_id")
+  action       String
+  reason       String
+  priority     Int      @default(1)
+  payloadJson  Json?    @map("payload_json")
+  isApplied    Boolean  @default(false) @map("is_applied")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  campaign   MarketingCampaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, createdAt])
+  @@map("marketing_ai_recommendations")
+}
+
+model MarketingChatMessage {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  userId       String?  @map("user_id")
+  role         String
+  content      String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("marketing_chat_messages")
+}
+
+model MarketingWhatsAppCampaign {
+  id              String                @id @default(cuid())
+  restaurantId    String                @map("restaurant_id")
+  type            MarketingWhatsAppType
+  title           String
+  message         String
+  segment         MarketingSegment?
+  recipientCount  Int                   @default(0) @map("recipient_count")
+  sentCount       Int                   @default(0) @map("sent_count")
+  status          String                @default("DRAFT")
+  scheduledAt     DateTime?             @map("scheduled_at")
+  sentAt          DateTime?             @map("sent_at")
+  createdByUserId String?               @map("created_by_user_id")
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, status])
+  @@map("marketing_whatsapp_campaigns")
+}
+
+model MarketingAuditLog {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  userId       String?  @map("user_id")
+  action       String
+  entityType   String?  @map("entity_type")
+  entityId     String?  @map("entity_id")
+  detailsJson  Json?    @map("details_json")
+  ipAddress    String?  @map("ip_address")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("marketing_audit_logs")
+}
+
+model MarketingEvent {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  eventType    String   @map("event_type")
+  metadataJson Json?    @map("metadata_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, eventType, createdAt])
+  @@map("marketing_events")
+}
+
+// ─── AI Marketing Center (Phase 1 — architecture only, no integrations) ───
+
+enum MarketingGoalType {
+  INCREASE_SALES
+  INCREASE_RESERVATIONS
+  INCREASE_WALKINS
+  INCREASE_DELIVERY
+  INCREASE_RETURNING
+  INCREASE_WHATSAPP
+  INCREASE_REVIEWS
+  INCREASE_FOLLOWERS
+}
+
+enum MarketingPlatformStatus {
+  NOT_CONNECTED
+  COMING_SOON
+}
+
+enum MarketingTimelineStep {
+  BUDGET_CREATED
+  AI_ANALYSIS
+  CAMPAIGN_SUGGESTED
+  BUDGET_OPTIMIZATION
+  EXPECTED_RESULT
+  COMPLETED
+}
+
+model MarketingBudget {
+  id               String   @id @default(cuid())
+  restaurantId     String   @map("restaurant_id")
+  dailyBudget      Decimal  @default(0) @map("daily_budget")
+  weeklyBudget     Decimal  @default(0) @map("weekly_budget")
+  monthlyBudget    Decimal  @default(0) @map("monthly_budget")
+  distributionJson Json?    @map("distribution_json")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("marketing_budgets")
+}
+
+model MarketingRecommendation {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  type         String
+  titleAr      String   @map("title_ar")
+  titleEn      String?  @map("title_en")
+  description  String?
+  priority     Int      @default(1)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, isActive])
+  @@map("marketing_recommendations")
+}
+
+model MarketingGoal {
+  id           String            @id @default(cuid())
+  restaurantId String            @map("restaurant_id")
+  goalType     MarketingGoalType @map("goal_type")
+  isActive     Boolean           @default(true) @map("is_active")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, goalType])
+  @@map("marketing_goals")
+}
+
+model McPlatformConfig {
+  id                  String                  @id @default(cuid())
+  restaurantId        String                  @map("restaurant_id")
+  platformKey         String                  @map("platform_key")
+  labelAr             String                  @map("label_ar")
+  status              MarketingPlatformStatus @default(NOT_CONNECTED)
+  budgetAllocated     Decimal?                @default(0) @map("budget_allocated")
+  spent               Decimal?                @default(0)
+  expectedCustomers   Int?                    @map("expected_customers")
+  expectedReservations Int?                   @map("expected_reservations")
+  expectedRevenue     Decimal?                @map("expected_revenue")
+  expectedRoi         Float?                  @map("expected_roi")
+  expectedProfit      Decimal?                @map("expected_profit")
+  confidenceScore     Float?                  @map("confidence_score")
+  sortOrder           Int                     @default(0) @map("sort_order")
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, platformKey])
+  @@map("marketing_platforms")
+}
+
+model MarketingDecision {
+  id                String   @id @default(cuid())
+  restaurantId      String   @map("restaurant_id")
+  fromPlatform      String   @map("from_platform")
+  toPlatform        String   @map("to_platform")
+  amount            Decimal  @default(0)
+  reason            String
+  expectedProfitPct Float?   @map("expected_profit_pct")
+  status            String   @default("SUGGESTED")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("marketing_decisions")
+}
+
+model MarketingAnalytics {
+  id            String   @id @default(cuid())
+  restaurantId  String   @map("restaurant_id")
+  ctr           Float?
+  cpc           Float?
+  cpa           Float?
+  roas          Float?
+  roi           Float?
+  reservations  Int?
+  orders        Int?
+  customers     Int?
+  revenue       Decimal?
+  profit        Decimal?
+  capturedAt    DateTime @default(now()) @map("captured_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, capturedAt])
+  @@map("marketing_analytics")
+}
+
+model MarketingSimulation {
+  id              String   @id @default(cuid())
+  restaurantId    String   @map("restaurant_id")
+  inputBudget     Decimal  @map("input_budget")
+  resultsJson     Json     @map("results_json")
+  expectedRevenue Decimal? @map("expected_revenue")
+  expectedProfit  Decimal? @map("expected_profit")
+  expectedRoi     Float?   @map("expected_roi")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("marketing_simulations")
+}
+
+model MarketingReport {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  period       String
+  title        String
+  summaryJson  Json?    @map("summary_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("marketing_reports")
+}
+
+enum MarketingProviderCategory {
+  BRAIN
+  IMAGE
+  VIDEO
+  AUDIO
+  COPY
+}
+
+enum MarketingProviderConnectionMethod {
+  OAUTH
+  API_KEY
+}
+
+enum MarketingProviderStatus {
+  DISCONNECTED
+  CONNECTED
+  NEEDS_RECONNECT
+  INVALID_KEY
+  EXPIRED
+  HEALTHY
+}
+
+model MarketingAiProviderConnection {
+  id                String                          @id @default(cuid())
+  restaurantId      String                          @map("restaurant_id")
+  branchId          String?                         @map("branch_id")
+  category          MarketingProviderCategory
+  providerKey       String                          @map("provider_key")
+  connectionMethod  MarketingProviderConnectionMethod? @map("connection_method")
+  apiKeyEnc         String?                         @map("api_key_enc")
+  orgId             String?                         @map("org_id")
+  projectId         String?                         @map("project_id")
+  endpointUrl       String?                         @map("endpoint_url")
+  modelId           String?                         @map("model_id")
+  accessTokenEnc    String?                         @map("access_token_enc")
+  refreshTokenEnc   String?                         @map("refresh_token_enc")
+  tokenExpiresAt    DateTime?                       @map("token_expires_at")
+  status            MarketingProviderStatus         @default(DISCONNECTED)
+  isDefault         Boolean                         @default(false) @map("is_default")
+  isBackup          Boolean                         @default(false) @map("is_backup")
+  roleAssignment    String?                         @map("role_assignment")
+  taskAssignment    String?                         @map("task_assignment")
+  accountName       String?                         @map("account_name")
+  accountIdMasked   String?                         @map("account_id_masked")
+  permissionsJson   Json?                           @map("permissions_json")
+  lastSuccessAt     DateTime?                       @map("last_success_at")
+  lastError         String?                         @map("last_error")
+  lastErrorAt       DateTime?                       @map("last_error_at")
+  lastSyncAt        DateTime?                       @map("last_sync_at")
+  usageEstimateJson Json?                           @map("usage_estimate_json")
+  costEstimateJson  Json?                           @map("cost_estimate_json")
+  connectedByUserId String?                         @map("connected_by_user_id")
+  createdAt         DateTime                        @default(now()) @map("created_at")
+  updatedAt         DateTime                        @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, category, providerKey])
+  @@index([restaurantId, category])
+  @@map("marketing_ai_provider_connections")
+}
+
+model MarketingProviderRouting {
+  id           String   @id @default(cuid())
+  restaurantId String   @unique @map("restaurant_id")
+  rulesJson    Json     @map("rules_json")
+  autoSelect   Boolean  @default(false) @map("auto_select")
+  createdBy    String?  @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("marketing_provider_routing")
+}
+
+model MarketingAiCostSettings {
+  id                   String   @id @default(cuid())
+  restaurantId         String   @unique @map("restaurant_id")
+  dailyBudget          Decimal  @default(0) @map("daily_budget")
+  monthlyBudget        Decimal  @default(0) @map("monthly_budget")
+  maxCostPerImage      Decimal? @map("max_cost_per_image")
+  maxCostPerVideo      Decimal? @map("max_cost_per_video")
+  maxDailyAiCost       Decimal? @map("max_daily_ai_cost")
+  maxMonthlyAiCost     Decimal? @map("max_monthly_ai_cost")
+  requireApprovalAbove Decimal? @map("require_approval_above")
+  hardSpendingLimit    Decimal? @map("hard_spending_limit")
+  alertsEnabled        Boolean  @default(true) @map("alerts_enabled")
+  createdBy            String?  @map("created_by")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("marketing_ai_cost_settings")
+}
+
+model MarketingAiUsageLog {
+  id           String                  @id @default(cuid())
+  restaurantId String                  @map("restaurant_id")
+  branchId     String?                 @map("branch_id")
+  providerKey  String                  @map("provider_key")
+  category     MarketingProviderCategory
+  usageType    String                  @map("usage_type")
+  costAmount   Decimal                 @default(0) @map("cost_amount")
+  metadataJson Json?                   @map("metadata_json")
+  createdBy    String?                 @map("created_by")
+  createdAt    DateTime                @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("marketing_ai_usage_logs")
+}
+
+model MarketingAutomationRule {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  ruleType     String   @map("rule_type")
+  nameAr       String   @map("name_ar")
+  isEnabled    Boolean  @default(false) @map("is_enabled")
+  configJson   Json?    @map("config_json")
+  createdBy    String?  @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, isEnabled])
+  @@map("marketing_automation_rules")
+}
+
+model MarketingJourneyMetric {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  stage        String
+  count        Int      @default(0)
+  dataSource   String   @default("simulation") @map("data_source")
+  capturedAt   DateTime @default(now()) @map("captured_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, stage])
+  @@map("marketing_journey_metrics")
+}
+
+model MarketingCommandSnapshot {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  period       String
+  metricsJson  Json     @map("metrics_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, period, createdAt])
+  @@map("marketing_command_snapshots")
+}
+
+model MarketingSettings {
+  id                   String   @id @default(cuid())
+  restaurantId         String   @unique @map("restaurant_id")
+  defaultDailyBudget   Decimal  @default(500) @map("default_daily_budget")
+  defaultWeeklyBudget  Decimal  @default(3500) @map("default_weekly_budget")
+  defaultMonthlyBudget Decimal  @default(15000) @map("default_monthly_budget")
+  reservePercent       Float    @default(5) @map("reserve_percent")
+  profitMargin         Float    @default(32) @map("profit_margin")
+  averageOrderValue    Decimal  @default(120) @map("average_order_value")
+  targetCpa            Decimal? @map("target_cpa")
+  targetRoas           Float?   @map("target_roas")
+  currency             String   @default("SAR")
+  configJson           Json?    @map("config_json")
+  createdBy            String?  @map("created_by")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("marketing_settings")
 }

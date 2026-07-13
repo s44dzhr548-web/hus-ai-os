@@ -17,6 +17,8 @@ import {
   type TableSortKey,
 } from "@/lib/table-meta";
 import { menuUrlForTable } from "@/lib/table-code";
+import { requestMeta } from "@/lib/request-meta";
+import { onCustomerRegistered } from "@/lib/visit-tracking";
 import type { TableSessionStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -99,7 +101,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { restaurantId, error } = await requireRestaurantRole(RECEPTION_ROLES);
+  const { restaurantId, session, error } = await requireRestaurantRole(RECEPTION_ROLES);
   if (error) return error;
 
   const featureErr = await assertFeature(restaurantId!, "reception");
@@ -168,6 +170,12 @@ export async function POST(req: NextRequest) {
     customerPhone?.trim() || null
   );
 
+  const now = new Date();
+  const displayNum = manualTable?.number
+    ? String(manualTable.number).trim()
+    : String(table.number);
+  const sessionStatus = status as TableSessionStatus;
+
   const visit = await prisma.customerVisit.create({
     data: {
       restaurantId: restaurantId!,
@@ -177,16 +185,30 @@ export async function POST(req: NextRequest) {
       guestCount: parseInt(String(guestCount)) || 1,
       notes: notes?.trim() || null,
       tableNumber: table.number,
-      tableDisplayNumber: manualTable?.number
-        ? String(manualTable.number).trim()
-        : String(table.number),
+      tableDisplayNumber: displayNum,
       tableLabel: table.label,
       tableIcon: table.tableIcon,
       tableZone: table.floorZone,
       minimumSpendAmount: minSpend,
-      arrivalTime: new Date(),
-      visitStatus: "ACTIVE",
+      tableId: table.id,
+      branchId: table.branchId,
+      source: "reception",
+      arrivalTime: now,
+      visitStatus: sessionStatus === "WAITING" ? "WAITING" : "SEATED",
     },
+  });
+
+  const meta = requestMeta(req);
+  await onCustomerRegistered({
+    visitId: visit.id,
+    restaurantId: restaurantId!,
+    branchId: table.branchId,
+    tableId: table.id,
+    tableDisplayNumber: displayNum,
+    customerProfileId: profile.id,
+    sessionStatus,
+    staff: { userId: session?.user?.id, name: session?.user?.name },
+    audit: meta,
   });
 
   const tableSession = await prisma.tableSession.create({

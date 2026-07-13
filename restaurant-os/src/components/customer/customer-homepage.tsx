@@ -1,11 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CustomerBranding } from "@/lib/restaurant-branding";
 import type { HomepageSectionId } from "@/lib/homepage-sections";
 import { SECTION_ICONS } from "@/lib/homepage-sections";
 import { buildWhatsAppOrderLink } from "@/lib/whatsapp";
+import { Clock, Star, X } from "lucide-react";
+
+export interface CustomerHomepageContext {
+  branchName?: string | null;
+  branchNameEn?: string | null;
+  workingHoursLabel?: string | null;
+  rating?: number | null;
+  ratingCount?: number;
+  phone?: string | null;
+}
 
 interface CustomerHomepageProps {
   branding: CustomerBranding;
@@ -16,6 +26,7 @@ interface CustomerHomepageProps {
   tableNumber?: number | null;
   whatsappNumber?: string | null;
   locale?: "ar" | "en";
+  context?: CustomerHomepageContext;
 }
 
 function sectionHref(
@@ -27,25 +38,34 @@ function sectionHref(
 ): string {
   switch (id) {
     case "menu":
-      return tableId ? `/menu/${tableId}` : `/r/${slug}`;
+      return tableId ? `/menu/${tableId}?direct=1` : `/r/${slug}`;
     case "reservations":
-      return whatsapp
-        ? buildWhatsAppOrderLink(whatsapp, {
-            orderNumber: 0,
-            totalAmount: 0,
-            items: [{ name: "حجز طاولة", quantity: 1 }],
-          })
-        : "#";
+      return `/r/${slug}/reserve${tableId ? `?table=${tableId}` : ""}`;
     case "offers":
-      return tableId ? `/menu/${tableId}?view=offers` : `/r/${slug}`;
+      return tableId ? `/menu/${tableId}?direct=1&view=offers` : `/r/${slug}`;
+    case "branches":
+      return `/r/${slug}/branches`;
+    case "track_order":
+      return `/r/${slug}/track-order`;
+    case "rate_visit":
+      return `/r/${slug}/rate${tableId ? `?table=${tableId}` : ""}`;
+    case "contact":
+      return `/r/${slug}/contact`;
+    case "whatsapp":
+      if (whatsapp) {
+        return buildWhatsAppOrderLink(whatsapp, {
+          orderNumber: 0,
+          totalAmount: 0,
+          items: [{ name: "استفسار", quantity: 1 }],
+        });
+      }
+      return "#";
     case "events":
     case "wishes":
-    case "gift":
       if (whatsapp) {
         const labels: Record<string, string> = {
           events: "استفسار عن حفلة",
           wishes: "أمنية خاصة",
-          gift: "طلب إهداء",
         };
         return buildWhatsAppOrderLink(whatsapp, {
           orderNumber: 0,
@@ -54,6 +74,8 @@ function sectionHref(
         });
       }
       return "#";
+    case "gift":
+      return tableId ? `/gift/${tableId}` : `/r/${slug}`;
     default:
       return "#";
   }
@@ -78,14 +100,36 @@ export function CustomerHomepage({
   tableNumber,
   whatsappNumber,
   locale = "ar",
+  context = {},
 }: CustomerHomepageProps) {
   const [lang, setLang] = useState(locale);
-  const displayName = lang === "en" ? restaurantNameEn || restaurantName : restaurantName;
-  const welcome = lang === "en" ? branding.welcomeTextEn || branding.welcomeText : branding.welcomeText;
-  const cta = lang === "en" ? branding.ctaTextEn || branding.ctaText : branding.ctaText;
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const heroMedia = branding.heroVideoUrl || branding.heroImageUrl;
+  const displayName = lang === "en" ? restaurantNameEn || restaurantName : restaurantName;
+  const welcome =
+    lang === "en" ? branding.welcomeTextEn || branding.welcomeText : branding.welcomeText;
+  const branchLabel =
+    lang === "en"
+      ? context.branchNameEn || context.branchName
+      : context.branchName || context.branchNameEn;
+
+  const heroVideo = branding.landingConfig.heroVideo;
+  const popup = branding.landingConfig.popupBanner;
+  const overlayOpacity = heroVideo.overlayOpacity / 100;
   const isVideo = !!branding.heroVideoUrl;
+  const fallbackImage = branding.heroImageUrl || branding.coverUrl;
+
+  useEffect(() => {
+    setMounted(true);
+    if (popup.enabled && (popup.titleAr || popup.messageAr || popup.imageUrl)) {
+      const key = `landing-popup-${slug}`;
+      if (!sessionStorage.getItem(key)) {
+        setPopupOpen(true);
+        sessionStorage.setItem(key, "1");
+      }
+    }
+  }, [popup, slug]);
 
   const cssVars = useMemo(
     () =>
@@ -99,12 +143,12 @@ export function CustomerHomepage({
     [branding]
   );
 
-  const menuHref = tableId ? `/menu/${tableId}` : `/r/${slug}`;
+  const menuHref = tableId ? `/menu/${tableId}?direct=1` : `/r/${slug}`;
 
   return (
     <div
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="relative min-h-screen overflow-x-hidden"
+      className="relative min-h-[100dvh] overflow-x-hidden"
       style={{
         ...cssVars,
         backgroundColor: branding.backgroundColor,
@@ -112,147 +156,263 @@ export function CustomerHomepage({
         fontFamily: branding.fontCss,
       }}
     >
-      {/* Hero */}
-      <section className="relative h-[min(72vh,640px)] w-full overflow-hidden">
+      {/* Full-screen hero background */}
+      <div className="fixed inset-0 z-0">
         {isVideo ? (
           <video
-            className="absolute inset-0 h-full w-full object-cover"
+            className="h-full w-full object-cover"
             src={branding.heroVideoUrl!}
-            autoPlay
-            muted
-            loop
+            autoPlay={heroVideo.autoplay}
+            muted={heroVideo.muted}
+            loop={heroVideo.loop}
             playsInline
-            poster={branding.heroImageUrl || undefined}
+            poster={fallbackImage || undefined}
           />
-        ) : heroMedia ? (
+        ) : fallbackImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={heroMedia}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
-          />
+          <img src={fallbackImage} alt="" className="h-full w-full object-cover" />
         ) : (
           <div
-            className="absolute inset-0"
+            className="h-full w-full"
             style={{
-              background: `linear-gradient(135deg, ${branding.backgroundColor} 0%, ${branding.secondaryColor}33 50%, ${branding.primaryColor}22 100%)`,
+              background: `linear-gradient(135deg, ${branding.backgroundColor} 0%, ${branding.secondaryColor}55 50%, ${branding.primaryColor}33 100%)`,
             }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-[var(--brand-bg)]" />
+        <div
+          className="absolute inset-0 bg-black"
+          style={{ opacity: overlayOpacity }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/70" />
+      </div>
 
-        <div className="relative z-10 flex h-full flex-col items-center justify-end px-4 pb-10 pt-16 text-center">
+      {/* Header */}
+      <header
+        className={`relative z-20 px-4 pt-4 transition-all duration-700 ${mounted ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"}`}
+      >
+        <div className="mx-auto flex max-w-3xl items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {branding.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={branding.logoUrl}
+                alt={displayName}
+                className="h-12 w-12 shrink-0 rounded-full border-2 object-cover shadow-lg sm:h-14 sm:w-14"
+                style={{ borderColor: branding.primaryColor }}
+              />
+            )}
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-bold drop-shadow-md sm:text-xl">
+                {displayName}
+              </h1>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-90">
+                {context.rating != null && context.rating > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    {context.rating.toFixed(1)}
+                    {context.ratingCount ? (
+                      <span className="opacity-70">({context.ratingCount})</span>
+                    ) : null}
+                  </span>
+                )}
+                {context.workingHoursLabel && (
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {context.workingHoursLabel}
+                  </span>
+                )}
+                {branchLabel && (
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 backdrop-blur-sm">
+                    {branchLabel}
+                    {tableNumber != null
+                      ? ` · ${lang === "ar" ? "طاولة" : "Table"} ${tableNumber}`
+                      : ""}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-            className="absolute left-4 top-4 rounded-full border border-white/30 bg-black/30 px-3 py-1 text-xs text-white backdrop-blur-md transition hover:bg-black/50"
+            className="shrink-0 rounded-full border border-white/30 bg-black/30 px-3 py-1.5 text-xs text-white backdrop-blur-md transition hover:bg-black/50"
           >
             {lang === "ar" ? "EN" : "عربي"}
           </button>
+        </div>
+      </header>
 
-          {branding.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={branding.logoUrl}
-              alt={displayName}
-              className="mb-4 h-20 w-20 rounded-full border-2 object-cover shadow-2xl"
-              style={{ borderColor: branding.primaryColor }}
-            />
-          )}
-
-          <h1
-            className="text-3xl font-bold tracking-wide drop-shadow-lg sm:text-4xl md:text-5xl"
-            style={{ color: branding.textColor }}
+      {/* Main content */}
+      <main className="relative z-10 flex min-h-[100dvh] flex-col px-4 pb-8 pt-6">
+        <div className="flex flex-1 flex-col items-center justify-end">
+          <p
+            className={`mb-6 max-w-md text-center text-base leading-relaxed opacity-95 sm:text-lg transition-all duration-700 delay-150 ${mounted ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"}`}
           >
-            {displayName}
-          </h1>
-
-          {tableNumber != null && (
-            <p className="mt-2 text-sm opacity-80">
-              {lang === "ar" ? `طاولة ${tableNumber}` : `Table ${tableNumber}`}
-            </p>
-          )}
-
-          <p className="mx-auto mt-4 max-w-md text-base leading-relaxed opacity-90 sm:text-lg">
             {welcome}
           </p>
 
           <Link
             href={menuHref}
-            className="mt-8 inline-flex min-h-[48px] items-center justify-center rounded-full px-10 py-3 text-base font-semibold text-[#0c0a09] shadow-lg transition hover:scale-[1.03] hover:brightness-110 active:scale-[0.98]"
+            className={`mb-8 inline-flex min-h-[52px] items-center justify-center rounded-full px-12 py-3.5 text-base font-semibold text-[#0c0a09] shadow-2xl transition-all duration-300 hover:scale-[1.03] hover:brightness-110 active:scale-[0.98] delay-200 ${mounted ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"}`}
             style={{
               background: `linear-gradient(135deg, ${branding.primaryColor}, ${branding.buttonColor})`,
-              boxShadow: `0 8px 32px ${branding.primaryColor}55`,
+              boxShadow: `0 8px 40px ${branding.primaryColor}66`,
             }}
           >
-            {cta}
+            {lang === "en" ? branding.ctaTextEn : branding.ctaText}
           </Link>
-        </div>
-      </section>
 
-      {/* Section cards */}
-      <section className="relative z-10 -mt-6 px-4 pb-12 pt-2">
-        <div className="mx-auto grid max-w-lg gap-4 sm:max-w-2xl sm:grid-cols-2 lg:max-w-4xl lg:grid-cols-3">
-          {branding.sections.map((section) => {
-            const href = sectionHref(
-              section.id,
-              slug,
-              tableId,
-              whatsappNumber,
-              section.titleAr
-            );
-            const title = lang === "en" ? section.titleEn : section.titleAr;
-            const external = href.startsWith("http");
+          {/* Action grid */}
+          <div className="mx-auto grid w-full max-w-lg grid-cols-2 gap-3 sm:max-w-2xl sm:grid-cols-4 sm:gap-4">
+            {branding.sections.map((section, index) => {
+              const href = sectionHref(
+                section.id,
+                slug,
+                tableId,
+                whatsappNumber,
+                section.titleAr
+              );
+              const title = lang === "en" ? section.titleEn : section.titleAr;
+              const external = href.startsWith("http") || href === "#";
+              const disabled = href === "#";
 
-            const inner = (
-              <>
-                <span className="text-3xl" aria-hidden>
-                  {SECTION_ICONS[section.id]}
-                </span>
-                <span className="mt-3 text-lg font-semibold">{title}</span>
-                <span
-                  className="mt-1 text-xs opacity-70"
-                  style={{ color: branding.primaryColor }}
-                >
-                  {lang === "ar" ? "اضغط للمتابعة" : "Tap to continue"}
-                </span>
-              </>
-            );
+              const inner = (
+                <>
+                  <span className="text-2xl sm:text-3xl" aria-hidden>
+                    {SECTION_ICONS[section.id]}
+                  </span>
+                  <span className="mt-2 text-sm font-semibold leading-tight sm:text-base">
+                    {title}
+                  </span>
+                </>
+              );
 
-            const className = `${cardClass(branding.cardStyle)} group flex min-h-[140px] flex-col items-center justify-center rounded-2xl p-5 text-center transition duration-300 hover:-translate-y-1 hover:shadow-2xl`;
+              const className = `${cardClass(branding.cardStyle)} group flex min-h-[100px] flex-col items-center justify-center rounded-2xl p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-[var(--brand-primary)]/50 ${disabled ? "pointer-events-none opacity-50" : ""}`;
+              const style = {
+                borderColor: `${branding.primaryColor}44`,
+                animationDelay: `${index * 60 + 300}ms`,
+              };
+              const animClass = mounted
+                ? "animate-[fadeUp_0.6s_ease-out_both]"
+                : "opacity-0";
 
-            if (external) {
+              if (external && !disabled) {
+                return (
+                  <a
+                    key={section.id}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${className} ${animClass}`}
+                    style={style}
+                  >
+                    {inner}
+                  </a>
+                );
+              }
+
               return (
-                <a
+                <Link
                   key={section.id}
                   href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={className}
-                  style={{ borderColor: `${branding.primaryColor}44` }}
+                  className={`${className} ${animClass}`}
+                  style={style}
                 >
                   {inner}
-                </a>
+                </Link>
               );
-            }
-
-            return (
-              <Link
-                key={section.id}
-                href={href}
-                className={className}
-                style={{ borderColor: `${branding.primaryColor}44` }}
-              >
-                {inner}
-              </Link>
-            );
-          })}
+            })}
+          </div>
         </div>
-      </section>
 
-      <footer className="pb-8 text-center text-xs opacity-50">
-        Powered by Menu OS
-      </footer>
+        <footer className="relative z-10 mt-10 text-center text-xs opacity-40">
+          Powered by Menu OS
+        </footer>
+      </main>
+
+      {/* Popup banner */}
+      {popupOpen && popup.enabled && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center">
+          <div
+            className="relative w-full max-w-md animate-[scaleIn_0.35s_ease-out] overflow-hidden rounded-2xl border border-white/20 shadow-2xl"
+            style={{ backgroundColor: branding.backgroundColor }}
+          >
+            {popup.dismissible && (
+              <button
+                type="button"
+                onClick={() => setPopupOpen(false)}
+                className="absolute left-3 top-3 z-10 rounded-full bg-black/40 p-1.5 text-white backdrop-blur-sm transition hover:bg-black/60"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            {popup.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={popup.imageUrl}
+                alt=""
+                className="h-40 w-full object-cover"
+              />
+            )}
+            <div className="p-5">
+              <h2 className="text-lg font-bold">
+                {lang === "en" ? popup.titleEn || popup.titleAr : popup.titleAr || popup.titleEn}
+              </h2>
+              {(popup.messageAr || popup.messageEn) && (
+                <p className="mt-2 text-sm opacity-85">
+                  {lang === "en"
+                    ? popup.messageEn || popup.messageAr
+                    : popup.messageAr || popup.messageEn}
+                </p>
+              )}
+              <div className="mt-4 flex gap-2">
+                {popup.linkUrl ? (
+                  <a
+                    href={popup.linkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 rounded-full py-2.5 text-center text-sm font-semibold text-[#0c0a09]"
+                    style={{ background: branding.primaryColor }}
+                  >
+                    {lang === "ar" ? "عرض التفاصيل" : "View details"}
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setPopupOpen(false)}
+                  className="flex-1 rounded-full border border-white/20 py-2.5 text-sm font-medium transition hover:bg-white/5"
+                >
+                  {lang === "ar" ? "إغلاق" : "Close"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx global>{`
+        @keyframes fadeUp {
+          from {
+            opacity: 0;
+            transform: translateY(16px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.92);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+      `}</style>
     </div>
   );
 }

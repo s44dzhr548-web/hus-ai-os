@@ -135,7 +135,7 @@ export default function OrderStatusPage() {
 
         {order.table && (
           <Link
-            href={`/menu/${order.table.id}`}
+            href={`/menu/${order.table.id}?direct=1`}
             className="block text-center text-sm text-emerald-600 hover:underline"
           >
             طلب المزيد

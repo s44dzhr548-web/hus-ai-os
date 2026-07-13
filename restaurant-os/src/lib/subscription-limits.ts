@@ -56,6 +56,7 @@ export interface PlanLimits {
   kitchenScreen: boolean;
   reports: boolean;
   reception: boolean;
+  marketing: boolean;
   label: string;
   price: number;
   features: string[];
@@ -79,6 +80,7 @@ export interface LimitOverrides {
   kitchenScreen?: boolean;
   reports?: boolean;
   reception?: boolean;
+  marketing?: boolean;
 }
 
 export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
@@ -100,6 +102,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     kitchenScreen: true,
     reports: false,
     reception: false,
+    marketing: false,
     label: "مجاني",
     price: 0,
     features: [
@@ -126,7 +129,9 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     loyalty: false,
     kitchenScreen: true,
     reports: false,
+
     reception: true,
+    marketing: false,
     label: "Starter",
     price: 49,
     features: [
@@ -153,7 +158,9 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     loyalty: false,
     kitchenScreen: true,
     reports: false,
+
     reception: true,
+    marketing: false,
     label: "Starter",
     price: 49,
     features: [
@@ -181,6 +188,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     kitchenScreen: true,
     reports: true,
     reception: true,
+    marketing: true,
     label: "Pro",
     price: 149,
     features: [
@@ -208,6 +216,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     kitchenScreen: true,
     reports: true,
     reception: true,
+    marketing: true,
     label: "Business",
     price: 299,
     features: [
@@ -235,6 +244,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     kitchenScreen: true,
     reports: true,
     reception: true,
+    marketing: true,
     label: "Enterprise",
     price: 0,
     features: [
@@ -265,7 +275,8 @@ export type FeatureFlag =
   | "loyalty"
   | "kitchenScreen"
   | "reports"
-  | "reception";
+  | "reception"
+  | "marketing";
 
 export interface RestaurantUsage {
   branches: number;
@@ -323,6 +334,7 @@ export function getEffectiveLimits(
     kitchenScreen: o.kitchenScreen ?? base.kitchenScreen,
     reports: o.reports ?? base.reports,
     reception: o.reception ?? base.reception,
+    marketing: o.marketing ?? base.marketing,
     label: base.label,
     price: base.price,
   };
@@ -391,6 +403,7 @@ const FEATURE_MESSAGES: Record<FeatureFlag, string> = {
   kitchenScreen: "شاشة المطبخ غير متاحة في bاقتك الحالية",
   reports: "التقارير غير متاحة في باقتك الحالية",
   reception: "ميزة الاستقبال والحجوزات غير متاحة في باقتك الحالية",
+  marketing: "التسويق الذكي غير متاح في باقتك الحالية — ترقية إلى Pro أو Business",
 };
 
 export async function checkFeature(

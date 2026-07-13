@@ -7,7 +7,7 @@ import {
   computeFavoriteTable,
   computeFavoriteArea,
 } from "@/lib/customer-history";
-import { tableIconEmoji } from "@/lib/table-meta";
+import { loadStaffNameMap } from "@/lib/staff-names";
 import {
   serializeCustomerVisit,
   serializeReservation,
@@ -43,6 +43,14 @@ export async function GET(
   }
 
   const completedVisits = profile.visits.filter((v) => v.visitStatus === "COMPLETED");
+  const staffNames = await loadStaffNameMap(
+    profile.visits.flatMap((v) => [
+      v.registeredByUserId,
+      v.assignedByUserId,
+      v.startedByUserId,
+      v.closedByUserId,
+    ])
+  );
 
   return NextResponse.json({
     id: profile.id,
@@ -61,9 +69,8 @@ export async function GET(
     reservations: profile.reservations.map((r) =>
       applyPhonePrivacy(serializeReservation(r), role)
     ),
-    visits: profile.visits.map((v) => ({
-      ...applyPhonePrivacy(serializeCustomerVisit(v), role),
-      tableIconEmoji: tableIconEmoji(v.tableIcon),
-    })),
+    visits: profile.visits.map((v) =>
+      applyPhonePrivacy(serializeCustomerVisit(v, staffNames), role)
+    ),
   });
 }

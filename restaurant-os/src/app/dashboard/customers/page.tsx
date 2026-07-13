@@ -58,17 +58,21 @@ interface VisitRow {
   customerName: string;
   customerPhone?: string | null;
   tableNumber?: number | null;
+  tableNumberSnapshot?: string | null;
   tableLabel?: string | null;
-  tableIcon?: string | null;
-  tableZone?: string | null;
-  minimumSpendAmount?: number | null;
-  guestCount: number;
-  arrivalTime: string;
-  endTime?: string | null;
-  totalBill: number;
-  ordersCount: number;
+  branchName?: string | null;
+  visitDateDisplay: string;
+  enteredAtDisplay: string;
+  seatedAtDisplay: string;
+  sessionStartedAtDisplay: string;
+  sessionEndedAtDisplay: string;
+  sessionDurationDisplay: string;
+  registeredByName: string;
+  assignedByName: string;
+  closedByName: string;
   visitStatus: string;
-  notes?: string | null;
+  totalBill: number;
+  guestCount: number;
 }
 
 interface Reports {
@@ -130,7 +134,13 @@ export default function CustomersPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [tableNumber, setTableNumber] = useState("");
+  const [branchId, setBranchId] = useState("");
+  const [staffUserId, setStaffUserId] = useState("");
   const [status, setStatus] = useState("all");
+  const [filterOptions, setFilterOptions] = useState<{
+    branches: { id: string; name: string; nameAr?: string | null }[];
+    staff: { userId: string; name: string; role: string }[];
+  }>({ branches: [], staff: [] });
 
   const queryString = useCallback(() => {
     const p = new URLSearchParams();
@@ -141,9 +151,11 @@ export default function CustomersPage() {
     if (phone) p.set("phone", phone);
     if (name) p.set("name", name);
     if (tableNumber) p.set("tableNumber", tableNumber);
+    if (branchId) p.set("branchId", branchId);
+    if (staffUserId) p.set("staffUserId", staffUserId);
     if (status !== "all") p.set("status", status);
     return p.toString();
-  }, [tab, preset, dateFrom, dateTo, phone, name, tableNumber, status]);
+  }, [tab, preset, dateFrom, dateTo, phone, name, tableNumber, branchId, staffUserId, status]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -155,7 +167,10 @@ export default function CustomersPage() {
     const data = await res.json();
     if (tab === "customers") setCustomers(data.customers || []);
     else if (tab === "reservations") setReservations(data.reservations || []);
-    else if (tab === "visits") setVisits(data.visits || []);
+    else if (tab === "visits") {
+      setVisits(data.visits || []);
+      if (data.filters) setFilterOptions(data.filters);
+    }
     else if (tab === "reports") setReports(data);
     setLoading(false);
   }, [queryString, tab]);
@@ -235,10 +250,26 @@ export default function CustomersPage() {
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded border px-2 py-1 text-sm" />
           </div>
         )}
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
           <input placeholder="الجوال" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded border px-3 py-2 text-sm" />
           <input placeholder="الاسم" value={name} onChange={(e) => setName(e.target.value)} className="rounded border px-3 py-2 text-sm" />
           <input placeholder="رقم الطاولة" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} className="rounded border px-3 py-2 text-sm" />
+          {tab === "visits" && (
+            <>
+              <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="rounded border px-3 py-2 text-sm">
+                <option value="">كل الفروع</option>
+                {filterOptions.branches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.nameAr || b.name}</option>
+                ))}
+              </select>
+              <select value={staffUserId} onChange={(e) => setStaffUserId(e.target.value)} className="rounded border px-3 py-2 text-sm">
+                <option value="">كل الموظفين</option>
+                {filterOptions.staff.map((s) => (
+                  <option key={s.userId} value={s.userId}>{s.name}</option>
+                ))}
+              </select>
+            </>
+          )}
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded border px-3 py-2 text-sm">
             <option value="all">كل الحالات</option>
             {tab === "reservations" &&
@@ -353,30 +384,48 @@ export default function CustomersPage() {
       ) : visits.length === 0 ? (
         <EmptyState title="لا توجد زيارات" />
       ) : (
-        <div className="grid gap-3">
-          {visits.map((v) => (
-            <Card key={v.id} className="p-4">
-              <div className="flex flex-wrap justify-between gap-2">
-                <div>
-                  <p className="font-semibold">{v.customerName}</p>
-                  <p className="text-sm text-gray-500">{v.customerPhone || "—"}</p>
-                  <p className="text-sm">
-                    {tableIconEmoji(v.tableIcon)} طاولة {v.tableNumber ?? "—"}
-                    {v.tableLabel ? ` (${v.tableLabel})` : ""}
-                    {v.tableZone ? ` · ${v.tableZone}` : ""}
-                    {" · "}{v.guestCount} ضيوف · {v.totalBill} ر.س · {v.ordersCount} طلب
-                    {v.minimumSpendAmount ? ` · حد أدنى ${v.minimumSpendAmount} ر.س` : ""}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {new Date(v.arrivalTime).toLocaleString("ar-SA")}
-                    {v.endTime && ` → ${new Date(v.endTime).toLocaleString("ar-SA")}`}
-                  </p>
-                </div>
-                <Badge>{VISIT_STATUS_LABELS[v.visitStatus as keyof typeof VISIT_STATUS_LABELS] || v.visitStatus}</Badge>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full min-w-[1200px] text-sm">
+            <thead>
+              <tr className="border-b bg-slate-50 text-right text-xs">
+                <th className="px-2 py-2">الاسم</th>
+                <th className="px-2 py-2">الجوال</th>
+                <th className="px-2 py-2">تاريخ الزيارة</th>
+                <th className="px-2 py-2">وقت الدخول</th>
+                <th className="px-2 py-2">وقت الجلوس</th>
+                <th className="px-2 py-2">الطاولة</th>
+                <th className="px-2 py-2">بدء الجلسة</th>
+                <th className="px-2 py-2">انتهاء الجلسة</th>
+                <th className="px-2 py-2">المدة</th>
+                <th className="px-2 py-2">التسجيل</th>
+                <th className="px-2 py-2">تعيين الطاولة</th>
+                <th className="px-2 py-2">إنهاء الجلسة</th>
+                <th className="px-2 py-2">الحالة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visits.map((v) => (
+                <tr key={v.id} className="border-b hover:bg-slate-50">
+                  <td className="px-2 py-2 font-medium">{v.customerName}</td>
+                  <td className="px-2 py-2">{v.customerPhone || "—"}</td>
+                  <td className="px-2 py-2">{v.visitDateDisplay}</td>
+                  <td className="px-2 py-2">{v.enteredAtDisplay}</td>
+                  <td className="px-2 py-2">{v.seatedAtDisplay}</td>
+                  <td className="px-2 py-2">{v.tableNumberSnapshot ?? v.tableNumber ?? "—"}</td>
+                  <td className="px-2 py-2">{v.sessionStartedAtDisplay}</td>
+                  <td className="px-2 py-2">{v.sessionEndedAtDisplay}</td>
+                  <td className="px-2 py-2">{v.sessionDurationDisplay}</td>
+                  <td className="px-2 py-2">{v.registeredByName}</td>
+                  <td className="px-2 py-2">{v.assignedByName}</td>
+                  <td className="px-2 py-2">{v.closedByName}</td>
+                  <td className="px-2 py-2">
+                    <Badge>{VISIT_STATUS_LABELS[v.visitStatus] || v.visitStatus}</Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       )}
 
       {selected && (
@@ -401,10 +450,10 @@ export default function CustomersPage() {
             <div className="mt-2 space-y-1 text-sm">
               {selected.visits.map((v) => (
                 <p key={v.id}>
-                  {tableIconEmoji(v.tableIcon)} طاولة {v.tableNumber}
+                  طاولة {v.tableNumberSnapshot ?? v.tableNumber ?? "—"}
                   {v.tableLabel ? ` (${v.tableLabel})` : ""} — {v.totalBill} ر.س
-                  {v.minimumSpendAmount ? ` · حد ${v.minimumSpendAmount}` : ""}
-                  {" — "}{VISIT_STATUS_LABELS[v.visitStatus as keyof typeof VISIT_STATUS_LABELS]}
+                  {" — "}{VISIT_STATUS_LABELS[v.visitStatus] || v.visitStatus}
+                  {" · "}{v.visitDateDisplay} {v.enteredAtDisplay}
                 </p>
               ))}
             </div>

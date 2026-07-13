@@ -40,6 +40,7 @@ export const FEATURE_FIELDS: {
   { key: "kitchenScreen", label: "شاشة المطبخ" },
   { key: "reports", label: "التقارير" },
   { key: "reception", label: "الاستقبال والحجوزات" },
+  { key: "marketing", label: "التسويق الذكي (AI)" },
 ];
 
 export const PERMISSION_FIELD_LABELS: Record<PermissionKey, string> = {
@@ -60,6 +61,7 @@ export const PERMISSION_FIELD_LABELS: Record<PermissionKey, string> = {
   kitchenScreen: "شاشة المطبخ",
   reports: "التقارير",
   reception: "الاستقبال والحجوزات",
+  marketing: "التسويق الذكي (AI)",
 };
 
 export interface PermissionChange {

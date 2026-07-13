@@ -37,7 +37,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const items = getCart(tableId);
     if (!items.length) {
-      router.replace(`/menu/${tableId}`);
+      router.replace(`/menu/${tableId}?direct=1`);
       return;
     }
     setCart(items);
@@ -127,7 +127,7 @@ export default function CheckoutPage() {
     <div className="min-h-screen bg-gray-50 pb-8">
       <header className="sticky top-0 z-10 bg-white px-4 py-4 shadow-sm">
         <div className="mx-auto flex max-w-lg items-center gap-3">
-          <Link href={`/menu/${tableId}`}>
+          <Link href={`/menu/${tableId}?direct=1`}>
             <ArrowRight className="h-5 w-5 text-gray-600" />
           </Link>
           <h1 className="text-lg font-bold">الدفع</h1>

@@ -95,6 +95,7 @@ export async function GET(
     return NextResponse.json({ error: "الطاولة غير موجودة" }, { status: 404 });
   }
 
+  const giftsEnabled = table.branch.restaurant.tableGiftsEnabled;
   const restaurant = table.branch.restaurant;
   const defaultCategoryColor = restaurant.categoryColor || "#047857";
 
@@ -216,6 +217,7 @@ export async function GET(
       ? serializePublicSession(activeSession)
       : null,
     reservation: reservationDetails,
+    giftsEnabled,
   });
   response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
   return response;

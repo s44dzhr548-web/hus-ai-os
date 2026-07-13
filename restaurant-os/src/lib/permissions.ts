@@ -5,9 +5,11 @@ export type AppRole =
   | "OWNER"
   | "ADMIN"
   | "MANAGER"
+  | "RECEPTION"
   | "CASHIER"
   | "KITCHEN"
   | "WAITER"
+  | "MARKETING"
   | string
   | null;
 

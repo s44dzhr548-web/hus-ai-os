@@ -15,6 +15,7 @@ export const STAFF_MANAGER_ROLES = ["OWNER", "ADMIN"] as const;
 export const ASSIGNABLE_STAFF_ROLES = [
   "RECEPTION",
   "MANAGER",
+  "MARKETING",
   "WAITER",
   "KITCHEN",
 ] as const;

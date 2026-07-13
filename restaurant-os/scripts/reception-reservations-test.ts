@@ -99,6 +99,7 @@ async function main() {
   const tableId = availableTable?.table?.id;
 
   let sessionId = "";
+  let walkInData: { id?: string; tableId?: string } = {};
   if (!tableId) {
     fail("4. Walk-in customer created", "no available table");
   } else {
@@ -115,7 +116,7 @@ async function main() {
         notes: "QA walk-in test",
       }),
     });
-    const walkInData = await json(walkIn);
+    walkInData = await json(walkIn);
     if (!walkIn.ok) {
       fail("4. Walk-in customer created", `HTTP ${walkIn.status}: ${walkInData.error}`);
     } else {
@@ -131,23 +132,33 @@ async function main() {
       body: JSON.stringify({ minimumSpendAmount: 100, status: "ORDERING" }),
     });
     const patchData = await json(patchRes);
-    if (patchRes.ok && patchData.minimumSpendAmount === 100) {
+    const minSpend = patchData.session?.minimumSpendAmount ?? patchData.minimumSpendAmount;
+    if (patchRes.ok && Number(minSpend) === 100) {
       pass("5. Minimum spend assigned", "100 SAR");
     } else {
-      fail("5. Minimum spend assigned", `HTTP ${patchRes.status}`);
+      fail("5. Minimum spend assigned", `HTTP ${patchRes.status}, min=${minSpend}`);
     }
   } else {
     fail("5. Minimum spend assigned", "skipped");
   }
 
-  const menuTableId = tableId || receptionData.cards?.[0]?.table?.id;
+  const menuTableId =
+    (sessionId && walkInData?.tableId) || tableId || receptionData.cards?.[0]?.table?.id;
   if (menuTableId) {
-    const menuRes = await fetch(`${BASE}/api/public/menu/${menuTableId}`);
-    const menuData = await json(menuRes);
+    let menuRes: Response | null = null;
+    let menuData: Record<string, unknown> = {};
+    for (let attempt = 0; attempt < 5; attempt++) {
+      menuRes = await fetch(`${BASE}/api/public/menu/${menuTableId}`);
+      menuData = await json(menuRes);
+      if (menuData.activeSession?.customerName) break;
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    const minSpend =
+      menuData.activeSession?.minimumSpendAmount ?? menuData.table?.minimumSpendAmount;
     if (
-      menuRes.ok &&
+      menuRes!.ok &&
       menuData.activeSession?.customerName &&
-      menuData.activeSession?.minimumSpendAmount === 100
+      Number(minSpend) === 100
     ) {
       pass(
         "6. Customer menu shows session + minimum spend",

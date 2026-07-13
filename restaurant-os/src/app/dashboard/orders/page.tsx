@@ -32,7 +32,12 @@ interface Order {
   totalAmount: number | string;
   createdAt: string;
   notes?: string;
-  table?: { number: number; label?: string };
+  customerName?: string | null;
+  tableNumber?: number | null;
+  tableLabel?: string | null;
+  tableIconEmoji?: string;
+  minimumSpendAmount?: number | null;
+  table?: { number: number; label?: string; tableIcon?: string };
   branch?: { name: string; nameAr?: string };
   items: OrderItem[];
 }
@@ -95,14 +100,24 @@ export default function OrdersPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
+                    <span className="text-xl">{order.tableIconEmoji || "🪑"}</span>
                     <h3 className="text-lg font-bold">طلب #{order.orderNumber}</h3>
                     <Badge variant={ORDER_STATUS_VARIANTS[order.status]}>
                       {ORDER_STATUS_LABELS[order.status]}
                     </Badge>
+                    {order.minimumSpendAmount != null && order.minimumSpendAmount > 0 && (
+                      <Badge className="bg-amber-100 text-amber-800">
+                        حد أدنى {order.minimumSpendAmount} ر.س
+                      </Badge>
+                    )}
                   </div>
                   <p className="mt-1 text-sm text-gray-500">
-                    {order.branch?.nameAr} · طاولة {order.table?.number ?? "—"} ·{" "}
-                    {formatDate(order.createdAt)}
+                    {order.branch?.nameAr} ·{" "}
+                    {order.customerName ? `${order.customerName} · ` : ""}
+                    طاولة {order.tableNumber ?? order.table?.number ?? "—"}
+                    {(order.tableLabel || order.table?.label) &&
+                      ` (${order.tableLabel || order.table?.label})`}{" "}
+                    · {formatDate(order.createdAt)}
                   </p>
                 </div>
                 <p className="text-lg font-bold text-emerald-700">

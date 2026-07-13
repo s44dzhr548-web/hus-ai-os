@@ -1,4 +1,4 @@
-import type { ReservationStatus, VisitStatus } from "@prisma/client";
+import type { ReservationStatus } from "@prisma/client";
 
 /** Roles allowed to see full mobile numbers */
 export const PHONE_VISIBLE_ROLES = [
@@ -143,10 +143,14 @@ export function computeFavoriteArea(
   return best;
 }
 
-export const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
+export const VISIT_STATUS_LABELS: Record<string, string> = {
+  REGISTERED: "مسجّل",
+  WAITING: "في الانتظار",
+  SEATED: "جالس",
   ACTIVE: "نشطة",
   COMPLETED: "مكتملة",
   CANCELLED: "ملغاة",
+  NO_SHOW: "لم يحضر",
 };
 
 export const RESERVATION_HISTORY_STATUSES: ReservationStatus[] = [

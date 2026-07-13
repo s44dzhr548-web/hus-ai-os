@@ -29,7 +29,11 @@ interface Order {
   status: string;
   totalAmount: number | string;
   createdAt: string;
-  table?: { number: number };
+  tableNumber?: number | null;
+  tableLabel?: string | null;
+  tableIconEmoji?: string;
+  customerName?: string | null;
+  table?: { number: number; label?: string };
   items: OrderItem[];
 }
 
@@ -134,7 +138,9 @@ export default function KitchenPage() {
                 </Badge>
               </div>
               <p className="mt-1 text-sm text-gray-500">
-                طاولة {order.table?.number ?? "—"} · {formatDate(order.createdAt)}
+                {order.tableIconEmoji || "🪑"} طاولة {order.tableNumber ?? order.table?.number ?? "—"}
+                {order.tableLabel || order.table?.label ? ` (${order.tableLabel || order.table?.label})` : ""}
+                {order.customerName ? ` · ${order.customerName}` : ""} · {formatDate(order.createdAt)}
               </p>
 
               <ul className="my-4 space-y-2">

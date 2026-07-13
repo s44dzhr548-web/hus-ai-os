@@ -5,6 +5,11 @@ import {
   parseHomepageSections,
   type HomepageSectionConfig,
 } from "@/lib/homepage-sections";
+import {
+  DEFAULT_LANDING_PAGE_CONFIG,
+  parseLandingPageConfig,
+  type LandingPageConfig,
+} from "@/lib/landing-page-config";
 
 export type CardStyle = "glass" | "solid" | "outline";
 
@@ -27,6 +32,7 @@ export interface CustomerBranding {
   ctaText: string;
   ctaTextEn: string;
   sections: HomepageSectionConfig[];
+  landingConfig: LandingPageConfig;
 }
 
 type RestaurantBrandingRow = {
@@ -40,6 +46,7 @@ type RestaurantBrandingRow = {
   ctaTextEn?: string | null;
   cardStyle?: string | null;
   homepageSections?: unknown;
+  landingPageConfig?: unknown;
   primaryColor?: string | null;
   secondaryColor?: string | null;
   backgroundColor?: string | null;
@@ -88,6 +95,7 @@ export function resolveCustomerBranding(
       (locale === "en" ? "Explore Menu" : "استكشف المنيو"),
     ctaTextEn: restaurant.ctaTextEn || "Explore Menu",
     sections: parseHomepageSections(restaurant.homepageSections).filter((s) => s.enabled),
+    landingConfig: parseLandingPageConfig(restaurant.landingPageConfig),
   };
 }
 
@@ -109,9 +117,11 @@ export const DEFAULT_BRANDING_FORM = {
   categoryColor: "#d4af37",
   fontFamily: "cairo",
   homepageSections: DEFAULT_HOMEPAGE_SECTIONS,
+  landingPageConfig: DEFAULT_LANDING_PAGE_CONFIG,
 };
 
 export const BRANDING_SELECT = {
+  id: true,
   logoUrl: true,
   coverUrl: true,
   heroVideoUrl: true,
@@ -122,6 +132,7 @@ export const BRANDING_SELECT = {
   ctaTextEn: true,
   cardStyle: true,
   homepageSections: true,
+  landingPageConfig: true,
   primaryColor: true,
   secondaryColor: true,
   backgroundColor: true,
@@ -132,5 +143,7 @@ export const BRANDING_SELECT = {
   name: true,
   nameAr: true,
   nameEn: true,
+  phone: true,
   whatsappNumber: true,
+  workingHours: true,
 } as const;

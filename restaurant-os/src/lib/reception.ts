@@ -7,6 +7,13 @@ import type {
 } from "@prisma/client";
 import { tableIconEmoji } from "@/lib/table-meta";
 import { formatSessionTableTitle } from "@/lib/session-edit";
+import {
+  formatDurationMinutes,
+  formatRiyadhDate,
+  formatRiyadhTime,
+  LEGACY_UNAVAILABLE,
+} from "@/lib/timezone";
+import { onSessionCompleted } from "@/lib/visit-tracking";
 
 export const TABLE_SESSION_STATUSES: TableSessionStatus[] = [
   "WAITING",
@@ -188,6 +195,18 @@ export async function finalizeTableSession(
   });
 
   if (tableSession.customerVisitId) {
+    await onSessionCompleted({
+      visitId: tableSession.customerVisitId,
+      restaurantId: tableSession.restaurantId,
+      branchId: tableSession.branchId,
+      sessionId: tableSession.id,
+      sessionStartedAt: tableSession.startedAt,
+      staff: {
+        userId: closedBy?.staffUserId,
+        name: closedBy?.staffName ?? tableSession.staffMemberName,
+      },
+    });
+
     await prisma.customerVisit.update({
       where: { id: tableSession.customerVisitId },
       data: {
@@ -198,12 +217,9 @@ export async function finalizeTableSession(
         tableIcon: tableSession.tableIcon ?? undefined,
         tableZone: tableSession.tableZone ?? undefined,
         minimumSpendAmount: tableSession.minimumSpendAmount,
-        closedByStaffName: closedBy?.staffName ?? tableSession.staffMemberName,
         arrivalTime: tableSession.startedAt,
-        endTime: endedAt,
         totalBill: bill.currentBill,
         ordersCount: bill.orderCount,
-        visitStatus: "COMPLETED",
       },
     });
 
@@ -491,44 +507,98 @@ export function serializeReservation(r: {
   };
 }
 
-export function serializeCustomerVisit(v: {
-  id: string;
-  restaurantId: string;
-  customerProfileId?: string | null;
-  customerName: string;
-  customerPhone?: string | null;
-  guestCount: number;
-  tableNumber?: number | null;
-  tableDisplayNumber?: string | null;
-  tableLabel?: string | null;
-  tableIcon?: string | null;
-  tableZone?: string | null;
-  minimumSpendAmount?: unknown;
-  previousTables?: unknown;
-  closedByStaffName?: string | null;
-  arrivalTime?: Date | null;
-  endTime?: Date | null;
-  totalBill?: unknown;
-  ordersCount?: number;
-  visitStatus?: string;
-  notes?: string | null;
-  createdAt: Date;
-  updatedAt?: Date;
-}) {
+export function serializeCustomerVisit(
+  v: {
+    id: string;
+    restaurantId: string;
+    customerProfileId?: string | null;
+    customerName: string;
+    customerPhone?: string | null;
+    guestCount: number;
+    tableNumber?: number | null;
+    tableDisplayNumber?: string | null;
+    tableLabel?: string | null;
+    tableIcon?: string | null;
+    tableZone?: string | null;
+    tableId?: string | null;
+    branchId?: string | null;
+    source?: string | null;
+    minimumSpendAmount?: unknown;
+    previousTables?: unknown;
+    closedByStaffName?: string | null;
+    enteredAt?: Date | null;
+    registeredAt?: Date | null;
+    seatedAt?: Date | null;
+    sessionStartedAt?: Date | null;
+    sessionEndedAt?: Date | null;
+    exitedAt?: Date | null;
+    sessionDurationMinutes?: number | null;
+    visitDate?: Date | null;
+    registeredByUserId?: string | null;
+    assignedByUserId?: string | null;
+    startedByUserId?: string | null;
+    closedByUserId?: string | null;
+    arrivalTime?: Date | null;
+    endTime?: Date | null;
+    totalBill?: unknown;
+    ordersCount?: number;
+    visitStatus?: string;
+    notes?: string | null;
+    createdAt: Date;
+    updatedAt?: Date;
+  },
+  staffNames?: Map<string, string>
+) {
+  const staffLabel = (userId?: string | null, fallback?: string | null) => {
+    if (userId && staffNames?.has(userId)) return staffNames.get(userId)!;
+    if (fallback) return fallback;
+    return LEGACY_UNAVAILABLE;
+  };
+
   return {
     id: v.id,
     customerName: v.customerName,
     customerPhone: v.customerPhone ?? null,
     tableNumber: v.tableNumber ?? null,
     tableDisplayNumber: v.tableDisplayNumber ?? null,
+    tableNumberSnapshot: v.tableDisplayNumber ?? (v.tableNumber != null ? String(v.tableNumber) : null),
     tableLabel: v.tableLabel ?? null,
     tableIcon: v.tableIcon ?? null,
     tableZone: v.tableZone ?? null,
+    tableId: v.tableId ?? null,
+    branchId: v.branchId ?? null,
+    source: v.source ?? null,
     guestCount: v.guestCount,
     minimumSpendAmount:
       v.minimumSpendAmount != null ? Number(v.minimumSpendAmount) : null,
     previousTables: Array.isArray(v.previousTables) ? v.previousTables : [],
     closedByStaffName: v.closedByStaffName ?? null,
+    enteredAt: v.enteredAt?.toISOString() ?? v.arrivalTime?.toISOString() ?? null,
+    registeredAt: v.registeredAt?.toISOString() ?? null,
+    seatedAt: v.seatedAt?.toISOString() ?? null,
+    sessionStartedAt: v.sessionStartedAt?.toISOString() ?? null,
+    sessionEndedAt: v.sessionEndedAt?.toISOString() ?? v.endTime?.toISOString() ?? null,
+    exitedAt: v.exitedAt?.toISOString() ?? v.endTime?.toISOString() ?? null,
+    sessionDurationMinutes: v.sessionDurationMinutes ?? null,
+    visitDate: v.visitDate?.toISOString()?.slice(0, 10) ?? null,
+    registeredByUserId: v.registeredByUserId ?? null,
+    assignedByUserId: v.assignedByUserId ?? null,
+    startedByUserId: v.startedByUserId ?? null,
+    closedByUserId: v.closedByUserId ?? null,
+    registeredByName: staffLabel(v.registeredByUserId),
+    assignedByName: staffLabel(v.assignedByUserId),
+    startedByName: staffLabel(v.startedByUserId),
+    closedByName: staffLabel(v.closedByUserId, v.closedByStaffName),
+    enteredAtDisplay: v.enteredAt || v.arrivalTime ? formatRiyadhTime(v.enteredAt ?? v.arrivalTime) : LEGACY_UNAVAILABLE,
+    registeredAtDisplay: v.registeredAt ? formatRiyadhTime(v.registeredAt) : LEGACY_UNAVAILABLE,
+    seatedAtDisplay: v.seatedAt ? formatRiyadhTime(v.seatedAt) : LEGACY_UNAVAILABLE,
+    sessionStartedAtDisplay: v.sessionStartedAt ? formatRiyadhTime(v.sessionStartedAt) : LEGACY_UNAVAILABLE,
+    sessionEndedAtDisplay: v.sessionEndedAt || v.endTime ? formatRiyadhTime(v.sessionEndedAt ?? v.endTime) : LEGACY_UNAVAILABLE,
+    exitedAtDisplay: v.exitedAt || v.endTime ? formatRiyadhTime(v.exitedAt ?? v.endTime) : LEGACY_UNAVAILABLE,
+    visitDateDisplay: v.visitDate || v.enteredAt || v.arrivalTime
+      ? formatRiyadhDate(v.visitDate ?? v.enteredAt ?? v.arrivalTime ?? v.createdAt)
+      : LEGACY_UNAVAILABLE,
+    sessionDurationDisplay: formatDurationMinutes(v.sessionDurationMinutes),
     arrivalTime: v.arrivalTime?.toISOString() ?? v.createdAt.toISOString(),
     endTime: v.endTime?.toISOString() ?? null,
     totalBill: v.totalBill != null ? Number(v.totalBill) : 0,

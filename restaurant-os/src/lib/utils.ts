@@ -43,6 +43,7 @@ export const ORDER_STATUS_VARIANTS: Record<
 export const STAFF_ROLE_LABELS: Record<string, string> = {
   ADMIN: "مدير النظام",
   MANAGER: "مدير",
+  RECEPTION: "استقبال",
   CASHIER: "كاشير",
   KITCHEN: "مطبخ",
   WAITER: "نادل",

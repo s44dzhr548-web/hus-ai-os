@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import prisma, { withTimeout } from "@/lib/prisma";
 import { verifyImpersonationToken } from "@/lib/impersonate";
+import { logStaffActivity } from "@/lib/staff-activity";
 import { PLATFORM_ADMIN_ROLE, resolveAuthRole } from "@/lib/permissions";
 import { validateSessionRestaurantPatch } from "@/lib/restaurant-access";
 import { verifyTotp } from "@/lib/totp";
@@ -83,6 +84,15 @@ async function resolveAuthUser(
 
   const owned = user.restaurants[0];
   const staff = user.staff[0];
+
+  if (!owned && !staff) {
+    const anyStaff = await withTimeout(
+      prisma.staff.count({ where: { userId: user.id } }),
+      5000
+    );
+    if (anyStaff > 0) return null;
+  }
+
   const restaurant = owned ?? staff?.restaurant ?? null;
   const isPlatformAdmin = user.isPlatformAdmin;
   const role = resolveAuthRole({
@@ -246,6 +256,30 @@ export const authOptions: NextAuthOptions = {
         session.user.role = (token.role as string) ?? null;
       }
       return session;
+    },
+  },
+  events: {
+    async signIn({ user }) {
+      const u = user as { id?: string; restaurantId?: string | null; name?: string | null };
+      if (u.id && u.restaurantId) {
+        await logStaffActivity({
+          restaurantId: u.restaurantId,
+          userId: u.id,
+          action: "LOGIN",
+          staffName: u.name,
+        });
+      }
+    },
+    async signOut({ token }) {
+      const t = token as { id?: string; restaurantId?: string | null; name?: string | null };
+      if (t?.id && t?.restaurantId) {
+        await logStaffActivity({
+          restaurantId: t.restaurantId as string,
+          userId: t.id as string,
+          action: "LOGOUT",
+          staffName: t.name as string | null,
+        });
+      }
     },
   },
   debug: process.env.NODE_ENV === "development",

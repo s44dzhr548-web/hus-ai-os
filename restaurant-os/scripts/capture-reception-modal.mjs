@@ -23,10 +23,11 @@ async function main() {
   await page.goto(`${BASE}/dashboard/reception`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "تسجيل عميل جديد" }).click();
   await page.waitForSelector('[data-testid="manual-table-number"]', { timeout: 15000 });
+  await page.locator('[data-testid="manual-table-number"]').scrollIntoViewIfNeeded();
   await page.fill('[data-testid="manual-table-number"]', "VIP-01");
 
-  const modal = page.locator('[data-testid="walk-in-form"]');
-  await modal.screenshot({ path: OUT });
+  const modalPanel = page.locator('h3:text("تسجيل عميل جديد")').locator("..").locator("..");
+  await modalPanel.screenshot({ path: OUT });
   console.log("Saved:", OUT);
 
   const visible = await page.locator('[data-testid="manual-table-number"]').isVisible();

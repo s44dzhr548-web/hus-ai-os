@@ -12,6 +12,11 @@ import {
   type AuditStaff,
   type PreviousTableEntry,
 } from "@/lib/session-audit";
+import {
+  onCustomerUpdated,
+  onSessionStatusChange,
+  onTableAssigned,
+} from "@/lib/visit-tracking";
 
 export const FORCE_ASSIGN_ROLES = ["OWNER", "ADMIN", "MANAGER"];
 
@@ -275,6 +280,18 @@ export async function updateTableSession(
       data.tableCapacity = targetTable.capacity;
       targetTableId = targetTable.id;
       tableChanged = true;
+
+      if (session.customerVisitId) {
+        await onTableAssigned({
+          visitId: session.customerVisitId,
+          restaurantId,
+          branchId: session.branchId,
+          tableId: targetTable.id,
+          tableDisplayNumber: displayNum,
+          staff: { userId: staff.userId, name: staff.name },
+          previousTableId: session.tableId,
+        });
+      }
     } else if (input.manualTable) {
       const displayNum = String(input.manualTable.tableNumber).trim();
       const updates: Record<string, unknown> = {};
@@ -312,6 +329,18 @@ export async function updateTableSession(
       String(data.customerName ?? session.customerName),
       (data.customerPhone as string) ?? session.customerPhone
     );
+    const customerChanges = changes.filter((c) =>
+      ["customerName", "customerPhone"].includes(c.field)
+    );
+    if (customerChanges.length > 0 && session.customerVisitId) {
+      await onCustomerUpdated({
+        visitId: session.customerVisitId,
+        customerProfileId: profile.id,
+        restaurantId,
+        staff: { userId: staff.userId, name: staff.name },
+        changes: customerChanges,
+      });
+    }
     if (session.customerVisitId) {
       await prisma.customerVisit.update({
         where: { id: session.customerVisitId },
@@ -365,6 +394,18 @@ export async function updateTableSession(
   });
 
   await logSessionChanges(restaurantId, sessionId, changes, staff);
+
+  if (input.status && input.status !== session.status && session.customerVisitId) {
+    await onSessionStatusChange({
+      visitId: session.customerVisitId,
+      restaurantId,
+      branchId: session.branchId,
+      sessionId,
+      oldStatus: session.status,
+      newStatus: input.status,
+      staff: { userId: staff.userId, name: staff.name },
+    });
+  }
 
   if (tableChanged) {
     await syncTableOperationalStatus(session.tableId);

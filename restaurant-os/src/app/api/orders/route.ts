@@ -3,6 +3,7 @@ import { requireRestaurant } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { assertFeature } from "@/lib/permissions-engine";
 import { OrderStatus } from "@prisma/client";
+import { tableIconEmoji } from "@/lib/table-meta";
 
 export const dynamic = "force-dynamic";
 
@@ -15,23 +16,36 @@ export async function GET(req: NextRequest) {
 
   const status = req.nextUrl.searchParams.get("status");
   const branchId = req.nextUrl.searchParams.get("branchId");
+  const tableId = req.nextUrl.searchParams.get("tableId");
 
   const orders = await prisma.order.findMany({
     where: {
       branch: { restaurantId: restaurantId! },
       ...(status ? { status: status as OrderStatus } : {}),
       ...(branchId ? { branchId } : {}),
+      ...(tableId ? { tableId } : {}),
     },
     include: {
       items: true,
-      table: { select: { number: true, label: true } },
+      table: { select: { number: true, label: true, tableIcon: true } },
       branch: { select: { name: true, nameAr: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
 
-  return NextResponse.json(orders);
+  return NextResponse.json(
+    orders.map((o) => ({
+      ...o,
+      subtotal: Number(o.subtotal),
+      totalAmount: Number(o.totalAmount),
+      minimumSpendAmount:
+        o.minimumSpendAmount != null ? Number(o.minimumSpendAmount) : null,
+      tableIconEmoji: tableIconEmoji(o.tableIcon ?? o.table?.tableIcon),
+      tableNumber: o.tableNumber ?? o.table?.number,
+      tableLabel: o.tableLabel ?? o.table?.label,
+    }))
+  );
 }
 
 export async function POST() {

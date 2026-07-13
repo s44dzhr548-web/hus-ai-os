@@ -200,6 +200,30 @@ export async function POST(req: NextRequest) {
   });
   const orderNumber = (lastOrder?.orderNumber ?? 1000) + 1;
 
+  const activeSession = await prisma.tableSession.findFirst({
+    where: {
+      tableId: table.id,
+      endedAt: null,
+      status: { not: "COMPLETED" },
+    },
+    orderBy: { startedAt: "desc" },
+  });
+
+  const minSpend = activeSession?.minimumSpendAmount != null
+    ? Number(activeSession.minimumSpendAmount)
+    : table.minimumSpendAmount != null
+      ? Number(table.minimumSpendAmount)
+      : null;
+
+  let customerProfileId: string | undefined;
+  if (activeSession?.customerVisitId) {
+    const visit = await prisma.customerVisit.findUnique({
+      where: { id: activeSession.customerVisitId },
+      select: { customerProfileId: true },
+    });
+    customerProfileId = visit?.customerProfileId ?? undefined;
+  }
+
   let paymentResult;
   try {
     paymentResult = await processRestaurantPayment(
@@ -232,6 +256,13 @@ export async function POST(req: NextRequest) {
       branchId: table.branchId,
       tableId: table.id,
       customerId,
+      customerProfileId,
+      tableSessionId: activeSession?.id,
+      tableNumber: table.number,
+      tableLabel: activeSession?.tableLabel ?? table.label,
+      tableIcon: activeSession?.tableIcon ?? table.tableIcon,
+      minimumSpendAmount: minSpend,
+      customerName: activeSession?.customerName ?? customerName,
       orderNumber,
       status: "NEW",
       subtotal,
@@ -281,6 +312,12 @@ export async function POST(req: NextRequest) {
       orderNumber: order.orderNumber,
       totalAmount: Number(order.totalAmount),
       paymentStatus: "PAID",
+      tableNumber: order.tableNumber,
+      tableLabel: order.tableLabel,
+      tableIcon: order.tableIcon,
+      minimumSpendAmount:
+        order.minimumSpendAmount != null ? Number(order.minimumSpendAmount) : null,
+      customerName: order.customerName,
     },
     { status: 201 }
   );

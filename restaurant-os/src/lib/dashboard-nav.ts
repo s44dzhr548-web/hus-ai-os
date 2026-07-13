@@ -19,6 +19,9 @@ import {
   CalendarDays,
   Users,
   UserCog,
+  Megaphone,
+  Images,
+  Activity,
 } from "lucide-react";
 import {
   PLATFORM_ADMIN_ROLE,
@@ -36,12 +39,19 @@ export interface NavItem {
   roles?: DashboardRole[];
 }
 
+/** Routes marketing staff may access */
+export const MARKETING_STAFF_ROUTES = [
+  "/dashboard/marketing",
+];
+
 /** Routes reception staff may access */
 export const RECEPTION_STAFF_ROUTES = [
   "/dashboard/reception",
   "/dashboard/reservations",
   "/dashboard/customers",
   "/dashboard/tables",
+  "/dashboard/staff/activity",
+  "/dashboard/staff/login-history",
 ];
 
 export const platformNavItems: NavItem[] = [
@@ -54,16 +64,22 @@ export const platformNavItems: NavItem[] = [
 export const restaurantNavItems: NavItem[] = [
   { href: "/dashboard", label: "نظرة عامة", icon: LayoutDashboard, roles: ["OWNER", "ADMIN", "MANAGER", "CASHIER", "KITCHEN", "WAITER"] },
   { href: "/dashboard/staff", label: "الموظفون", icon: UserCog, roles: ["OWNER", "ADMIN"] },
+  { href: "/dashboard/staff/activity", label: "سجل نشاط المستخدمين", icon: Activity, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION"] },
+  { href: "/dashboard/staff/login-history", label: "سجل الدخول", icon: Shield, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION"] },
   { href: "/dashboard/onboarding", label: "البدء", icon: Layers, roles: ["OWNER", "ADMIN", "MANAGER"] },
   { href: "/dashboard/settings", label: "إعدادات المطعم", icon: Store, roles: ["OWNER", "ADMIN"] },
   { href: "/dashboard/restaurant", label: "بيانات المطعم", icon: Store, roles: ["OWNER", "ADMIN"] },
   { href: "/dashboard/branches", label: "الفروع", icon: GitBranch, roles: ["OWNER", "ADMIN", "MANAGER"] },
-  { href: "/dashboard/tables", label: "الطاولات", icon: Table2, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "WAITER"] },
+  { href: "/dashboard/tables", label: "إدارة الطاولات", icon: Table2, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "WAITER"] },
+  { href: "/dashboard/monitoring", label: "لوحة مراقبة المطعم", icon: Activity, roles: ["OWNER", "ADMIN", "MANAGER"] },
+  { href: "/dashboard/gifts", label: "إهداء الطاولات", icon: Gift, roles: ["OWNER", "ADMIN", "MANAGER"] },
   { href: "/dashboard/reception", label: "الاستقبال", icon: ConciergeBell, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "CASHIER", "WAITER"] },
   { href: "/dashboard/reservations", label: "الحجوزات", icon: CalendarDays, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "CASHIER", "WAITER"] },
   { href: "/dashboard/customers", label: "سجل العملاء", icon: Users, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "CASHIER", "WAITER"] },
   { href: "/dashboard/menu/categories", label: "المنيو", icon: UtensilsCrossed, roles: ["OWNER", "ADMIN", "MANAGER"] },
-  { href: "/dashboard/branding", label: "تخصيص الصفحة الرئيسية", icon: Palette, roles: ["OWNER", "ADMIN"] },
+  { href: "/dashboard/branding", label: "Landing Page Builder", icon: Palette, roles: ["OWNER", "ADMIN"] },
+  { href: "/dashboard/media", label: "مركز الوسائط", icon: Images, roles: ["OWNER", "ADMIN", "MANAGER"] },
+  { href: "/dashboard/marketing", label: "التسويق الذكي", icon: Megaphone, roles: ["OWNER", "ADMIN", "MARKETING"] },
   { href: "/dashboard/menu/options", label: "الخيارات والإضافات", icon: ListTree, roles: ["OWNER", "ADMIN", "MANAGER"] },
   { href: "/dashboard/orders", label: "الطلبات", icon: ClipboardList, roles: ["OWNER", "ADMIN", "MANAGER", "CASHIER", "KITCHEN", "WAITER"] },
   { href: "/dashboard/kitchen", label: "المطبخ", icon: ChefHat, roles: ["OWNER", "ADMIN", "MANAGER", "KITCHEN"] },
@@ -74,6 +90,18 @@ export const restaurantNavItems: NavItem[] = [
   { href: "/dashboard/billing", label: "الفوترة", icon: CreditCard, roles: ["OWNER", "ADMIN"] },
   { href: "/dashboard/subscription", label: "الاشتراك", icon: CreditCard, roles: ["OWNER", "ADMIN"] },
 ];
+
+function isMarketingStaff(role?: DashboardRole) {
+  return role === "MARKETING";
+}
+
+function marketingRouteAllowed(pathname: string): boolean {
+  return MARKETING_STAFF_ROUTES.some(
+    (route) =>
+      pathname === route ||
+      (route !== "/dashboard" && pathname.startsWith(route))
+  );
+}
 
 function isReceptionStaff(role?: DashboardRole) {
   return role === "RECEPTION";
@@ -100,6 +128,12 @@ export function getSidebarNavItems(opts: {
   if (isReceptionStaff(role)) {
     return restaurantNavItems.filter((item) =>
       roleCanAccessNavItem("RECEPTION", item.roles)
+    );
+  }
+
+  if (isMarketingStaff(role)) {
+    return restaurantNavItems.filter((item) =>
+      roleCanAccessNavItem("MARKETING", item.roles)
     );
   }
 
@@ -133,6 +167,11 @@ export function isRouteAllowedForUser(
     );
   }
 
+  if (isMarketingStaff(opts.role)) {
+    if (pathname === "/dashboard") return false;
+    return marketingRouteAllowed(pathname);
+  }
+
   if (pathname === "/dashboard") return true;
 
   const items = getSidebarNavItems(opts);
@@ -149,6 +188,7 @@ export function defaultDashboardPath(opts: {
 }): string {
   if (isPlatformAdminUser(opts)) return "/dashboard/platform";
   if (opts.role === "RECEPTION") return "/dashboard/reception";
+  if (opts.role === "MARKETING") return "/dashboard/marketing/command-center";
   if (opts.role === "KITCHEN") return "/dashboard/kitchen";
   if (opts.role === "WAITER") return "/dashboard/waiter-calls";
   if (opts.role === "CASHIER") return "/dashboard/payments";

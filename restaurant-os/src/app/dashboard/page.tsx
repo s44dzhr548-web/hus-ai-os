@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   PageHeader,
   StatCard,
@@ -8,6 +10,7 @@ import {
   CardTitle,
   Badge,
   LoadingSpinner,
+  Button,
 } from "@/components/ui";
 import {
   formatCurrency,
@@ -39,6 +42,9 @@ interface Order {
 }
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
+  const role = session?.user?.role;
+  const isOwner = role === "OWNER" || role === "ADMIN";
   const [reports, setReports] = useState<ReportData | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +69,13 @@ export default function DashboardPage() {
       <PageHeader
         title="نظرة عامة"
         description="ملخص أداء مطعمك اليوم"
+        action={
+          isOwner ? (
+            <Link href="/dashboard/staff">
+              <Button variant="outline">إضافة موظف استقبال</Button>
+            </Link>
+          ) : undefined
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

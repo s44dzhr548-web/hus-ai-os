@@ -9,6 +9,8 @@ import {
   computeFavoriteArea,
   resolveDateRange,
 } from "@/lib/customer-history";
+import { loadStaffNameMap } from "@/lib/staff-names";
+import { buildVisitReports } from "@/lib/staff-activity-service";
 import { tableIconEmoji } from "@/lib/table-meta";
 import {
   serializeCustomerVisit,
@@ -39,6 +41,9 @@ export async function GET(req: NextRequest) {
   const phone = sp.get("phone")?.trim();
   const name = sp.get("name")?.trim();
   const tableNumber = sp.get("tableNumber");
+  const tableId = sp.get("tableId");
+  const branchId = sp.get("branchId");
+  const staffUserId = sp.get("staffUserId");
   const status = sp.get("status");
   const view = sp.get("view") || "customers";
 
@@ -51,7 +56,11 @@ export async function GET(req: NextRequest) {
       : undefined;
 
   if (view === "reports") {
-    return NextResponse.json(await buildReports(restaurantId!, from, to));
+    const [legacyReports, visitReports] = await Promise.all([
+      buildReports(restaurantId!, from, to),
+      buildVisitReports(restaurantId!, from, to),
+    ]);
+    return NextResponse.json({ ...legacyReports, visitReports });
   }
 
   if (view === "reservations") {
@@ -87,22 +96,71 @@ export async function GET(req: NextRequest) {
       ...(phone ? { customerPhone: { contains: phone } } : {}),
       ...(name ? { customerName: { contains: name, mode: "insensitive" } } : {}),
       ...(tableNumber ? { tableNumber: parseInt(tableNumber) } : {}),
+      ...(tableId ? { tableId } : {}),
+      ...(branchId ? { branchId } : {}),
       ...(status && status !== "all"
         ? { visitStatus: status as VisitStatus }
         : {}),
-      ...(dateFilter ? { arrivalTime: dateFilter } : {}),
+      AND:
+        staffUserId || dateFilter
+          ? [
+              ...(staffUserId
+                ? [
+                    {
+                      OR: [
+                        { registeredByUserId: staffUserId },
+                        { assignedByUserId: staffUserId },
+                        { startedByUserId: staffUserId },
+                        { closedByUserId: staffUserId },
+                      ],
+                    },
+                  ]
+                : []),
+              ...(dateFilter
+                ? [{ OR: [{ enteredAt: dateFilter }, { arrivalTime: dateFilter }] }]
+                : []),
+            ]
+          : undefined,
     };
 
     const visits = await prisma.customerVisit.findMany({
       where,
-      orderBy: { arrivalTime: "desc" },
+      orderBy: [{ enteredAt: "desc" }, { arrivalTime: "desc" }],
       take: 500,
     });
 
+    const staffNames = await loadStaffNameMap(
+      visits.flatMap((v) => [
+        v.registeredByUserId,
+        v.assignedByUserId,
+        v.startedByUserId,
+        v.closedByUserId,
+      ])
+    );
+
+    const branches = await prisma.branch.findMany({
+      where: { restaurantId: restaurantId!, isActive: true },
+      select: { id: true, name: true, nameAr: true },
+    });
+    const branchMap = new Map(branches.map((b) => [b.id, b.nameAr || b.name]));
+
     return NextResponse.json({
       visits: visits.map((v) =>
-        applyPhonePrivacy(serializeCustomerVisit(v), role)
+        applyPhonePrivacy(
+          {
+            ...serializeCustomerVisit(v, staffNames),
+            branchName: v.branchId ? branchMap.get(v.branchId) ?? null : null,
+          },
+          role
+        )
       ),
+      filters: {
+        branches,
+        staff: await prisma.staff.findMany({
+          where: { restaurantId: restaurantId!, isActive: true },
+          select: { userId: true, name: true, role: true },
+        }),
+      },
     });
   }
 
