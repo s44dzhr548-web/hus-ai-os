@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { encryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
-import { parseOAuthState, OAUTH_CONFIG } from "@/lib/marketing/oauth";
+import {
+  parseOAuthState,
+  exchangeOAuthCode,
+  discoverAdAccount,
+} from "@/lib/marketing/ads-oauth";
+import { ADS_INTEGRATION_DEFS } from "@/lib/platform/ads-integrations";
 import { logMarketingAudit } from "@/lib/marketing/security";
 import type { MarketingPlatform } from "@prisma/client";
+import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
 
 export const dynamic = "force-dynamic";
 
@@ -14,87 +20,83 @@ export async function GET(
   const { platform: platformParam } = await params;
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
-  const base = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
-  const redirectOk = `${base}/dashboard/marketing/connections?connected=${platformParam}`;
+  const base = resolveAppBaseUrl();
+  const redirectOk = `${base}/dashboard/marketing/platforms?connected=${platformParam}`;
 
   if (!code || !state) {
-    return NextResponse.redirect(`${base}/dashboard/marketing/connections?error=oauth_denied`);
+    return NextResponse.redirect(`${base}/dashboard/marketing/platforms?error=oauth_denied`);
   }
 
   const parsed = parseOAuthState(state);
   if (!parsed) {
-    return NextResponse.redirect(`${base}/dashboard/marketing/connections?error=invalid_state`);
+    return NextResponse.redirect(`${base}/dashboard/marketing/platforms?error=invalid_state`);
   }
 
   const platform = platformParam.toUpperCase() as MarketingPlatform;
-  const cfg = OAUTH_CONFIG[platform];
-  if (!cfg || !canEncryptTokens()) {
-    return NextResponse.redirect(`${base}/dashboard/marketing/connections?error=not_configured`);
+
+  if (!canEncryptTokens()) {
+    return NextResponse.redirect(`${base}/dashboard/marketing/platforms?error=not_configured`);
   }
 
-  const clientId = process.env[cfg.clientIdEnv];
-  const clientSecret = process.env[cfg.clientSecretEnv];
-  if (!clientId || !clientSecret) {
-    return NextResponse.redirect(`${base}/dashboard/marketing/connections?error=missing_credentials`);
-  }
+  try {
+    const tokens = await exchangeOAuthCode(platform, code);
+    const account = await discoverAdAccount(platform, tokens.accessToken);
+    const key = platformParam.toUpperCase();
+    const def = ADS_INTEGRATION_DEFS[key as keyof typeof ADS_INTEGRATION_DEFS];
+    const scopes = def?.defaultScopes ?? [];
 
-  const redirectUri = `${base}/api/marketing/connections/${platformParam}/callback`;
-  const tokenRes = await fetch(cfg.tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
-  });
+    const accessEnc = encryptToken(tokens.accessToken);
+    const refreshEnc = tokens.refreshToken ? encryptToken(tokens.refreshToken) : null;
 
-  if (!tokenRes.ok) {
-    return NextResponse.redirect(`${base}/dashboard/marketing/connections?error=token_exchange`);
-  }
-
-  const tokens = await tokenRes.json();
-  const accessEnc = tokens.access_token ? encryptToken(tokens.access_token) : null;
-  const refreshEnc = tokens.refresh_token ? encryptToken(tokens.refresh_token) : null;
-
-  await prisma.marketingAdConnection.upsert({
-    where: {
-      restaurantId_platform: {
+    await prisma.marketingAdConnection.upsert({
+      where: {
+        restaurantId_platform: {
+          restaurantId: parsed.restaurantId,
+          platform,
+        },
+      },
+      create: {
         restaurantId: parsed.restaurantId,
         platform,
+        accessTokenEnc: accessEnc,
+        refreshTokenEnc: refreshEnc,
+        tokenExpiresAt: tokens.expiresIn ? new Date(Date.now() + tokens.expiresIn * 1000) : null,
+        scopes,
+        isActive: true,
+        connectedAt: new Date(),
+        accountId: account?.accountId ?? null,
+        accountName: account?.accountName ?? null,
+        businessName: account?.businessName ?? null,
+        currency: account?.currency ?? null,
+        timezone: account?.timezone ?? null,
+        syncStatus: "CONNECTED",
+        lastSyncAt: new Date(),
       },
-    },
-    create: {
+      update: {
+        accessTokenEnc: accessEnc,
+        refreshTokenEnc: refreshEnc,
+        tokenExpiresAt: tokens.expiresIn ? new Date(Date.now() + tokens.expiresIn * 1000) : null,
+        isActive: true,
+        connectedAt: new Date(),
+        accountId: account?.accountId ?? null,
+        accountName: account?.accountName ?? null,
+        businessName: account?.businessName ?? null,
+        currency: account?.currency ?? null,
+        timezone: account?.timezone ?? null,
+        syncStatus: "CONNECTED",
+        lastSyncAt: new Date(),
+      },
+    });
+
+    await logMarketingAudit({
       restaurantId: parsed.restaurantId,
-      platform,
-      accessTokenEnc: accessEnc,
-      refreshTokenEnc: refreshEnc,
-      tokenExpiresAt: tokens.expires_in
-        ? new Date(Date.now() + tokens.expires_in * 1000)
-        : null,
-      scopes: cfg.scopes,
-      isActive: true,
-      connectedAt: new Date(),
-    },
-    update: {
-      accessTokenEnc: accessEnc,
-      refreshTokenEnc: refreshEnc,
-      tokenExpiresAt: tokens.expires_in
-        ? new Date(Date.now() + tokens.expires_in * 1000)
-        : null,
-      isActive: true,
-      connectedAt: new Date(),
-    },
-  });
+      action: "OAUTH_CONNECT",
+      entityType: "MarketingAdConnection",
+      details: { platform, accountName: account?.accountName },
+    });
 
-  await logMarketingAudit({
-    restaurantId: parsed.restaurantId,
-    action: "OAUTH_CONNECT",
-    entityType: "MarketingAdConnection",
-    details: { platform },
-  });
-
-  return NextResponse.redirect(redirectOk);
+    return NextResponse.redirect(`${redirectOk}&success=1`);
+  } catch {
+    return NextResponse.redirect(`${base}/dashboard/marketing/platforms?error=oauth_failed`);
+  }
 }

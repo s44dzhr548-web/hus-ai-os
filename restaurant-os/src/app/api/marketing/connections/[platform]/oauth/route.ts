@@ -1,30 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireMarketingAccess } from "@/lib/marketing/auth";
-import { getOAuthStartUrl } from "@/lib/marketing/oauth";
+import { NextResponse } from "next/server";
+import { requireAdsPlatformConnectAccess } from "@/lib/marketing/auth";
+import { getOAuthStartUrl, isOAuthConfigured } from "@/lib/marketing/ads-oauth";
 import type { MarketingPlatform } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  req: NextRequest,
+  _req: Request,
   { params }: { params: Promise<{ platform: string }> }
 ) {
   const { platform: platformParam } = await params;
-  const { error, restaurantId } = await requireMarketingAccess();
+  const { error, restaurantId } = await requireAdsPlatformConnectAccess();
   if (error) return error;
 
   const platform = platformParam.toUpperCase() as MarketingPlatform;
-  const base = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
-  const url = getOAuthStartUrl(platform, restaurantId!, base);
 
-  if (!url) {
+  if (!(await isOAuthConfigured(platform))) {
     return NextResponse.json(
-      {
-        error: "OAuth غير مُعدّ لهذه المنصة. أضف بيانات الاعتماد في بيئة Staging.",
-        platform,
-      },
+      { error: "خدمة الربط غير مفعّلة بعد — تواصل مع مسؤول المنصة", ready: false },
       { status: 503 }
     );
+  }
+
+  const url = await getOAuthStartUrl(platform, restaurantId!);
+  if (!url) {
+    return NextResponse.json({ error: "تعذّر بدء الربط", ready: false }, { status: 503 });
   }
 
   return NextResponse.redirect(url);

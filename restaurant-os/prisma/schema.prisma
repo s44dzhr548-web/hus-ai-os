@@ -353,6 +353,7 @@ model Restaurant {
   receptionNotifications ReceptionNotification[]
   sessionAuditLogs    SessionAuditLog[]
   marketingAdConnections MarketingAdConnection[]
+  marketingAdEntities    MarketingAdEntity[]
   marketingCampaigns     MarketingCampaign[]
   marketingCreatives     MarketingCreative[]
   marketingMetrics       MarketingMetricsSnapshot[]
@@ -1222,6 +1223,8 @@ enum MarketingPlatform {
   GOOGLE
   YOUTUBE
   X
+  LINKEDIN
+  PINTEREST
 }
 
 enum MarketingCreativeType {
@@ -1286,11 +1289,17 @@ model MarketingAdConnection {
   platform          MarketingPlatform
   accountId         String?           @map("account_id")
   accountName       String?           @map("account_name")
+  businessName      String?           @map("business_name")
+  currency          String?
+  timezone          String?
   accessTokenEnc    String?           @map("access_token_enc")
   refreshTokenEnc   String?           @map("refresh_token_enc")
   tokenExpiresAt    DateTime?         @map("token_expires_at")
   scopes            String[]          @default([])
   isActive          Boolean           @default(true) @map("is_active")
+  syncStatus        String            @default("IDLE") @map("sync_status")
+  lastSyncAt        DateTime?         @map("last_sync_at")
+  metadataJson      Json?             @map("metadata_json")
   connectedAt       DateTime?         @map("connected_at")
   connectedByUserId String?           @map("connected_by_user_id")
   createdAt         DateTime          @default(now()) @map("created_at")
@@ -1988,4 +1997,61 @@ model PlatformAdminAlert {
 
   @@index([kind, isRead])
   @@map("platform_admin_alerts")
+}
+
+model PlatformAdsIntegration {
+  id                    String   @id @default(cuid())
+  platformKey           String   @unique @map("platform_key")
+  displayName           String?  @map("display_name")
+  clientId              String?  @map("client_id")
+  clientSecretEnc       String?  @map("client_secret_enc")
+  redirectUriOverride   String?  @map("redirect_uri_override")
+  webhookUrlOverride    String?  @map("webhook_url_override")
+  webhookVerifyTokenEnc String?  @map("webhook_verify_token_enc")
+  oauthScopes           String[] @default([]) @map("oauth_scopes")
+  extraConfigJson       Json?    @map("extra_config_json")
+  isEnabled             Boolean  @default(true) @map("is_enabled")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  updatedByUserId       String?  @map("updated_by_user_id")
+
+  @@map("platform_ads_integrations")
+}
+
+model MarketingAdEntity {
+  id           String            @id @default(cuid())
+  restaurantId String            @map("restaurant_id")
+  platform     MarketingPlatform
+  entityType   String            @map("entity_type")
+  externalId   String            @map("external_id")
+  name         String?
+  status       String?
+  spend        Decimal?          @default(0)
+  reach        Int?
+  impressions  Int?
+  clicks       Int?
+  conversions  Int?
+  roas         Decimal?
+  rawJson      Json?             @map("raw_json")
+  syncedAt     DateTime          @default(now()) @map("synced_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, platform, entityType, externalId])
+  @@index([restaurantId, platform])
+  @@map("marketing_ad_entities")
+}
+
+model MarketingAdSyncLog {
+  id           String   @id @default(cuid())
+  restaurantId String?  @map("restaurant_id")
+  platform     String?
+  kind         String
+  ok           Boolean  @default(true)
+  message      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([restaurantId, createdAt])
+  @@map("marketing_ad_sync_logs")
 }

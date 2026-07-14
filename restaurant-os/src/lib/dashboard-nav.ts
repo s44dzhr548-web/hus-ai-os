@@ -59,6 +59,7 @@ export const platformNavItems: NavItem[] = [
   { href: "/dashboard/platform/subscriptions", label: "الاشتراكات", icon: CreditCard },
   { href: "/dashboard/platform/billing", label: "الإيرادات", icon: CreditCard },
   { href: "/dashboard/platform/security", label: "الأمان", icon: Shield },
+  { href: "/dashboard/platform/integrations", label: "Platform Integrations", icon: Activity },
   { href: "/dashboard/platform/meta", label: "Meta / WhatsApp", icon: Activity },
 ];
 

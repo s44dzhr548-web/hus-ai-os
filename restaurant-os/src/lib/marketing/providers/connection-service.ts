@@ -10,7 +10,6 @@ import {
 } from "@/lib/marketing/providers/catalog";
 import { encryptApiKey, testProviderConnection } from "@/lib/marketing/providers/test-connection";
 import { logProviderAudit } from "@/lib/marketing/providers/permissions";
-import { isOAuthConfigured } from "@/lib/marketing/oauth";
 import type { MarketingPlatform, MarketingProviderCategory } from "@prisma/client";
 
 type ConnRow = {
@@ -337,24 +336,26 @@ export async function getAdPlatformConnections(restaurantId: string) {
   }
 
   const { ADS_PLATFORMS } = await import("@/lib/marketing/providers/catalog");
-  return ADS_PLATFORMS.map((p) => {
-    const conn = adConnections.find((c) => c.platform === p.key);
-    const oauthReady = isOAuthConfigured(p.key as MarketingPlatform);
-    return {
-      key: p.key,
-      labelAr: p.labelAr,
-      oauthSupported: p.oauthSupported,
-      oauthReady,
-      developerSetupRequired: !oauthReady,
-      status: conn?.isActive ? "CONNECTED" : "DISCONNECTED",
-      accountName: conn?.accountName ?? null,
-      accountIdMasked: maskAccountId(conn?.accountId),
-      scopes: conn?.scopes ?? [],
-      tokenExpiresAt: conn?.tokenExpiresAt ?? null,
-      lastSyncAt: conn?.connectedAt ?? null,
-      oauthUrl: oauthReady ? `/api/marketing/connections/${p.key.toLowerCase()}/oauth` : null,
-    };
-  });
+  const { isAdsIntegrationReady } = await import("@/lib/platform/ads-integrations");
+  const { platformToIntegrationKey } = await import("@/lib/marketing/ads-oauth");
+
+  return Promise.all(
+    ADS_PLATFORMS.map(async (p) => {
+      const conn = adConnections.find((c) => c.platform === p.key);
+      const integrationKey = platformToIntegrationKey(p.key as MarketingPlatform);
+      const oauthReady = integrationKey ? await isAdsIntegrationReady(integrationKey) : false;
+      return {
+        key: p.key,
+        labelAr: p.labelAr,
+        oauthSupported: p.oauthSupported,
+        integrationReady: oauthReady,
+        status: conn?.isActive ? "CONNECTED" : "DISCONNECTED",
+        accountName: conn?.accountName ?? null,
+        accountIdMasked: maskAccountId(conn?.accountId),
+        lastSyncAt: conn?.connectedAt ?? null,
+      };
+    })
+  );
 }
 
 export async function getRouting(restaurantId: string) {
