@@ -76,12 +76,22 @@ interface VisitRow {
 }
 
 interface Reports {
-  visitedToday: number;
-  visitedThisMonth: number;
+  period?: string;
+  from?: string | null;
+  to?: string | null;
+  labels?: {
+    visitors: string;
+    totalVisits: string;
+    repeatCustomers: string;
+    noShows: string;
+    vipVisitors: string;
+    topVisitors: string;
+  };
+  uniqueVisitors: number;
   totalVisits: number;
   noShows: number;
   repeatCustomers: number;
-  vipCustomers: number;
+  vipVisitors: number;
   mostFrequentCustomers: {
     id: string;
     customerName: string;
@@ -104,7 +114,8 @@ const PRESETS = [
 
 export default function CustomersPage() {
   const searchParams = useSearchParams();
-  const initialTab = (searchParams.get("tab") as Tab) || "customers";
+  const urlView = searchParams.get("view") || searchParams.get("tab");
+  const initialTab = (urlView as Tab) || "customers";
   const [tab, setTab] = useState<Tab>(
     ["customers", "reservations", "visits", "reports"].includes(initialTab)
       ? initialTab
@@ -128,9 +139,11 @@ export default function CustomersPage() {
     visits: VisitRow[];
   } | null>(null);
 
-  const [preset, setPreset] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [preset, setPreset] = useState(searchParams.get("period") || searchParams.get("preset") || "today");
+  const [dateFrom, setDateFrom] = useState(searchParams.get("from") || searchParams.get("dateFrom") || "");
+  const [dateTo, setDateTo] = useState(searchParams.get("to") || searchParams.get("dateTo") || "");
+  const [customDraftFrom, setCustomDraftFrom] = useState(dateFrom);
+  const [customDraftTo, setCustomDraftTo] = useState(dateTo);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [tableNumber, setTableNumber] = useState("");
@@ -145,9 +158,16 @@ export default function CustomersPage() {
   const queryString = useCallback(() => {
     const p = new URLSearchParams();
     p.set("view", tab === "reports" ? "reports" : tab);
-    if (preset) p.set("preset", preset);
-    if (preset === "custom" && dateFrom) p.set("dateFrom", dateFrom);
-    if (preset === "custom" && dateTo) p.set("dateTo", dateTo);
+    if (tab === "reports" && preset) p.set("period", preset);
+    else if (preset) p.set("preset", preset);
+    if (preset === "custom" && dateFrom) {
+      p.set("from", dateFrom);
+      p.set("dateFrom", dateFrom);
+    }
+    if (preset === "custom" && dateTo) {
+      p.set("to", dateTo);
+      p.set("dateTo", dateTo);
+    }
     if (phone) p.set("phone", phone);
     if (name) p.set("name", name);
     if (tableNumber) p.set("tableNumber", tableNumber);
@@ -157,8 +177,27 @@ export default function CustomersPage() {
     return p.toString();
   }, [tab, preset, dateFrom, dateTo, phone, name, tableNumber, branchId, staffUserId, status]);
 
+  const syncUrl = useCallback(
+    (nextPreset: string, nextFrom?: string, nextTo?: string) => {
+      if (typeof window === "undefined") return;
+      const p = new URLSearchParams(window.location.search);
+      p.set("view", tab === "reports" ? "reports" : tab);
+      if (tab === "reports") {
+        if (nextPreset) p.set("period", nextPreset);
+        else p.delete("period");
+        if (nextPreset === "custom" && nextFrom) p.set("from", nextFrom);
+        else p.delete("from");
+        if (nextPreset === "custom" && nextTo) p.set("to", nextTo);
+        else p.delete("to");
+      }
+      window.history.replaceState(null, "", `/dashboard/customers?${p.toString()}`);
+    },
+    [tab]
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
+    setReports(null);
     const res = await fetch(`/api/customers?${queryString()}`);
     if (!res.ok) {
       setLoading(false);
@@ -170,10 +209,26 @@ export default function CustomersPage() {
     else if (tab === "visits") {
       setVisits(data.visits || []);
       if (data.filters) setFilterOptions(data.filters);
-    }
-    else if (tab === "reports") setReports(data);
+    } else if (tab === "reports") setReports(data);
     setLoading(false);
   }, [queryString, tab]);
+
+  function selectPreset(id: string) {
+    setPreset(id);
+    if (id !== "custom") {
+      syncUrl(id);
+    }
+  }
+
+  function applyCustomRange() {
+    if (customDraftFrom && customDraftTo && customDraftTo < customDraftFrom) {
+      window.alert("تاريخ النهاية يجب أن يكون بعد تاريخ البداية");
+      return;
+    }
+    setDateFrom(customDraftFrom);
+    setDateTo(customDraftTo);
+    syncUrl("custom", customDraftFrom, customDraftTo);
+  }
 
   useEffect(() => {
     load();
@@ -219,7 +274,17 @@ export default function CustomersPage() {
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => setTab(id)}
+            onClick={() => {
+              setTab(id);
+              if (typeof window !== "undefined") {
+                const p = new URLSearchParams(window.location.search);
+                p.set("view", id);
+                if (id === "reports" && !p.get("period") && !p.get("preset")) {
+                  p.set("period", preset || "today");
+                }
+                window.history.replaceState(null, "", `/dashboard/customers?${p.toString()}`);
+              }
+            }}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${
               tab === id ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-700"
             }`}
@@ -235,7 +300,7 @@ export default function CustomersPage() {
           {PRESETS.map((p) => (
             <button
               key={p.id || "all"}
-              onClick={() => setPreset(p.id)}
+              onClick={() => selectPreset(p.id)}
               className={`rounded-full px-3 py-1 text-xs ${
                 preset === p.id ? "bg-emerald-600 text-white" : "bg-gray-100"
               }`}
@@ -245,9 +310,23 @@ export default function CustomersPage() {
           ))}
         </div>
         {preset === "custom" && (
-          <div className="flex flex-wrap gap-2">
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded border px-2 py-1 text-sm" />
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded border px-2 py-1 text-sm" />
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={customDraftFrom}
+              onChange={(e) => setCustomDraftFrom(e.target.value)}
+              className="rounded border px-2 py-1 text-sm"
+            />
+            <input
+              type="date"
+              value={customDraftTo}
+              min={customDraftFrom || undefined}
+              onChange={(e) => setCustomDraftTo(e.target.value)}
+              className="rounded border px-2 py-1 text-sm"
+            />
+            <Button size="sm" onClick={applyCustomRange}>
+              تطبيق
+            </Button>
           </div>
         )}
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
@@ -306,13 +385,19 @@ export default function CustomersPage() {
         <LoadingSpinner />
       ) : tab === "reports" && reports ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {reports.from && reports.to && (
+            <p className="col-span-full text-xs text-gray-500">
+              الفترة: {new Date(reports.from).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+              {" — "}
+              {new Date(reports.to).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+            </p>
+          )}
           {[
-            { label: "زوار اليوم", value: reports.visitedToday },
-            { label: "زوار هذا الشهر", value: reports.visitedThisMonth },
-            { label: "إجمالي الزيارات", value: reports.totalVisits },
-            { label: "عملاء متكررون", value: reports.repeatCustomers },
-            { label: "عملاء VIP", value: reports.vipCustomers },
-            { label: "لم يحضروا", value: reports.noShows },
+            { label: reports.labels?.visitors ?? "الزوار الفريدون", value: reports.uniqueVisitors },
+            { label: reports.labels?.totalVisits ?? "إجمالي الزيارات", value: reports.totalVisits },
+            { label: reports.labels?.repeatCustomers ?? "العملاء المتكررون", value: reports.repeatCustomers },
+            { label: reports.labels?.vipVisitors ?? "عملاء VIP", value: reports.vipVisitors },
+            { label: reports.labels?.noShows ?? "لم يحضروا", value: reports.noShows },
           ].map((item) => (
             <Card key={item.label} className="p-4">
               <p className="text-sm text-gray-500">{item.label}</p>
@@ -320,14 +405,22 @@ export default function CustomersPage() {
             </Card>
           ))}
           <Card className="col-span-full p-4">
-            <h3 className="mb-3 font-semibold">الأكثر زيارة</h3>
+            <h3 className="mb-3 font-semibold">{reports.labels?.topVisitors ?? "الأكثر زيارة"}</h3>
             <div className="space-y-2">
-              {reports.mostFrequentCustomers.map((c) => (
-                <div key={c.id} className="flex justify-between text-sm">
-                  <span>{c.customerName} {c.isVip && <Badge>VIP</Badge>}</span>
-                  <span>{c.visitCount} زيارة · {c.totalSpending} ر.س</span>
-                </div>
-              ))}
+              {reports.mostFrequentCustomers.length === 0 ? (
+                <p className="text-sm text-gray-500">لا توجد زيارات في هذه الفترة</p>
+              ) : (
+                reports.mostFrequentCustomers.map((c) => (
+                  <div key={c.id} className="flex justify-between text-sm">
+                    <span>
+                      {c.customerName} {c.isVip && <Badge>VIP</Badge>}
+                    </span>
+                    <span>
+                      {c.visitCount} زيارة · {c.totalSpending} ر.س
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
         </div>

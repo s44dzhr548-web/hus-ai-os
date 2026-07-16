@@ -535,12 +535,14 @@ export async function buildVisitReports(
 ) {
   const where: Prisma.CustomerVisitWhereInput = {
     restaurantId,
+    visitStatus: { notIn: ["CANCELLED", "NO_SHOW"] },
+    NOT: { customerName: { contains: "Register QA", mode: "insensitive" } },
     ...(from || to
       ? {
-          enteredAt: {
-            ...(from ? { gte: from } : {}),
-            ...(to ? { lte: to } : {}),
-          },
+          OR: [
+            { enteredAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } },
+            { arrivalTime: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } },
+          ],
         }
       : {}),
   };

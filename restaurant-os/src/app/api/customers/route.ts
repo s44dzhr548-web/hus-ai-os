@@ -9,6 +9,7 @@ import {
   computeFavoriteArea,
   resolveDateRange,
 } from "@/lib/customer-history";
+import { buildCustomerReports } from "@/lib/customer-reports";
 import { loadStaffNameMap } from "@/lib/staff-names";
 import { buildVisitReports } from "@/lib/staff-activity-service";
 import { tableIconEmoji } from "@/lib/table-meta";
@@ -31,11 +32,11 @@ export async function GET(req: NextRequest) {
 
   const sp = req.nextUrl.searchParams;
   const role = session?.user.role;
-  const preset = sp.get("preset");
-  const { from, to } = resolveDateRange(
+  const preset = sp.get("period") || sp.get("preset");
+  const { from, to, period } = resolveDateRange(
     preset,
-    sp.get("dateFrom"),
-    sp.get("dateTo")
+    sp.get("from") || sp.get("dateFrom"),
+    sp.get("to") || sp.get("dateTo")
   );
 
   const phone = sp.get("phone")?.trim();
@@ -56,11 +57,12 @@ export async function GET(req: NextRequest) {
       : undefined;
 
   if (view === "reports") {
-    const [legacyReports, visitReports] = await Promise.all([
-      buildReports(restaurantId!, from, to),
+    const branchId = sp.get("branchId") || undefined;
+    const [reports, visitReports] = await Promise.all([
+      buildCustomerReports(restaurantId!, from, to, period, branchId),
       buildVisitReports(restaurantId!, from, to),
     ]);
-    return NextResponse.json({ ...legacyReports, visitReports });
+    return NextResponse.json({ ...reports, visitReports });
   }
 
   if (view === "reservations") {
@@ -215,107 +217,4 @@ export async function GET(req: NextRequest) {
   }));
 
   return NextResponse.json({ customers });
-}
-
-async function buildReports(
-  restaurantId: string,
-  from?: Date,
-  to?: Date
-) {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    23,
-    59,
-    59,
-    999
-  );
-
-  const [
-    visitedToday,
-    visitedThisMonth,
-    totalVisits,
-    noShows,
-    repeatCustomers,
-    vipCustomers,
-    frequentCustomers,
-  ] = await Promise.all([
-    prisma.customerVisit.count({
-      where: {
-        restaurantId,
-        arrivalTime: { gte: startOfToday, lte: endOfToday },
-      },
-    }),
-    prisma.customerVisit.count({
-      where: {
-        restaurantId,
-        arrivalTime: { gte: startOfMonth },
-      },
-    }),
-    prisma.customerVisit.count({
-      where: {
-        restaurantId,
-        ...(from || to
-          ? {
-              arrivalTime: {
-                ...(from ? { gte: from } : {}),
-                ...(to ? { lte: to } : {}),
-              },
-            }
-          : {}),
-      },
-    }),
-    prisma.reservation.count({
-      where: {
-        restaurantId,
-        status: "NO_SHOW",
-        ...(from || to
-          ? {
-              date: {
-                ...(from ? { gte: from } : {}),
-                ...(to ? { lte: to } : {}),
-              },
-            }
-          : {}),
-      },
-    }),
-    prisma.customerProfile.count({
-      where: { restaurantId, visitCount: { gt: 1 } },
-    }),
-    prisma.customerProfile.count({
-      where: { restaurantId, isVip: true },
-    }),
-    prisma.customerProfile.findMany({
-      where: { restaurantId, visitCount: { gt: 0 } },
-      orderBy: { visitCount: "desc" },
-      take: 10,
-      select: {
-        id: true,
-        customerName: true,
-        customerPhone: true,
-        visitCount: true,
-        totalSpending: true,
-        lastVisitAt: true,
-        isVip: true,
-      },
-    }),
-  ]);
-
-  return {
-    visitedToday,
-    visitedThisMonth,
-    totalVisits,
-    noShows,
-    repeatCustomers,
-    vipCustomers,
-    mostFrequentCustomers: frequentCustomers.map((c) => ({
-      ...c,
-      totalSpending: Number(c.totalSpending),
-      lastVisitAt: c.lastVisitAt?.toISOString() ?? null,
-    })),
-  };
 }

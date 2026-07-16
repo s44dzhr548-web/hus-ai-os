@@ -31,9 +31,9 @@ export async function GET(req: NextRequest) {
   const role = session?.user.role;
   const showPhone = canViewCustomerPhone(role);
   const { from, to } = resolveDateRange(
-    sp.get("preset"),
-    sp.get("dateFrom"),
-    sp.get("dateTo")
+    sp.get("period") || sp.get("preset"),
+    sp.get("from") || sp.get("dateFrom"),
+    sp.get("to") || sp.get("dateTo")
   );
 
   const phone = sp.get("phone")?.trim();
@@ -118,7 +118,9 @@ export async function GET(req: NextRequest) {
       ...(status && status !== "all"
         ? { visitStatus: status as VisitStatus }
         : {}),
-      ...(dateFilter ? { arrivalTime: dateFilter } : {}),
+      ...(dateFilter
+        ? { OR: [{ enteredAt: dateFilter }, { arrivalTime: dateFilter }] }
+        : {}),
     };
 
     const visits = await prisma.customerVisit.findMany({

@@ -36,52 +36,15 @@ export type DatePreset =
   | "last90"
   | "custom";
 
-export function resolveDateRange(
-  preset?: string | null,
-  dateFrom?: string | null,
-  dateTo?: string | null
-): { from?: Date; to?: Date } {
-  const now = new Date();
-  const startOfDay = (d: Date) =>
-    new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const endOfDay = (d: Date) =>
-    new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-
-  switch (preset) {
-    case "today":
-      return { from: startOfDay(now), to: endOfDay(now) };
-    case "yesterday": {
-      const y = new Date(now);
-      y.setDate(y.getDate() - 1);
-      return { from: startOfDay(y), to: endOfDay(y) };
-    }
-    case "last7": {
-      const from = new Date(now);
-      from.setDate(from.getDate() - 6);
-      return { from: startOfDay(from), to: endOfDay(now) };
-    }
-    case "last30": {
-      const from = new Date(now);
-      from.setDate(from.getDate() - 29);
-      return { from: startOfDay(from), to: endOfDay(now) };
-    }
-    case "last90": {
-      const from = new Date(now);
-      from.setDate(from.getDate() - 89);
-      return { from: startOfDay(from), to: endOfDay(now) };
-    }
-    case "custom":
-      return {
-        from: dateFrom ? startOfDay(new Date(dateFrom)) : undefined,
-        to: dateTo ? endOfDay(new Date(dateTo)) : undefined,
-      };
-    default:
-      return {
-        from: dateFrom ? startOfDay(new Date(dateFrom)) : undefined,
-        to: dateTo ? endOfDay(new Date(dateTo)) : undefined,
-      };
-  }
-}
+export {
+  resolveDateRange,
+  reportPeriodLabels,
+  startOfRiyadhDay,
+  endOfRiyadhDay,
+  buildCustomerReports,
+  isQaTestRecord,
+} from "@/lib/customer-reports";
+export type { ReportPeriod } from "@/lib/customer-reports";
 
 export function csvEscape(value: unknown): string {
   const s = value == null ? "" : String(value);
