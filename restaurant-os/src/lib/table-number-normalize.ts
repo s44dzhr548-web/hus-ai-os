@@ -13,7 +13,7 @@ export function normalizeTableNumber(input: string | number | null | undefined):
   }
 
   s = s.replace(/\s+/g, " ").trim();
-  s = s.replace(/^(طاولة|table)\s*/i, "");
+  s = s.replace(/^(طاولة|table)[\s\-_]*/i, "");
   s = s.toLowerCase();
   s = s.replace(/[\s\-_]+/g, "");
   return s;

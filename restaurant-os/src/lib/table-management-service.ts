@@ -45,18 +45,19 @@ export async function checkDuplicateTableNumber(
 
   const normalized = normalizeTableNumber(number);
   const numeric = typeof number === "number" ? number : numericTableNumber(normalized);
-  if (numeric == null) return null;
-
-  const existing = await prisma.diningTable.findFirst({
-    where: {
-      branchId,
-      number: numeric,
-      isArchived: false,
-      ...(excludeId ? { id: { not: excludeId } } : {}),
-    },
-    select: { id: true, number: true },
-  });
-  return existing;
+  if (numeric != null) {
+    const existing = await prisma.diningTable.findFirst({
+      where: {
+        branchId,
+        number: numeric,
+        isArchived: false,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { id: true, number: true },
+    });
+    if (existing) return existing;
+  }
+  return null;
 }
 
 function tableNumberFields(raw: number | string) {

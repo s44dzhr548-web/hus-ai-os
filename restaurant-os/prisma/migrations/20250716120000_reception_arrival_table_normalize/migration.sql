@@ -24,7 +24,7 @@ SET
             '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹',
             '01234567890123456789'
           ),
-          '^(طاولة|table)\s*',
+            '^(طاولة|table)[\s\-_]*',
           '',
           'i'
         ),
@@ -39,6 +39,20 @@ SET
   )
 WHERE "normalized_number" IS NULL OR "normalized_number" = '';
 
-CREATE UNIQUE INDEX IF NOT EXISTS "dining_tables_branch_id_normalized_number_key"
-  ON "dining_tables"("branch_id", "normalized_number")
-  WHERE "normalized_number" IS NOT NULL AND "normalized_number" <> '' AND "is_archived" = false;
+-- App-level duplicate blocking; skip DB unique index when legacy duplicates exist (Fabrika-safe)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM "dining_tables"
+    WHERE "is_archived" = false
+      AND "normalized_number" IS NOT NULL
+      AND "normalized_number" <> ''
+    GROUP BY "branch_id", "normalized_number"
+    HAVING COUNT(*) > 1
+  ) THEN
+    CREATE UNIQUE INDEX IF NOT EXISTS "dining_tables_branch_id_normalized_number_key"
+      ON "dining_tables"("branch_id", "normalized_number")
+      WHERE "normalized_number" IS NOT NULL AND "normalized_number" <> '' AND "is_archived" = false;
+  END IF;
+END $$;
