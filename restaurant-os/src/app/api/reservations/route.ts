@@ -13,6 +13,7 @@ import {
   getReservationStats,
   nextReservationNumber,
   exportReservationsCsv,
+  exportReservationsPrintHtml,
   buildReservationOrderBy,
   serializeRegisterRow,
 } from "@/lib/reservation-register";
@@ -66,6 +67,23 @@ export async function GET(req: NextRequest) {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="reservations-${Date.now()}.csv"`,
+      },
+    });
+  }
+
+  if (req.nextUrl.searchParams.get("export") === "pdf") {
+    const q = parseQuery(req, restaurantId!);
+    q.pageSize = 5000;
+    q.page = 1;
+    const { reservations } = await queryReservations(q);
+    const html = exportReservationsPrintHtml(
+      reservations,
+      q.mode === "history" ? "السجل الكامل للحجوزات" : "سجل الحجوزات"
+    );
+    return new NextResponse(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `attachment; filename="reservations-${Date.now()}.html"`,
       },
     });
   }

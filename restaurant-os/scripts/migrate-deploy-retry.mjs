@@ -13,8 +13,8 @@ function isAdvisoryLockError(output) {
   );
 }
 
-function runMigrate() {
-  const result = spawnSync("npx", ["prisma", "migrate", "deploy"], {
+function run(cmd, args) {
+  const result = spawnSync(cmd, args, {
     encoding: "utf8",
     stdio: ["inherit", "pipe", "pipe"],
     shell: true,
@@ -25,17 +25,38 @@ function runMigrate() {
   return { ok: result.status === 0, output };
 }
 
+function isDatabaseUpToDate(output) {
+  const text = String(output || "");
+  return (
+    text.includes("Database schema is up to date") ||
+    text.includes("No pending migrations") ||
+    (text.includes("Following migrations have not yet been applied") === false &&
+      text.includes("migrations found") &&
+      !text.includes("have not yet been applied"))
+  );
+}
+
 for (let attempt = 1; attempt <= maxAttempts; attempt++) {
   console.log(`[migrate-deploy-retry] attempt ${attempt}/${maxAttempts}`);
-  const { ok, output } = runMigrate();
+  const { ok, output } = run("npx", ["prisma", "migrate", "deploy"]);
   if (ok) {
     console.log("[migrate-deploy-retry] success");
     process.exit(0);
   }
-  if (attempt >= maxAttempts || !isAdvisoryLockError(output)) {
-    console.error("[migrate-deploy-retry] failed");
-    process.exit(1);
+
+  if (isAdvisoryLockError(output)) {
+    const status = run("npx", ["prisma", "migrate", "status"]);
+    if (isDatabaseUpToDate(status.output)) {
+      console.warn("[migrate-deploy-retry] advisory lock but schema up to date — continuing build");
+      process.exit(0);
+    }
+    if (attempt < maxAttempts) {
+      console.warn(`[migrate-deploy-retry] advisory lock timeout, waiting ${delayMs}ms...`);
+      await new Promise((r) => setTimeout(r, delayMs));
+      continue;
+    }
   }
-  console.warn(`[migrate-deploy-retry] advisory lock timeout, waiting ${delayMs}ms...`);
-  await new Promise((r) => setTimeout(r, delayMs));
+
+  console.error("[migrate-deploy-retry] failed");
+  process.exit(1);
 }

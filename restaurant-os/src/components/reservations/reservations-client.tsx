@@ -288,6 +288,12 @@ export default function ReservationsClient({ mode = "active" }: Props) {
                 >
                   <Download className="h-4 w-4" /> تصدير CSV
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(`/api/reservations?mode=history&export=pdf&quick=full`, "_blank")}
+                >
+                  <Download className="h-4 w-4" /> تصدير PDF
+                </Button>
                 <Button variant="outline" onClick={() => window.print()}>
                   <Printer className="h-4 w-4" /> طباعة
                 </Button>

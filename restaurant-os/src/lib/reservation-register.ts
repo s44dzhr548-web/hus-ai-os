@@ -419,3 +419,73 @@ export function exportReservationsCsv(
   ];
   return "\uFEFF" + lines.join("\n");
 }
+
+export function exportReservationsPrintHtml(
+  rows: ReturnType<typeof serializeRegisterRow>[],
+  title = "سجل الحجوزات"
+) {
+  const esc = (v: unknown) =>
+    String(v ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  const bodyRows = rows
+    .map(
+      (r) => `<tr>
+        <td>${esc(r.reservationNumber)}</td>
+        <td>${esc(r.customerName)}</td>
+        <td dir="ltr">${esc(r.customerPhone)}</td>
+        <td>${esc(r.guestCount)}</td>
+        <td>${esc(r.reservationDateTimeDisplay)}</td>
+        <td>${esc(r.createdDateTimeDisplay)}</td>
+        <td>${esc(r.tableDisplay)}</td>
+        <td>${esc(r.statusLabel)}</td>
+        <td>${esc(r.arrivedAt ? formatRiyadhDateTime(r.arrivedAt) : "—")}</td>
+        <td>${esc(r.seatedAt ? formatRiyadhDateTime(r.seatedAt) : "—")}</td>
+        <td>${esc(r.sessionEndedAt ? formatRiyadhDateTime(r.sessionEndedAt) : "—")}</td>
+        <td>${esc(r.createdByName)}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <title>${esc(title)}</title>
+  <style>
+    body { font-family: Tahoma, Arial, sans-serif; padding: 24px; color: #111; }
+    h1 { font-size: 20px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; }
+    th { background: #f3f4f6; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <h1>${esc(title)}</h1>
+  <p>تاريخ التصدير: ${esc(formatRiyadhDateTime(new Date()))}</p>
+  <table>
+    <thead>
+      <tr>
+        <th>رقم الحجز</th>
+        <th>العميل</th>
+        <th>الجوال</th>
+        <th>الضيوف</th>
+        <th>موعد الحجز</th>
+        <th>التسجيل</th>
+        <th>الطاولة</th>
+        <th>الحالة</th>
+        <th>الوصول</th>
+        <th>الجلوس</th>
+        <th>إنهاء الجلسة</th>
+        <th>أنشأ</th>
+      </tr>
+    </thead>
+    <tbody>${bodyRows || "<tr><td colspan='12'>لا توجد بيانات</td></tr>"}</tbody>
+  </table>
+  <script>window.onload = () => window.print();</script>
+</body>
+</html>`;
+}
