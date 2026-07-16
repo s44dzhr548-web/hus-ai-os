@@ -48,6 +48,7 @@ export type RegisterRow = {
   createdDateTimeDisplay: string;
   sourceLabel: string;
   branchName: string | null;
+  tableId: string | null;
   tableDisplay: string | null;
   minimumSpendAmount: number | null;
   depositStatus: string | null;
@@ -58,7 +59,27 @@ export type RegisterRow = {
   sessionEndedAt: string | null;
   notes: string | null;
   createdByName: string | null;
+  updatedByName: string | null;
   assignedByName: string | null;
+  confirmedByName: string | null;
+  completedByName: string | null;
+};
+
+type DetailPayload = {
+  reservation: RegisterRow;
+  customer?: {
+    visitCount?: number;
+    totalSpending?: number;
+    lastVisitAt?: string | null;
+  } | null;
+  timeline?: { label: string; atDisplay: string; byName?: string | null }[];
+  statusHistory?: {
+    previousLabel: string | null;
+    newLabel: string;
+    changedAtDisplay: string;
+    changedByName: string | null;
+    note: string | null;
+  }[];
 };
 
 type Stats = {
@@ -124,7 +145,7 @@ export default function ReservationsClient({ mode = "active" }: Props) {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
+  const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [assignModal, setAssignModal] = useState<RegisterRow | null>(null);
   const [tables, setTables] = useState<{ id: string; number: number; label?: string }[]>([]);
@@ -382,15 +403,26 @@ export default function ReservationsClient({ mode = "active" }: Props) {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-right text-xs text-gray-600">
               <tr>
-                <th className="px-3 py-2">رقم الحجز</th>
-                <th className="px-3 py-2">العميل</th>
-                <th className="px-3 py-2">الجوال</th>
-                <th className="px-3 py-2">الضيوف</th>
-                <th className="px-3 py-2">موعد الحجز</th>
-                <th className="px-3 py-2">وقت إنشاء الحجز</th>
-                <th className="px-3 py-2">الطاولة</th>
-                <th className="px-3 py-2">الحالة</th>
-                <th className="px-3 py-2">إجراءات</th>
+                <th className="whitespace-nowrap px-3 py-2">رقم الحجز</th>
+                <th className="whitespace-nowrap px-3 py-2">العميل</th>
+                <th className="whitespace-nowrap px-3 py-2">الجوال</th>
+                <th className="whitespace-nowrap px-3 py-2">الضيوف</th>
+                <th className="whitespace-nowrap px-3 py-2">موعد الحجز</th>
+                <th className="whitespace-nowrap px-3 py-2">تاريخ التسجيل</th>
+                <th className="whitespace-nowrap px-3 py-2">وقت التسجيل</th>
+                <th className="whitespace-nowrap px-3 py-2">المصدر</th>
+                <th className="whitespace-nowrap px-3 py-2">الفرع</th>
+                <th className="whitespace-nowrap px-3 py-2">الطاولة</th>
+                <th className="whitespace-nowrap px-3 py-2">الحد الأدنى</th>
+                <th className="whitespace-nowrap px-3 py-2">العربون</th>
+                <th className="whitespace-nowrap px-3 py-2">الحالة</th>
+                <th className="whitespace-nowrap px-3 py-2">وقت الوصول</th>
+                <th className="whitespace-nowrap px-3 py-2">وقت الجلوس</th>
+                <th className="whitespace-nowrap px-3 py-2">إنهاء الجلسة</th>
+                <th className="whitespace-nowrap px-3 py-2">أنشأ</th>
+                <th className="whitespace-nowrap px-3 py-2">آخر تعديل</th>
+                <th className="whitespace-nowrap px-3 py-2">ملاحظات</th>
+                <th className="whitespace-nowrap px-3 py-2">إجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -400,17 +432,34 @@ export default function ReservationsClient({ mode = "active" }: Props) {
                   className="cursor-pointer border-t border-gray-100 hover:bg-emerald-50/40"
                   onClick={() => openDetail(r.id)}
                 >
-                  <td className="px-3 py-2 font-mono text-xs">{r.reservationNumber}</td>
-                  <td className="px-3 py-2 font-medium">{r.customerName}</td>
-                  <td className="px-3 py-2" dir="ltr">{r.customerPhone}</td>
-                  <td className="px-3 py-2">{r.guestCount}</td>
-                  <td className="px-3 py-2">{r.reservationDateTimeDisplay}</td>
-                  <td className="px-3 py-2">{r.createdDateTimeDisplay}</td>
-                  <td className="px-3 py-2">{r.tableDisplay || "—"}</td>
-                  <td className="px-3 py-2">
+                  <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">{r.reservationNumber}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-medium">{r.customerName}</td>
+                  <td className="whitespace-nowrap px-3 py-2" dir="ltr">{r.customerPhone}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{r.guestCount}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{r.reservationDateTimeDisplay}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{r.createdDateDisplay}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{r.createdTimeDisplay}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{r.sourceLabel}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{r.branchName || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{r.tableDisplay || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{r.minimumSpendAmount ?? "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{r.depositStatus || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2">
                     <Badge className={STATUS_COLORS[r.status] || ""}>{r.statusLabel}</Badge>
                   </td>
-                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-600">
+                    {r.arrivedAt ? new Date(r.arrivedAt).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" }) : "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-600">
+                    {r.seatedAt ? new Date(r.seatedAt).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" }) : "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-600">
+                    {r.sessionEndedAt ? new Date(r.sessionEndedAt).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" }) : "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs">{r.createdByName || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs">{r.updatedByName || "—"}</td>
+                  <td className="max-w-[140px] truncate px-3 py-2 text-xs text-gray-600">{r.notes || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <RowActions row={r} onPatch={patch} onAssign={setAssignModal} />
                   </td>
                 </tr>
@@ -477,29 +526,114 @@ export default function ReservationsClient({ mode = "active" }: Props) {
       {detailId && detail && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={() => setDetailId(null)}>
           <div
-            className="h-full w-full max-w-lg overflow-y-auto bg-white p-6 shadow-xl"
+            className="h-full w-full max-w-xl overflow-y-auto bg-white p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-bold">تفاصيل الحجز</h2>
-            <pre className="mt-4 whitespace-pre-wrap text-sm text-gray-700">
-              {JSON.stringify(detail.reservation, null, 2)}
-            </pre>
-            {Array.isArray((detail as { timeline?: unknown[] }).timeline) && (
-              <div className="mt-4 space-y-2">
-                <h3 className="font-semibold">المسار الزمني</h3>
-                {((detail as { timeline: { label: string; atDisplay: string; byName?: string }[] }).timeline).map(
-                  (t, i) => (
-                    <p key={i} className="text-sm text-gray-600">
-                      {t.label}: {t.atDisplay}
-                      {t.byName ? ` — ${t.byName}` : ""}
-                    </p>
-                  )
-                )}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-sm text-gray-500">{detail.reservation.reservationNumber}</p>
+                <h2 className="text-xl font-bold">{detail.reservation.customerName}</h2>
+                <Badge className={`mt-2 ${STATUS_COLORS[detail.reservation.status] || ""}`}>
+                  {detail.reservation.statusLabel}
+                </Badge>
               </div>
+              <Button variant="outline" size="sm" onClick={() => setDetailId(null)}>
+                إغلاق
+              </Button>
+            </div>
+
+            <section className="mt-6 space-y-2">
+              <h3 className="font-semibold text-gray-900">العميل</h3>
+              <p className="text-sm" dir="ltr">{detail.reservation.customerPhone}</p>
+              {detail.customer && (
+                <p className="text-sm text-gray-600">
+                  زيارات سابقة: {detail.customer.visitCount ?? 0}
+                  {detail.customer.totalSpending != null
+                    ? ` — إجمالي الإنفاق: ${detail.customer.totalSpending}`
+                    : ""}
+                </p>
+              )}
+            </section>
+
+            <section className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-gray-100 p-3">
+                <p className="text-xs text-gray-500">تاريخ التسجيل</p>
+                <p className="font-medium">{detail.reservation.createdDateDisplay}</p>
+                <p className="text-sm text-gray-600">{detail.reservation.createdTimeDisplay}</p>
+              </div>
+              <div className="rounded-lg border border-gray-100 p-3">
+                <p className="text-xs text-gray-500">موعد الحجز</p>
+                <p className="font-medium">{detail.reservation.reservationDateDisplay}</p>
+                <p className="text-sm text-gray-600">{detail.reservation.reservationTime}</p>
+              </div>
+              <div className="rounded-lg border border-gray-100 p-3">
+                <p className="text-xs text-gray-500">الضيوف / المصدر / الفرع</p>
+                <p className="text-sm">
+                  {detail.reservation.guestCount} ضيوف — {detail.reservation.sourceLabel}
+                  {detail.reservation.branchName ? ` — ${detail.reservation.branchName}` : ""}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-100 p-3">
+                <p className="text-xs text-gray-500">الطاولة / الحد الأدنى</p>
+                <p className="text-sm">
+                  {detail.reservation.tableDisplay || "—"}
+                  {detail.reservation.minimumSpendAmount != null
+                    ? ` — ${detail.reservation.minimumSpendAmount} ر.س`
+                    : ""}
+                </p>
+              </div>
+            </section>
+
+            {detail.reservation.notes && (
+              <section className="mt-4 rounded-lg bg-gray-50 p-3">
+                <p className="text-xs text-gray-500">ملاحظات</p>
+                <p className="text-sm">{detail.reservation.notes}</p>
+              </section>
             )}
-            <Button className="mt-4" variant="outline" onClick={() => setDetailId(null)}>
-              إغلاق
-            </Button>
+
+            {detail.timeline && detail.timeline.length > 0 && (
+              <section className="mt-6">
+                <h3 className="mb-3 font-semibold">المسار الزمني</h3>
+                <ol className="space-y-3 border-r-2 border-emerald-200 pr-4">
+                  {detail.timeline.map((t, i) => (
+                    <li key={i} className="text-sm">
+                      <p className="font-medium">{t.label}</p>
+                      <p className="text-gray-600">{t.atDisplay}</p>
+                      {t.byName && <p className="text-xs text-gray-500">بواسطة: {t.byName}</p>}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+
+            {detail.statusHistory && detail.statusHistory.length > 0 && (
+              <section className="mt-6">
+                <h3 className="mb-2 font-semibold">سجل تغيير الحالة</h3>
+                <div className="space-y-2">
+                  {detail.statusHistory.map((h, i) => (
+                    <div key={i} className="rounded-lg border border-gray-100 p-2 text-sm">
+                      <p>
+                        {h.previousLabel ? `${h.previousLabel} → ` : ""}
+                        {h.newLabel}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {h.changedAtDisplay}
+                        {h.changedByName ? ` — ${h.changedByName}` : ""}
+                      </p>
+                      {h.note && <p className="text-xs text-gray-600">{h.note}</p>}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className="mt-6 rounded-lg border border-gray-100 p-3 text-sm">
+              <h3 className="mb-2 font-semibold">نشاط الموظفين</h3>
+              <p>أنشأ: {detail.reservation.createdByName || "—"}</p>
+              <p>أكّد: {detail.reservation.confirmedByName || "—"}</p>
+              <p>عيّن الطاولة: {detail.reservation.assignedByName || "—"}</p>
+              <p>أنهى الجلسة: {detail.reservation.completedByName || "—"}</p>
+            </section>
           </div>
         </div>
       )}
@@ -572,8 +706,8 @@ function RowActions({
           <MapPin className="h-3 w-3" />
         </Button>
       )}
-      {row.tableDisplay && ["ARRIVED", "CHECKED_IN", "APPROVED", "CONFIRMED"].includes(row.status) && (
-        <Button size="sm" onClick={() => onPatch(row.id, { action: "seat", tableId: undefined })}>
+      {row.tableId && ["ARRIVED", "CHECKED_IN", "APPROVED", "CONFIRMED"].includes(row.status) && (
+        <Button size="sm" onClick={() => onPatch(row.id, { action: "seat", tableId: row.tableId })}>
           <ArrowRightLeft className="h-3 w-3" />
         </Button>
       )}

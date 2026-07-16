@@ -1,4 +1,25 @@
-import prisma from "@/lib/prisma";
+#!/usr/bin/env node
+import { PrismaClient } from "@prisma/client";
 
-const count = await prisma.reservation.count();
-console.log(JSON.stringify({ count }));
+const prisma = new PrismaClient();
+
+try {
+  const [total, byRestaurant] = await Promise.all([
+    prisma.reservation.count(),
+    prisma.reservation.groupBy({
+      by: ["restaurantId"],
+      _count: { _all: true },
+    }),
+  ]);
+  console.log(
+    JSON.stringify({
+      total,
+      byRestaurant: byRestaurant.map((r) => ({
+        restaurantId: r.restaurantId,
+        count: r._count._all,
+      })),
+    })
+  );
+} finally {
+  await prisma.$disconnect();
+}
