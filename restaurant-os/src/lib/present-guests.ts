@@ -1,6 +1,11 @@
 import prisma from "@/lib/prisma";
 import { isActiveSession, RESERVATION_STATUS_LABELS } from "@/lib/reception";
 import type { ReservationStatus } from "@prisma/client";
+import {
+  currentBusinessDate,
+  getBusinessDayRange,
+  DEFAULT_BUSINESS_DAY_CONFIG,
+} from "@/lib/business-day";
 
 export const RECEPTION_ACTIVE_STATUSES: ReservationStatus[] = [
   "CONFIRMED",
@@ -37,11 +42,14 @@ export type PresentGuestRow = {
 };
 
 function todayBounds() {
-  const dayStart = new Date();
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date();
-  dayEnd.setHours(23, 59, 59, 999);
-  return { dayStart, dayEnd };
+  const config = DEFAULT_BUSINESS_DAY_CONFIG;
+  const bd = currentBusinessDate(new Date(), config.timezone, config.businessDayStartHour);
+  const range = getBusinessDayRange({
+    businessDate: bd,
+    timezone: config.timezone,
+    businessDayStartHour: config.businessDayStartHour,
+  });
+  return { dayStart: range.startUtc, dayEnd: range.endUtc };
 }
 
 function sectionForStatus(

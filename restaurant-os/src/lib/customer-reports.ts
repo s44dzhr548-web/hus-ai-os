@@ -1,15 +1,29 @@
 import prisma from "@/lib/prisma";
 import type { Prisma, VisitStatus } from "@prisma/client";
-import { RIYADH_TZ } from "@/lib/timezone";
+import {
+  BUSINESS_DAY_NOTE_AR,
+  formatOperationalPeriodLabel,
+  type ReportPeriod,
+} from "@/lib/business-day";
+import {
+  actualEntryBroadWhere,
+  filterByActualEntry,
+  isAfterMidnightEntry,
+  resolveActualEntryAt,
+} from "@/lib/actual-entry";
+import { formatRiyadhDateTime } from "@/lib/timezone";
+import type { BusinessDayConfig } from "@/lib/business-day";
 
-export type ReportPeriod =
-  | "today"
-  | "yesterday"
-  | "last7"
-  | "last30"
-  | "last90"
-  | "custom"
-  | "";
+export type { ReportPeriod } from "@/lib/business-day";
+export {
+  resolveDateRange,
+  startOfRiyadhDay,
+  endOfRiyadhDay,
+  getBusinessDayRange,
+  currentBusinessDate,
+  BUSINESS_DAY_NOTE_AR,
+  formatOperationalPeriodLabel,
+} from "@/lib/business-day";
 
 const ACTUAL_VISIT_STATUSES: VisitStatus[] = [
   "REGISTERED",
@@ -26,106 +40,6 @@ export function isQaTestRecord(name?: string | null): boolean {
   return QA_NAME_PATTERNS.some((re) => re.test(name));
 }
 
-function riyadhParts(d: Date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: RIYADH_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(d);
-  return {
-    year: parseInt(parts.find((p) => p.type === "year")?.value ?? "1970", 10),
-    month: parseInt(parts.find((p) => p.type === "month")?.value ?? "01", 10),
-    day: parseInt(parts.find((p) => p.type === "day")?.value ?? "01", 10),
-  };
-}
-
-function riyadhDayStart(y: number, m: number, d: number): Date {
-  const mm = String(m).padStart(2, "0");
-  const dd = String(d).padStart(2, "0");
-  return new Date(`${y}-${mm}-${dd}T00:00:00+03:00`);
-}
-
-function riyadhDayEnd(y: number, m: number, d: number): Date {
-  const mm = String(m).padStart(2, "0");
-  const dd = String(d).padStart(2, "0");
-  return new Date(`${y}-${mm}-${dd}T23:59:59.999+03:00`);
-}
-
-export function startOfRiyadhDay(d: Date = new Date()): Date {
-  const { year, month, day } = riyadhParts(d);
-  return riyadhDayStart(year, month, day);
-}
-
-export function endOfRiyadhDay(d: Date = new Date()): Date {
-  const { year, month, day } = riyadhParts(d);
-  return riyadhDayEnd(year, month, day);
-}
-
-function addRiyadhDays(d: Date, offset: number): Date {
-  const start = startOfRiyadhDay(d);
-  return new Date(start.getTime() + offset * 86400000);
-}
-
-function startOfRiyadhMonth(year: number, month: number): Date {
-  return riyadhDayStart(year, month, 1);
-}
-
-export function resolveDateRange(
-  preset?: string | null,
-  dateFrom?: string | null,
-  dateTo?: string | null
-): { from?: Date; to?: Date; period: ReportPeriod } {
-  const now = new Date();
-  const period = (preset || "") as ReportPeriod;
-
-  switch (period) {
-    case "today":
-      return { from: startOfRiyadhDay(now), to: endOfRiyadhDay(now), period };
-    case "yesterday": {
-      const y = addRiyadhDays(now, -1);
-      return { from: startOfRiyadhDay(y), to: endOfRiyadhDay(y), period };
-    }
-    case "last7":
-      return {
-        from: startOfRiyadhDay(addRiyadhDays(now, -6)),
-        to: endOfRiyadhDay(now),
-        period,
-      };
-    case "last30":
-      return {
-        from: startOfRiyadhDay(addRiyadhDays(now, -29)),
-        to: endOfRiyadhDay(now),
-        period,
-      };
-    case "last90": {
-      const { year, month } = riyadhParts(now);
-      let startMonth = month - 2;
-      let startYear = year;
-      while (startMonth <= 0) {
-        startMonth += 12;
-        startYear -= 1;
-      }
-      return {
-        from: startOfRiyadhMonth(startYear, startMonth),
-        to: endOfRiyadhDay(now),
-        period,
-      };
-    }
-    case "custom": {
-      const from = dateFrom ? new Date(`${dateFrom}T00:00:00+03:00`) : undefined;
-      const to = dateTo ? new Date(`${dateTo}T23:59:59.999+03:00`) : undefined;
-      return { from, to, period };
-    }
-    default:
-      return {
-        from: dateFrom ? new Date(`${dateFrom}T00:00:00+03:00`) : undefined,
-        to: dateTo ? new Date(`${dateTo}T23:59:59.999+03:00`) : undefined,
-        period: "",
-      };
-  }
-}
-
 export function reportPeriodLabels(period: ReportPeriod): {
   visitors: string;
   totalVisits: string;
@@ -133,101 +47,51 @@ export function reportPeriodLabels(period: ReportPeriod): {
   noShows: string;
   vipVisitors: string;
   topVisitors: string;
+  actualEntries: string;
+  firstEntry: string;
+  lastEntry: string;
+  afterMidnight: string;
+  avgSession: string;
+  completedSessions: string;
+  activeSessions: string;
 } {
-  switch (period) {
-    case "today":
-      return {
-        visitors: "زوار اليوم",
-        totalVisits: "زيارات اليوم",
-        repeatCustomers: "متكررون اليوم",
-        noShows: "لم يحضروا اليوم",
-        vipVisitors: "VIP اليوم",
-        topVisitors: "الأكثر زيارة اليوم",
-      };
-    case "yesterday":
-      return {
-        visitors: "زوار أمس",
-        totalVisits: "زيارات أمس",
-        repeatCustomers: "متكررون أمس",
-        noShows: "لم يحضروا أمس",
-        vipVisitors: "VIP أمس",
-        topVisitors: "الأكثر زيارة أمس",
-      };
-    case "last7":
-      return {
-        visitors: "زوار آخر 7 أيام",
-        totalVisits: "زيارات آخر 7 أيام",
-        repeatCustomers: "متكررون (7 أيام)",
-        noShows: "لم يحضروا (7 أيام)",
-        vipVisitors: "VIP (7 أيام)",
-        topVisitors: "الأكثر زيارة (7 أيام)",
-      };
-    case "last30":
-      return {
-        visitors: "زوار آخر 30 يومًا",
-        totalVisits: "زيارات آخر 30 يومًا",
-        repeatCustomers: "متكررون (30 يوم)",
-        noShows: "لم يحضروا (30 يوم)",
-        vipVisitors: "VIP (30 يوم)",
-        topVisitors: "الأكثر زيارة (30 يوم)",
-      };
-    case "last90":
-      return {
-        visitors: "زوار آخر 3 أشهر",
-        totalVisits: "زيارات آخر 3 أشهر",
-        repeatCustomers: "متكررون (3 أشهر)",
-        noShows: "لم يحضروا (3 أشهر)",
-        vipVisitors: "VIP (3 أشهر)",
-        topVisitors: "الأكثر زيارة (3 أشهر)",
-      };
-    case "custom":
-      return {
-        visitors: "زوار الفترة المحددة",
-        totalVisits: "زيارات الفترة",
-        repeatCustomers: "متكررون في الفترة",
-        noShows: "لم يحضروا في الفترة",
-        vipVisitors: "VIP في الفترة",
-        topVisitors: "الأكثر زيارة في الفترة",
-      };
-    default:
-      return {
-        visitors: "الزوار الفريدون",
-        totalVisits: "إجمالي الزيارات",
-        repeatCustomers: "العملاء المتكررون",
-        noShows: "لم يحضروا",
-        vipVisitors: "عملاء VIP",
-        topVisitors: "الأكثر زيارة",
-      };
-  }
-}
+  const suffix = (() => {
+    switch (period) {
+      case "today":
+        return "اليوم";
+      case "yesterday":
+        return "أمس";
+      case "last7":
+        return "(7 أيام)";
+      case "last30":
+        return "(30 يوم)";
+      case "last90":
+        return "(3 أشهر)";
+      case "custom":
+        return "في الفترة";
+      default:
+        return "";
+    }
+  })();
 
-function visitTimeFilter(from?: Date, to?: Date): Prisma.CustomerVisitWhereInput {
-  if (!from && !to) return {};
-  const range = {
-    ...(from ? { gte: from } : {}),
-    ...(to ? { lte: to } : {}),
-  };
-  return { OR: [{ enteredAt: range }, { arrivalTime: range }] };
-}
+  const withSuffix = (base: string, alt?: string) =>
+    suffix ? `${base} ${suffix}` : alt ?? base;
 
-function baseVisitWhere(
-  restaurantId: string,
-  from?: Date,
-  to?: Date,
-  branchId?: string
-): Prisma.CustomerVisitWhereInput {
   return {
-    restaurantId,
-    ...(branchId ? { branchId } : {}),
-    visitStatus: { in: ACTUAL_VISIT_STATUSES },
-    NOT: { customerName: { contains: "Register QA", mode: "insensitive" } },
-    ...visitTimeFilter(from, to),
+    visitors: withSuffix("الزوار الفريدون", "الزوار الفريدون"),
+    totalVisits: withSuffix("زيارات", "إجمالي الزيارات"),
+    repeatCustomers: withSuffix("متكررون", "العملاء المتكررون"),
+    noShows: withSuffix("لم يحضروا", "لم يحضروا"),
+    vipVisitors: withSuffix("VIP", "عملاء VIP"),
+    topVisitors: withSuffix("الأكثر زيارة", "الأكثر زيارة"),
+    actualEntries: withSuffix("عدد الداخلين الفعلي", "عدد الداخلين الفعلي"),
+    firstEntry: withSuffix("وقت أول دخول", "وقت أول دخول"),
+    lastEntry: withSuffix("وقت آخر دخول", "وقت آخر دخول"),
+    afterMidnight: withSuffix("داخلين بعد منتصف الليل", "عدد الداخلين بعد منتصف الليل"),
+    avgSession: withSuffix("متوسط مدة الجلسة", "متوسط مدة الجلسة"),
+    completedSessions: withSuffix("جلسات مكتملة", "عدد الجلسات المكتملة"),
+    activeSessions: withSuffix("جلسات نشطة", "عدد الجلسات النشطة"),
   };
-}
-
-/** Simpler QA exclusion — Prisma NOT with regex is awkward */
-function excludeQaVisits<T extends { customerName: string }>(rows: T[]): T[] {
-  return rows.filter((r) => !isQaTestRecord(r.customerName));
 }
 
 export async function buildCustomerReports(
@@ -235,46 +99,147 @@ export async function buildCustomerReports(
   from?: Date,
   to?: Date,
   period: ReportPeriod = "",
-  branchId?: string
+  branchId?: string,
+  config?: BusinessDayConfig
 ) {
-  const visitWhere = baseVisitWhere(restaurantId, from, to, branchId);
+  const timezone = config?.timezone ?? "Asia/Riyadh";
+  const businessDayStartHour = config?.businessDayStartHour ?? 4;
 
-  const [visits, noShows] = await Promise.all([
-    prisma.customerVisit.findMany({
-      where: visitWhere,
-      select: {
-        id: true,
-        customerProfileId: true,
-        customerName: true,
-        customerPhone: true,
-        totalBill: true,
-        enteredAt: true,
-        arrivalTime: true,
-        customerProfile: { select: { isVip: true } },
-      },
-      take: 10000,
-    }),
-    prisma.reservation.count({
-      where: {
-        restaurantId,
-        status: "NO_SHOW",
-        ...(branchId ? { branchId } : {}),
-        NOT: { customerName: { contains: "Register QA", mode: "insensitive" } },
-        ...(from || to
-          ? {
-              date: {
-                ...(from ? { gte: from } : {}),
-                ...(to ? { lte: to } : {}),
-              },
-            }
-          : {}),
-      },
-    }),
-  ]);
+  const broadFilter = actualEntryBroadWhere(from, to);
+  const visitWhere: Prisma.CustomerVisitWhereInput = {
+    restaurantId,
+    ...(branchId ? { branchId } : {}),
+    visitStatus: { in: ACTUAL_VISIT_STATUSES },
+    NOT: { customerName: { contains: "Register QA", mode: "insensitive" } },
+    ...(broadFilter ?? {}),
+  };
 
-  const filtered = excludeQaVisits(visits);
+  const [visitsRaw, noShows, activeSessionsCount, completedSessionsInPeriod] =
+    await Promise.all([
+      prisma.customerVisit.findMany({
+        where: visitWhere,
+        select: {
+          id: true,
+          customerProfileId: true,
+          customerName: true,
+          customerPhone: true,
+          totalBill: true,
+          enteredAt: true,
+          createdAt: true,
+          visitStatus: true,
+          sessionDurationMinutes: true,
+          sessionStartedAt: true,
+          sessionEndedAt: true,
+          tableSessions: {
+            select: {
+              id: true,
+              startedAt: true,
+              endedAt: true,
+              status: true,
+              reservation: { select: { arrivedAt: true } },
+            },
+          },
+          customerProfile: { select: { isVip: true } },
+        },
+        take: 15000,
+      }),
+      prisma.reservation.count({
+        where: {
+          restaurantId,
+          status: "NO_SHOW",
+          ...(branchId ? { branchId } : {}),
+          NOT: { customerName: { contains: "Register QA", mode: "insensitive" } },
+          ...(from || to
+            ? {
+                OR: [
+                  ...(from || to
+                    ? [
+                        {
+                          noShowAt: {
+                            ...(from ? { gte: from } : {}),
+                            ...(to ? { lte: to } : {}),
+                          },
+                        },
+                      ]
+                    : []),
+                  {
+                    date: {
+                      ...(from ? { gte: from } : {}),
+                      ...(to ? { lte: to } : {}),
+                    },
+                  },
+                ],
+              }
+            : {}),
+        },
+      }),
+      prisma.tableSession.count({
+        where: {
+          restaurantId,
+          endedAt: null,
+          status: { not: "COMPLETED" },
+          ...(branchId ? { branchId } : {}),
+        },
+      }),
+      prisma.tableSession.count({
+        where: {
+          restaurantId,
+          status: "COMPLETED",
+          ...(branchId ? { branchId } : {}),
+          ...(from || to
+            ? {
+                endedAt: {
+                  ...(from ? { gte: from } : {}),
+                  ...(to ? { lte: to } : {}),
+                },
+              }
+            : {}),
+        },
+      }),
+    ]);
+
+  const visitsWithReservation = visitsRaw.map((v) => {
+    const reservationArrived = v.tableSessions.find((s) => s.reservation?.arrivedAt)
+      ?.reservation;
+    return {
+      ...v,
+      reservation: reservationArrived ?? null,
+    };
+  });
+
+  const filtered = filterByActualEntry(visitsWithReservation, from, to).filter(
+    (v) => !isQaTestRecord(v.customerName)
+  );
 
   const totalVisits = filtered.length;
+  const actualEntries = totalVisits;
+
+  let firstEntryAt: Date | null = null;
+  let lastEntryAt: Date | null = null;
+  let afterMidnightEntries = 0;
+  let durationSum = 0;
+  let durationCount = 0;
+
+  for (const v of filtered) {
+    if (!firstEntryAt || v.actualEntryAt < firstEntryAt) firstEntryAt = v.actualEntryAt;
+    if (!lastEntryAt || v.actualEntryAt > lastEntryAt) lastEntryAt = v.actualEntryAt;
+    if (isAfterMidnightEntry(v.actualEntryAt, timezone, businessDayStartHour)) {
+      afterMidnightEntries++;
+    }
+    if (v.sessionDurationMinutes != null) {
+      durationSum += v.sessionDurationMinutes;
+      durationCount++;
+    } else if (v.sessionStartedAt && v.sessionEndedAt) {
+      durationSum += Math.max(
+        0,
+        Math.round(
+          (v.sessionEndedAt.getTime() - v.sessionStartedAt.getTime()) / 60000
+        )
+      );
+      durationCount++;
+    }
+  }
+
   const byCustomer = new Map<
     string,
     {
@@ -320,13 +285,24 @@ export async function buildCustomerReports(
     labels,
     from: from?.toISOString() ?? null,
     to: to?.toISOString() ?? null,
+    businessDayNote: BUSINESS_DAY_NOTE_AR,
+    operationalPeriodLabel:
+      from && to ? formatOperationalPeriodLabel(from, to, timezone) : null,
     uniqueVisitors,
     totalVisits,
+    actualEntries,
     repeatCustomers,
     noShows,
     vipVisitors,
     mostFrequentCustomers,
-    /** @deprecated use uniqueVisitors — kept for backward compat */
+    firstEntryAt: firstEntryAt ? formatRiyadhDateTime(firstEntryAt) : null,
+    lastEntryAt: lastEntryAt ? formatRiyadhDateTime(lastEntryAt) : null,
+    afterMidnightEntries,
+    avgSessionDurationMinutes:
+      durationCount > 0 ? Math.round(durationSum / durationCount) : 0,
+    completedSessions: completedSessionsInPeriod,
+    activeSessions: activeSessionsCount,
+    /** @deprecated use uniqueVisitors */
     visitedToday: uniqueVisitors,
     /** @deprecated use totalVisits */
     visitedThisMonth: totalVisits,
@@ -334,3 +310,5 @@ export async function buildCustomerReports(
     vipCustomers: vipVisitors,
   };
 }
+
+export { resolveActualEntryAt, filterByActualEntry };

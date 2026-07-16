@@ -41,10 +41,17 @@ export {
   reportPeriodLabels,
   startOfRiyadhDay,
   endOfRiyadhDay,
+  getBusinessDayRange,
+  currentBusinessDate,
+  BUSINESS_DAY_NOTE_AR,
+  formatOperationalPeriodLabel,
   buildCustomerReports,
   isQaTestRecord,
+  resolveActualEntryAt,
+  filterByActualEntry,
 } from "@/lib/customer-reports";
 export type { ReportPeriod } from "@/lib/customer-reports";
+export type { BusinessDayConfig } from "@/lib/business-day";
 
 export function csvEscape(value: unknown): string {
   const s = value == null ? "" : String(value);

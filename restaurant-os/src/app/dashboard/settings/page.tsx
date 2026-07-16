@@ -18,6 +18,7 @@ interface SettingsForm {
   customDomain: string;
   timezone: string;
   currency: string;
+  businessDayStartHour: number;
 }
 
 export default function OwnerSettingsPage() {
@@ -29,6 +30,7 @@ export default function OwnerSettingsPage() {
     customDomain: "",
     timezone: "Asia/Riyadh",
     currency: "SAR",
+    businessDayStartHour: 4,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,6 +50,7 @@ export default function OwnerSettingsPage() {
             customDomain: r.customDomain || "",
             timezone: r.timezone || "Asia/Riyadh",
             currency: r.currency || "SAR",
+            businessDayStartHour: r.businessDayStartHour ?? 4,
           });
         }
       })
@@ -119,6 +122,17 @@ export default function OwnerSettingsPage() {
             onChange={(e) => setForm({ ...form, timezone: e.target.value })}
             dir="ltr"
           />
+          <Input
+            label="بداية اليوم التشغيلي (ساعة)"
+            value={String(form.businessDayStartHour)}
+            readOnly
+            disabled
+            dir="ltr"
+          />
+          <p className="-mt-2 text-xs text-gray-500">
+            اليوم التشغيلي من {form.businessDayStartHour}:00 صباحًا حتى 3:59 صباحًا من اليوم التالي.
+            لا يمكن تغيير هذا الإعداد حاليًا.
+          </p>
           <Input
             label="العملة"
             value={form.currency}

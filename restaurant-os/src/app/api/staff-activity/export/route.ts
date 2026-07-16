@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRestaurantRole } from "@/lib/api-auth";
 import { assertFeature } from "@/lib/permissions-engine";
 import { toCsv, resolveDateRange } from "@/lib/customer-history";
+import { getRestaurantBusinessDayConfig } from "@/lib/restaurant-config";
 import {
   canViewAllStaffActivity,
   getAuditLogRows,
@@ -25,7 +26,13 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const type = sp.get("type") || "summary";
   const format = sp.get("format") || "csv";
-  const { from, to } = resolveDateRange(sp.get("preset"), sp.get("dateFrom"), sp.get("dateTo"));
+  const businessConfig = await getRestaurantBusinessDayConfig(restaurantId!);
+  const { from, to } = resolveDateRange(
+    sp.get("preset"),
+    sp.get("dateFrom"),
+    sp.get("dateTo"),
+    businessConfig
+  );
   const userId = sp.get("userId") || undefined;
   const role = session?.user.role;
 

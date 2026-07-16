@@ -312,6 +312,7 @@ model Restaurant {
   taxNumber   String?  @map("tax_number")
   currency    String   @default("SAR")
   timezone    String   @default("Asia/Riyadh")
+  businessDayStartHour Int @default(4) @map("business_day_start_hour")
   isActive    Boolean  @default(true) @map("is_active")
 
   defaultPaymentProvider PaymentProvider @default(MOYASAR) @map("default_payment_provider")

@@ -1,5 +1,7 @@
 import prisma from "@/lib/prisma";
 import { resolveDateRange } from "@/lib/customer-history";
+import { getRestaurantBusinessDayConfig } from "@/lib/restaurant-config";
+import { actualEntryBroadWhere } from "@/lib/actual-entry";
 import {
   DEFAULT_MONITORING_SETTINGS,
   parseMonitoringSettings,
@@ -24,7 +26,13 @@ export async function getMonitoringSettings(restaurantId: string): Promise<Monit
 }
 
 export async function getMonitoringStats(restaurantId: string, branchId?: string) {
-  const { from: todayStart, to: todayEnd } = resolveDateRange("today");
+  const businessConfig = await getRestaurantBusinessDayConfig(restaurantId);
+  const { from: todayStart, to: todayEnd } = resolveDateRange(
+    "today",
+    null,
+    null,
+    businessConfig
+  );
   const branchFilter = branchId ? { branchId } : {};
 
   const [
@@ -49,7 +57,7 @@ export async function getMonitoringStats(restaurantId: string, branchId?: string
     prisma.customerVisit.count({
       where: {
         restaurantId,
-        createdAt: { gte: todayStart!, lte: todayEnd! },
+        ...actualEntryBroadWhere(todayStart, todayEnd),
       },
     }),
     prisma.customerVisit.count({
@@ -176,11 +184,17 @@ export async function getLiveCustomers(restaurantId: string, branchId?: string) 
 }
 
 export async function getStaffPerformance(restaurantId: string) {
-  const { from: todayStart, to: todayEnd } = resolveDateRange("today");
-  const weekStart = new Date();
-  weekStart.setDate(weekStart.getDate() - 6);
-  const monthStart = new Date();
-  monthStart.setDate(monthStart.getDate() - 29);
+  const businessConfig = await getRestaurantBusinessDayConfig(restaurantId);
+  const { from: todayStart, to: todayEnd } = resolveDateRange(
+    "today",
+    null,
+    null,
+    businessConfig
+  );
+  const weekRange = resolveDateRange("last7", null, null, businessConfig);
+  const monthRange = resolveDateRange("last30", null, null, businessConfig);
+  const weekStart = weekRange.from!;
+  const monthStart = monthRange.from!;
 
   const staffList = await prisma.staff.findMany({
     where: { restaurantId, isActive: true },
@@ -433,7 +447,13 @@ export async function searchMonitoring(
   const term = q.trim();
   if (!term) return { visits: [], sessions: [], reservations: [], staff: [] };
 
-  const { from, to } = resolveDateRange("custom", filters?.dateFrom, filters?.dateTo);
+  const businessConfig = await getRestaurantBusinessDayConfig(restaurantId);
+  const { from, to } = resolveDateRange(
+    "custom",
+    filters?.dateFrom,
+    filters?.dateTo,
+    businessConfig
+  );
 
   const [visits, sessions, reservations, staff] = await Promise.all([
     prisma.customerVisit.findMany({

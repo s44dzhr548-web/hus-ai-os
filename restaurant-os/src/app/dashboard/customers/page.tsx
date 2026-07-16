@@ -79,6 +79,8 @@ interface Reports {
   period?: string;
   from?: string | null;
   to?: string | null;
+  businessDayNote?: string;
+  operationalPeriodLabel?: string | null;
   labels?: {
     visitors: string;
     totalVisits: string;
@@ -86,12 +88,26 @@ interface Reports {
     noShows: string;
     vipVisitors: string;
     topVisitors: string;
+    actualEntries?: string;
+    firstEntry?: string;
+    lastEntry?: string;
+    afterMidnight?: string;
+    avgSession?: string;
+    completedSessions?: string;
+    activeSessions?: string;
   };
   uniqueVisitors: number;
   totalVisits: number;
+  actualEntries?: number;
   noShows: number;
   repeatCustomers: number;
   vipVisitors: number;
+  firstEntryAt?: string | null;
+  lastEntryAt?: string | null;
+  afterMidnightEntries?: number;
+  avgSessionDurationMinutes?: number;
+  completedSessions?: number;
+  activeSessions?: number;
   mostFrequentCustomers: {
     id: string;
     customerName: string;
@@ -385,19 +401,27 @@ export default function CustomersPage() {
         <LoadingSpinner />
       ) : tab === "reports" && reports ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {reports.from && reports.to && (
-            <p className="col-span-full text-xs text-gray-500">
-              الفترة: {new Date(reports.from).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
-              {" — "}
-              {new Date(reports.to).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}
+          <p className="col-span-full text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-3 py-2">
+            {reports.businessDayNote ?? "اليوم التشغيلي من 4:00 صباحًا حتى 3:59 صباحًا من اليوم التالي"}
+          </p>
+          {reports.operationalPeriodLabel && (
+            <p className="col-span-full whitespace-pre-line text-xs text-gray-600">
+              {reports.operationalPeriodLabel}
             </p>
           )}
           {[
+            { label: reports.labels?.actualEntries ?? "عدد الداخلين الفعلي", value: reports.actualEntries ?? reports.totalVisits },
             { label: reports.labels?.visitors ?? "الزوار الفريدون", value: reports.uniqueVisitors },
             { label: reports.labels?.totalVisits ?? "إجمالي الزيارات", value: reports.totalVisits },
             { label: reports.labels?.repeatCustomers ?? "العملاء المتكررون", value: reports.repeatCustomers },
             { label: reports.labels?.vipVisitors ?? "عملاء VIP", value: reports.vipVisitors },
             { label: reports.labels?.noShows ?? "لم يحضروا", value: reports.noShows },
+            { label: reports.labels?.firstEntry ?? "وقت أول دخول", value: reports.firstEntryAt ?? "—" },
+            { label: reports.labels?.lastEntry ?? "وقت آخر دخول", value: reports.lastEntryAt ?? "—" },
+            { label: reports.labels?.afterMidnight ?? "عدد الداخلين بعد منتصف الليل", value: reports.afterMidnightEntries ?? 0 },
+            { label: reports.labels?.avgSession ?? "متوسط مدة الجلسة", value: reports.avgSessionDurationMinutes != null ? `${reports.avgSessionDurationMinutes} دقيقة` : "—" },
+            { label: reports.labels?.completedSessions ?? "عدد الجلسات المكتملة", value: reports.completedSessions ?? 0 },
+            { label: reports.labels?.activeSessions ?? "عدد الجلسات النشطة", value: reports.activeSessions ?? 0 },
           ].map((item) => (
             <Card key={item.label} className="p-4">
               <p className="text-sm text-gray-500">{item.label}</p>

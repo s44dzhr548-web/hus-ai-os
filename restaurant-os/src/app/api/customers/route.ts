@@ -9,6 +9,7 @@ import {
   computeFavoriteArea,
   resolveDateRange,
 } from "@/lib/customer-history";
+import { getRestaurantBusinessDayConfig } from "@/lib/restaurant-config";
 import { buildCustomerReports } from "@/lib/customer-reports";
 import { loadStaffNameMap } from "@/lib/staff-names";
 import { buildVisitReports } from "@/lib/staff-activity-service";
@@ -33,10 +34,12 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const role = session?.user.role;
   const preset = sp.get("period") || sp.get("preset");
+  const businessConfig = await getRestaurantBusinessDayConfig(restaurantId!);
   const { from, to, period } = resolveDateRange(
     preset,
     sp.get("from") || sp.get("dateFrom"),
-    sp.get("to") || sp.get("dateTo")
+    sp.get("to") || sp.get("dateTo"),
+    businessConfig
   );
 
   const phone = sp.get("phone")?.trim();
@@ -59,8 +62,8 @@ export async function GET(req: NextRequest) {
   if (view === "reports") {
     const branchId = sp.get("branchId") || undefined;
     const [reports, visitReports] = await Promise.all([
-      buildCustomerReports(restaurantId!, from, to, period, branchId),
-      buildVisitReports(restaurantId!, from, to),
+      buildCustomerReports(restaurantId!, from, to, period, branchId, businessConfig),
+      buildVisitReports(restaurantId!, from, to, businessConfig),
     ]);
     return NextResponse.json({ ...reports, visitReports });
   }

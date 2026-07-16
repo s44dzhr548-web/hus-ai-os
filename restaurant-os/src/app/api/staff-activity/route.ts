@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRestaurantRole } from "@/lib/api-auth";
 import { assertFeature } from "@/lib/permissions-engine";
 import { resolveDateRange } from "@/lib/customer-history";
+import { getRestaurantBusinessDayConfig } from "@/lib/restaurant-config";
 import {
   canViewAllStaffActivity,
   getAuditLogRows,
@@ -26,7 +27,13 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const section = sp.get("section") || "summary";
   const preset = sp.get("preset");
-  const { from, to } = resolveDateRange(preset, sp.get("dateFrom"), sp.get("dateTo"));
+  const businessConfig = await getRestaurantBusinessDayConfig(restaurantId!);
+  const { from, to } = resolveDateRange(
+    preset,
+    sp.get("dateFrom"),
+    sp.get("dateTo"),
+    businessConfig
+  );
   const requestedUserId = sp.get("userId") || undefined;
   const role = session?.user.role;
   const sessionUserId = session?.user.id;

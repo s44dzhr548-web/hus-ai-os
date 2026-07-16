@@ -2,6 +2,12 @@ import prisma from "@/lib/prisma";
 import type { Prisma, ReservationStatus, Reservation } from "@prisma/client";
 import { formatRiyadhDate, formatRiyadhTime, formatRiyadhDateTime } from "@/lib/timezone";
 import { REGISTER_STATUS_LABELS, SOURCE_LABELS } from "@/lib/reservation-labels";
+import {
+  addCalendarDays,
+  currentBusinessDate,
+  getBusinessDayRange,
+  DEFAULT_BUSINESS_DAY_CONFIG,
+} from "@/lib/business-day";
 
 export const TERMINAL_STATUSES: ReservationStatus[] = [
   "COMPLETED",
@@ -42,22 +48,15 @@ export type ReservationQuery = {
 };
 
 function dayBoundsRiyadh(offsetDays = 0) {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Riyadh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now);
-  const y = parts.find((p) => p.type === "year")?.value ?? "1970";
-  const m = parts.find((p) => p.type === "month")?.value ?? "01";
-  const d = parts.find((p) => p.type === "day")?.value ?? "01";
-  const base = new Date(`${y}-${m}-${d}T00:00:00.000Z`);
-  base.setUTCDate(base.getUTCDate() + offsetDays);
-  const end = new Date(base);
-  end.setUTCDate(end.getUTCDate() + 1);
-  end.setUTCMilliseconds(end.getUTCMilliseconds() - 1);
-  return { start: base, end };
+  const config = DEFAULT_BUSINESS_DAY_CONFIG;
+  const bd = currentBusinessDate(new Date(), config.timezone, config.businessDayStartHour);
+  const targetBd = offsetDays === 0 ? bd : addCalendarDays(bd, offsetDays);
+  const range = getBusinessDayRange({
+    businessDate: targetBd,
+    timezone: config.timezone,
+    businessDayStartHour: config.businessDayStartHour,
+  });
+  return { start: range.startUtc, end: range.endUtc };
 }
 
 export function buildReservationWhere(q: ReservationQuery): Prisma.ReservationWhereInput {

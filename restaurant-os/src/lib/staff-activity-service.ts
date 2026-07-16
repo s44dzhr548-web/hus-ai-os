@@ -1,6 +1,11 @@
 import prisma from "@/lib/prisma";
 import { resolveDateRange } from "@/lib/customer-history";
 import {
+  businessDateForTimestamp,
+  type BusinessDayConfig,
+} from "@/lib/business-day";
+import { actualEntryBroadWhere, filterByActualEntry } from "@/lib/actual-entry";
+import {
   AUDIT_ACTION_LABELS_AR,
   STAFF_AUDIT_ACTIONS,
 } from "@/lib/staff-audit-event";
@@ -531,34 +536,49 @@ export async function getAuditLogRows(
 export async function buildVisitReports(
   restaurantId: string,
   from?: Date,
-  to?: Date
+  to?: Date,
+  config?: BusinessDayConfig
 ) {
-  const where: Prisma.CustomerVisitWhereInput = {
-    restaurantId,
-    visitStatus: { notIn: ["CANCELLED", "NO_SHOW"] },
-    NOT: { customerName: { contains: "Register QA", mode: "insensitive" } },
-    ...(from || to
-      ? {
-          OR: [
-            { enteredAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } },
-            { arrivalTime: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } },
-          ],
-        }
-      : {}),
-  };
+  const timezone = config?.timezone ?? "Asia/Riyadh";
+  const businessDayStartHour = config?.businessDayStartHour ?? 4;
+  const broadFilter = actualEntryBroadWhere(from, to);
 
-  const visits = await prisma.customerVisit.findMany({
-    where,
+  const visitsRaw = await prisma.customerVisit.findMany({
+    where: {
+      restaurantId,
+      visitStatus: { notIn: ["CANCELLED", "NO_SHOW"] },
+      NOT: { customerName: { contains: "Register QA", mode: "insensitive" } },
+      ...(broadFilter ?? {}),
+    },
     select: {
+      id: true,
       enteredAt: true,
+      createdAt: true,
       exitedAt: true,
       sessionDurationMinutes: true,
       tableNumber: true,
       tableDisplayNumber: true,
       branchId: true,
+      tableSessions: {
+        select: {
+          id: true,
+          startedAt: true,
+          reservation: { select: { arrivedAt: true } },
+        },
+      },
     },
     take: 5000,
   });
+
+  const visits = filterByActualEntry(
+    visitsRaw.map((v) => ({
+      ...v,
+      reservation:
+        v.tableSessions.find((s) => s.reservation?.arrivedAt)?.reservation ?? null,
+    })),
+    from,
+    to
+  );
 
   const entriesByDate = new Map<string, number>();
   const exitsByDate = new Map<string, number>();
@@ -570,21 +590,28 @@ export async function buildVisitReports(
   let durationCount = 0;
 
   for (const v of visits) {
-    if (v.enteredAt) {
-      const d = formatRiyadhDate(v.enteredAt);
-      entriesByDate.set(d, (entriesByDate.get(d) ?? 0) + 1);
-      const hour = new Date(
-        v.enteredAt.toLocaleString("en-US", { timeZone: "Asia/Riyadh" })
-      ).getHours();
-      entryHours.set(hour, (entryHours.get(hour) ?? 0) + 1);
-    }
+    const bd = businessDateForTimestamp(
+      v.actualEntryAt,
+      timezone,
+      businessDayStartHour
+    );
+    entriesByDate.set(bd, (entriesByDate.get(bd) ?? 0) + 1);
+    const hour = new Date(
+      v.actualEntryAt.toLocaleString("en-US", { timeZone: timezone })
+    ).getHours();
+    entryHours.set(hour, (entryHours.get(hour) ?? 0) + 1);
+
     if (v.exitedAt) {
-      const d = formatRiyadhDate(v.exitedAt);
-      exitsByDate.set(d, (exitsByDate.get(d) ?? 0) + 1);
-      const hour = new Date(
-        v.exitedAt.toLocaleString("en-US", { timeZone: "Asia/Riyadh" })
+      const exitBd = businessDateForTimestamp(
+        v.exitedAt,
+        timezone,
+        businessDayStartHour
+      );
+      exitsByDate.set(exitBd, (exitsByDate.get(exitBd) ?? 0) + 1);
+      const exitHour = new Date(
+        v.exitedAt.toLocaleString("en-US", { timeZone: timezone })
       ).getHours();
-      exitHours.set(hour, (exitHours.get(hour) ?? 0) + 1);
+      exitHours.set(exitHour, (exitHours.get(exitHour) ?? 0) + 1);
     }
     if (v.sessionDurationMinutes != null) {
       durationSum += v.sessionDurationMinutes;

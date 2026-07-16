@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRestaurantRole } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { assertFeature } from "@/lib/permissions-engine";
+import { getRestaurantBusinessDayConfig } from "@/lib/restaurant-config";
 import {
   applyPhonePrivacy,
   canViewCustomerPhone,
@@ -30,10 +31,12 @@ export async function GET(req: NextRequest) {
   const type = sp.get("type") || "customers";
   const role = session?.user.role;
   const showPhone = canViewCustomerPhone(role);
+  const businessConfig = await getRestaurantBusinessDayConfig(restaurantId!);
   const { from, to } = resolveDateRange(
     sp.get("period") || sp.get("preset"),
     sp.get("from") || sp.get("dateFrom"),
-    sp.get("to") || sp.get("dateTo")
+    sp.get("to") || sp.get("dateTo"),
+    businessConfig
   );
 
   const phone = sp.get("phone")?.trim();
