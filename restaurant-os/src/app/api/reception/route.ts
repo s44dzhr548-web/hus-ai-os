@@ -19,6 +19,7 @@ import {
 import { menuUrlForTable } from "@/lib/table-code";
 import { requestMeta } from "@/lib/request-meta";
 import { onCustomerRegistered } from "@/lib/visit-tracking";
+import { fetchPresentGuests } from "@/lib/present-guests";
 import type { TableSessionStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -91,8 +92,11 @@ export async function GET(req: NextRequest) {
 
   cards = sortTableCards(cards, sortBy);
 
+  const presentGuests = await fetchPresentGuests(restaurantId!, branchId);
+
   return NextResponse.json({
     cards,
+    presentGuests,
     branches: await prisma.branch.findMany({
       where: { restaurantId: restaurantId!, isActive: true },
       select: { id: true, name: true, nameAr: true },

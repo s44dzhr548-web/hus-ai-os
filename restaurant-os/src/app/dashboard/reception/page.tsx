@@ -64,6 +64,20 @@ interface TableCard {
   status: string;
 }
 
+type PresentGuest = {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  guestCount: number;
+  status: string;
+  statusLabel: string;
+  displaySection: "arrived" | "checked_in" | "seated";
+  tableNumberSnapshot: string | null;
+  tableLabel: string | null;
+  arrivedAt: string | null;
+  checkedInAt: string | null;
+};
+
 type EditModal = "edit" | "move" | "minSpend" | null;
 type TableMode = "existing" | "manual";
 
@@ -343,6 +357,7 @@ function ManualTableFields({
 
 export default function ReceptionPage() {
   const [cards, setCards] = useState<TableCard[]>([]);
+  const [presentGuests, setPresentGuests] = useState<PresentGuest[]>([]);
   const [branches, setBranches] = useState<{ id: string; name: string; nameAr?: string }[]>([]);
   const [branchId, setBranchId] = useState("");
   const [sortBy, setSortBy] = useState("sortOrder");
@@ -406,6 +421,7 @@ export default function ReceptionPage() {
     }
     const data = await res.json();
     setCards(data.cards || []);
+    setPresentGuests(data.presentGuests || []);
     setBranches(data.branches || []);
     if (!branchId && data.branches?.[0]) setBranchId(data.branches[0].id);
   }, [branchId, sortBy]);
@@ -626,6 +642,12 @@ export default function ReceptionPage() {
   }
 
   const filteredCards = branchId ? cards.filter((c) => c.table.branchId === branchId) : cards;
+  const filteredPresent = branchId
+    ? presentGuests
+    : presentGuests;
+  const arrivedGuests = filteredPresent.filter((g) => g.displaySection === "arrived");
+  const checkedInGuests = filteredPresent.filter((g) => g.displaySection === "checked_in");
+  const seatedGuests = filteredPresent.filter((g) => g.displaySection === "seated");
   const availableTables = filteredCards.filter((c) => !c.session);
   const canForce = userRole != null && FORCE_ROLES.includes(userRole);
 
@@ -645,6 +667,48 @@ export default function ReceptionPage() {
         description="تسجيل العملاء وتعيين الطاولات"
         action={<Button onClick={() => openWalkInModal()}>تسجيل عميل جديد</Button>}
       />
+
+      {error && (
+        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>
+      )}
+
+      {(arrivedGuests.length > 0 || checkedInGuests.length > 0 || seatedGuests.length > 0) && (
+        <Card className="space-y-4 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">الحاضرون اليوم</h2>
+            <Link href="/dashboard/reservations" className="text-sm text-emerald-700 hover:underline">
+              إدارة الحجوزات
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              { title: "وصل", guests: arrivedGuests, color: "bg-blue-50 border-blue-200" },
+              { title: "تم الوصول", guests: checkedInGuests, color: "bg-amber-50 border-amber-200" },
+              { title: "على الطاولة", guests: seatedGuests, color: "bg-emerald-50 border-emerald-200" },
+            ].map((section) => (
+              <div key={section.title} className={`rounded-xl border p-3 ${section.color}`}>
+                <p className="mb-2 text-sm font-semibold">{section.title} ({section.guests.length})</p>
+                {section.guests.length === 0 ? (
+                  <p className="text-xs text-gray-500">لا يوجد</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {section.guests.map((g) => (
+                      <li key={g.id} className="rounded-lg bg-white/80 p-2 text-sm">
+                        <p className="font-medium">{g.customerName}</p>
+                        <p className="text-xs text-gray-600">
+                          {g.guestCount} ضيف
+                          {g.tableNumberSnapshot ? ` · طاولة ${g.tableNumberSnapshot}` : ""}
+                        </p>
+                        <Badge className="mt-1">{g.statusLabel}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         {branches.length > 1 && (
@@ -672,8 +736,6 @@ export default function ReceptionPage() {
           ))}
         </select>
       </div>
-
-      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
       {filteredCards.length === 0 ? (
         <EmptyState title="لا توجد طاولات" description="أضف طاولات من قسم الطاولات" />

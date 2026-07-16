@@ -130,7 +130,7 @@ export default function ReservationsPage() {
     if (tableMode === "manual" && manualTable.number) {
       payload.manualTable = {
         ...manualTable,
-        number: parseInt(manualTable.number),
+        number: manualTable.number,
         minimumSpendAmount: manualTable.minimumSpendAmount || undefined,
       };
     } else if (tableMode === "existing" && form.tableId) {
@@ -179,7 +179,7 @@ export default function ReservationsPage() {
       }
       body.manualTable = {
         ...manualTable,
-        number: parseInt(manualTable.number),
+        number: manualTable.number,
       };
     } else {
       if (!assignModal.tableId) return;
@@ -195,6 +195,7 @@ export default function ReservationsPage() {
     APPROVED: "bg-emerald-100 text-emerald-800",
     CONFIRMED: "bg-emerald-100 text-emerald-800",
     ARRIVED: "bg-blue-100 text-blue-800",
+    CHECKED_IN: "bg-amber-100 text-amber-800",
     SEATED: "bg-purple-100 text-purple-800",
     CANCELLED: "bg-gray-100 text-gray-600",
     CONVERTED: "bg-purple-100 text-purple-800",
@@ -227,7 +228,8 @@ export default function ReservationsPage() {
           { id: "PENDING", label: "قيد المراجعة" },
           { id: "CONFIRMED", label: "مؤكد" },
           { id: "ARRIVED", label: "وصل" },
-          { id: "CONVERTED", label: "تحوّل لجلسة" },
+          { id: "CHECKED_IN", label: "تم الوصول" },
+          { id: "SEATED", label: "على الطاولة" },
           { id: "CANCELLED", label: "ملغي" },
         ].map((f) => (
           <button

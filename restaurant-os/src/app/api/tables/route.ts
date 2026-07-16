@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
   try {
     const table = await createManagedTable(restaurantId!, session!.user.id, {
       branchId,
-      number: parseInt(number),
+      number,
       label,
       capacity: capacity ? parseInt(capacity) : undefined,
       floorZone,
@@ -193,7 +193,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const table = await updateManagedTable(restaurantId!, session!.user.id, id, {
-      number: data.number != null ? parseInt(data.number) : undefined,
+      number: data.number != null ? data.number : undefined,
       label: data.label,
       capacity: data.capacity != null ? parseInt(data.capacity) : undefined,
       floorZone: data.zone ?? data.floorZone,

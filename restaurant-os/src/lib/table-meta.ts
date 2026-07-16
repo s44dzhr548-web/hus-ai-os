@@ -1,6 +1,13 @@
 import type { TableIcon, DiningTable } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { tableCodeFor, menuUrlForTable } from "@/lib/table-code";
+import {
+  displayTableNumber,
+  normalizeTableNumber,
+  numericTableNumber,
+  TABLE_DUPLICATE_ERROR_AR,
+} from "@/lib/table-number-normalize";
+import { findNormalizedTableConflict } from "@/lib/table-duplicates";
 
 export const TABLE_ICONS: { id: TableIcon; label: string; emoji: string }[] = [
   { id: "REGULAR", label: "عادية", emoji: "🪑" },
@@ -37,14 +44,12 @@ export type ManualTableInput = {
 function parseTableIdentifier(raw: string | number): {
   numeric: number | null;
   display: string;
+  normalized: string;
 } {
-  const display = String(raw).trim();
-  if (!display) return { numeric: null, display: "" };
-  const parsed = parseInt(display, 10);
-  if (!Number.isNaN(parsed) && String(parsed) === display) {
-    return { numeric: parsed, display };
-  }
-  return { numeric: null, display };
+  const display = displayTableNumber(raw);
+  const normalized = normalizeTableNumber(raw);
+  const numeric = numericTableNumber(normalized);
+  return { numeric, display, normalized };
 }
 
 async function nextManualTableNumber(branchId: string): Promise<number> {
@@ -101,8 +106,30 @@ export async function upsertManualTable(
   branchId: string,
   input: ManualTableInput
 ) {
-  const { numeric, display } = parseTableIdentifier(input.number);
-  if (!display) throw new Error("رقم الطاولة غير صالح");
+  const { numeric, display, normalized } = parseTableIdentifier(input.number);
+  if (!display || !normalized) throw new Error("رقم الطاولة غير صالح");
+
+  let existing = await prisma.diningTable.findFirst({
+    where: { branchId, normalizedNumber: normalized, isArchived: false },
+  });
+
+  if (!existing && numeric != null) {
+    existing = await prisma.diningTable.findFirst({ where: { branchId, number: numeric } });
+  }
+
+  if (!existing) {
+    const conflict = await findNormalizedTableConflict(branchId, normalized);
+    if (conflict) throw new Error(TABLE_DUPLICATE_ERROR_AR);
+  }
+
+  if (!existing) {
+    existing = await prisma.diningTable.findFirst({
+      where: {
+        branchId,
+        OR: [{ label: display }, { tableCode: display.toLowerCase().replace(/\s+/g, "-") }],
+      },
+    });
+  }
 
   const slug =
     (await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { slug: true } }))
@@ -112,6 +139,8 @@ export async function upsertManualTable(
   const label = input.label?.trim() || display;
   const data = {
     label,
+    displayNumber: display,
+    normalizedNumber: normalized,
     tableIcon: icon,
     capacity: parseInt(String(input.capacity)) || 4,
     floorZone: input.zone?.trim() || null,
@@ -123,19 +152,6 @@ export async function upsertManualTable(
     sortOrder: input.sortOrder ?? (numeric ?? 9000),
     isActive: true,
   };
-
-  let existing = numeric
-    ? await prisma.diningTable.findFirst({ where: { branchId, number: numeric } })
-    : null;
-
-  if (!existing) {
-    existing = await prisma.diningTable.findFirst({
-      where: {
-        branchId,
-        OR: [{ label: display }, { tableCode: display.toLowerCase().replace(/\s+/g, "-") }],
-      },
-    });
-  }
 
   const tableNumber = numeric ?? (existing?.number ?? (await nextManualTableNumber(branchId)));
 
@@ -172,7 +188,7 @@ export async function checkReservationConflict(
       restaurantId,
       tableId,
       id: excludeReservationId ? { not: excludeReservationId } : undefined,
-      status: { in: ["PENDING", "APPROVED", "CONFIRMED", "ARRIVED"] },
+      status: { in: ["PENDING", "APPROVED", "CONFIRMED", "ARRIVED", "CHECKED_IN", "SEATED"] },
       date: { gte: dayStart, lte: dayEnd },
     },
   });

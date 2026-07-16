@@ -2,6 +2,13 @@ import prisma from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
 import { tableCodeFor, menuUrlForTable } from "@/lib/table-code";
 import { logTableAudit, tableSnapshot } from "@/lib/table-audit";
+import {
+  displayTableNumber,
+  normalizeTableNumber,
+  numericTableNumber,
+  TABLE_DUPLICATE_ERROR_AR,
+} from "@/lib/table-number-normalize";
+import { findNormalizedTableConflict } from "@/lib/table-duplicates";
 
 export async function getRestaurantSlug(restaurantId: string) {
   return (
@@ -30,19 +37,33 @@ export async function assertTableOwned(tableId: string, restaurantId: string) {
 
 export async function checkDuplicateTableNumber(
   branchId: string,
-  number: number,
+  number: number | string,
   excludeId?: string
 ) {
+  const conflict = await findNormalizedTableConflict(branchId, number, excludeId);
+  if (conflict) return conflict.table;
+
+  const normalized = normalizeTableNumber(number);
+  const numeric = typeof number === "number" ? number : numericTableNumber(normalized);
+  if (numeric == null) return null;
+
   const existing = await prisma.diningTable.findFirst({
     where: {
       branchId,
-      number,
+      number: numeric,
       isArchived: false,
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },
     select: { id: true, number: true },
   });
   return existing;
+}
+
+function tableNumberFields(raw: number | string) {
+  const display = displayTableNumber(raw);
+  const normalized = normalizeTableNumber(raw);
+  const numeric = typeof raw === "number" ? raw : numericTableNumber(normalized);
+  return { display, normalized, numeric };
 }
 
 export async function getTableWarnings(tableId: string, restaurantId: string) {
@@ -94,7 +115,7 @@ export async function createManagedTable(
   userId: string,
   data: {
     branchId: string;
-    number: number;
+    number: number | string;
     label?: string;
     capacity?: number;
     floorZone?: string | null;
@@ -102,8 +123,13 @@ export async function createManagedTable(
   }
 ) {
   await assertBranchOwned(data.branchId, restaurantId);
-  const dup = await checkDuplicateTableNumber(data.branchId, data.number);
-  if (dup) throw new Error(`رقم الطاولة ${data.number} مستخدم بالفعل`);
+  const fields = tableNumberFields(data.number);
+  if (!fields.normalized) throw new Error("رقم الطاولة غير صالح");
+
+  const dup = await checkDuplicateTableNumber(data.branchId, fields.normalized);
+  if (dup) throw new Error(TABLE_DUPLICATE_ERROR_AR);
+
+  const tableNum = fields.numeric ?? (await nextFallbackNumber(data.branchId));
 
   const slug = await getRestaurantSlug(restaurantId);
   const maxSort = await prisma.diningTable.aggregate({
@@ -114,16 +140,18 @@ export async function createManagedTable(
   const table = await prisma.diningTable.create({
     data: {
       branchId: data.branchId,
-      number: data.number,
-      label: data.label || `طاولة ${data.number}`,
+      number: tableNum,
+      displayNumber: fields.display,
+      normalizedNumber: fields.normalized,
+      label: data.label || `طاولة ${fields.display}`,
       capacity: data.capacity ?? 4,
       floorZone: data.floorZone || null,
       sortOrder: (maxSort._max.sortOrder ?? 0) + 1,
-      tableCode: data.tableCode || tableCodeFor(slug, data.number),
+      tableCode: data.tableCode || tableCodeFor(slug, tableNum),
     },
   });
 
-  const updated = await regenerateTableQr(table.id, slug, data.number, table.tableCode);
+  const updated = await regenerateTableQr(table.id, slug, tableNum, table.tableCode);
   await logTableAudit({
     restaurantId,
     userId,
@@ -134,12 +162,20 @@ export async function createManagedTable(
   return updated;
 }
 
+async function nextFallbackNumber(branchId: string) {
+  const last = await prisma.diningTable.findFirst({
+    where: { branchId, number: { gte: 9000 } },
+    orderBy: { number: "desc" },
+  });
+  return last ? last.number + 1 : 9000;
+}
+
 export async function updateManagedTable(
   restaurantId: string,
   userId: string,
   tableId: string,
   patch: {
-    number?: number;
+    number?: number | string;
     label?: string;
     capacity?: number;
     floorZone?: string | null;
@@ -156,13 +192,15 @@ export async function updateManagedTable(
   const existing = await assertTableOwned(tableId, restaurantId);
   const before = tableSnapshot(existing);
 
-  if (patch.number != null && patch.number !== existing.number) {
+  if (patch.number != null && String(patch.number) !== String(existing.number)) {
     const dup = await checkDuplicateTableNumber(existing.branchId, patch.number, tableId);
-    if (dup) throw new Error(`رقم الطاولة ${patch.number} مستخدم بالفعل`);
+    if (dup) throw new Error(TABLE_DUPLICATE_ERROR_AR);
   }
 
   const slug = await getRestaurantSlug(restaurantId);
-  const newNumber = patch.number ?? existing.number;
+  const fields =
+    patch.number != null ? tableNumberFields(patch.number) : null;
+  const newNumber = fields?.numeric ?? existing.number;
   const newCode =
     patch.tableCode !== undefined
       ? patch.tableCode || tableCodeFor(slug, newNumber)
@@ -173,8 +211,10 @@ export async function updateManagedTable(
   const updated = await prisma.diningTable.update({
     where: { id: tableId },
     data: {
-      number: patch.number,
-      label: patch.label,
+      number: fields?.numeric ?? (typeof patch.number === "number" ? patch.number : undefined),
+      displayNumber: fields?.display,
+      normalizedNumber: fields?.normalized,
+      label: patch.label ?? (fields ? `طاولة ${fields.display}` : undefined),
       capacity: patch.capacity,
       floorZone: patch.floorZone,
       isActive: patch.isActive,

@@ -67,7 +67,8 @@ export const RESERVATION_STATUS_LABELS: Record<string, string> = {
   CONFIRMED: "مؤكد",
   REJECTED: "مرفوض",
   ARRIVED: "وصل",
-  SEATED: "جلس",
+  CHECKED_IN: "تم الوصول",
+  SEATED: "على الطاولة",
   COMPLETED: "مكتمل",
   CANCELLED: "ملغي",
   CONVERTED: "تحوّل لجلسة",
@@ -489,6 +490,12 @@ export function serializeReservation(r: {
   depositStatus?: string | null;
   depositPaymentId?: string | null;
   arrivedAt?: Date | null;
+  checkedInAt?: Date | null;
+  tableNumberSnapshot?: string | null;
+  assignedByUserId?: string | null;
+  assignedAt?: Date | null;
+  currentVisitId?: string | null;
+  activeSessionId?: string | null;
   completedAt?: Date | null;
   cancelledAt?: Date | null;
   noShowAt?: Date | null;
@@ -521,6 +528,12 @@ export function serializeReservation(r: {
     depositStatus: r.depositStatus ?? null,
     depositPaymentId: r.depositPaymentId ?? null,
     arrivedAt: r.arrivedAt?.toISOString() ?? null,
+    checkedInAt: r.checkedInAt?.toISOString() ?? null,
+    tableNumberSnapshot: r.tableNumberSnapshot ?? null,
+    assignedAt: r.assignedAt?.toISOString() ?? null,
+    assignedByUserId: r.assignedByUserId ?? null,
+    currentVisitId: r.currentVisitId ?? null,
+    activeSessionId: r.activeSessionId ?? null,
     completedAt: r.completedAt?.toISOString() ?? null,
     cancelledAt: r.cancelledAt?.toISOString() ?? null,
     noShowAt: r.noShowAt?.toISOString() ?? null,

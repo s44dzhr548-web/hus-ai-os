@@ -33,6 +33,7 @@
     "test:marketing": "tsx scripts/marketing-ai-test.ts",
     "test:marketing-center": "tsx scripts/marketing-center-test.ts",
     "test:fabrika-regression": "node scripts/fabrika-regression-test.mjs",
+    "test:reception-table-qa": "node scripts/reception-table-qa.mjs",
     "test:table-management": "node scripts/table-management-test.mjs",
     "test:table-enterprise-qa": "node scripts/table-enterprise-qa.mjs",
     "test:owner-monitoring": "node scripts/owner-monitoring-qa.mjs",

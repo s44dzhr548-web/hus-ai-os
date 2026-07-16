@@ -127,6 +127,7 @@ enum ReservationStatus {
   CONFIRMED
   REJECTED
   ARRIVED
+  CHECKED_IN
   SEATED
   COMPLETED
   CANCELLED
@@ -453,6 +454,8 @@ model DiningTable {
   id                 String                 @id @default(cuid())
   branchId           String                 @map("branch_id")
   number             Int
+  displayNumber      String?                @map("display_number")
+  normalizedNumber   String?                @map("normalized_number")
   tableCode          String?                @unique @map("table_code")
   label              String?
   tableIcon          TableIcon              @default(REGULAR) @map("table_icon")
@@ -480,6 +483,7 @@ model DiningTable {
   customerVisits CustomerVisit[]
 
   @@unique([branchId, number])
+  @@index([branchId, normalizedNumber])
   @@index([branchId])
   @@map("dining_tables")
 }
@@ -1036,6 +1040,12 @@ model Reservation {
   depositStatus     DepositStatus?    @map("deposit_status")
   depositPaymentId  String?           @map("deposit_payment_id")
   arrivedAt         DateTime?         @map("arrived_at")
+  checkedInAt       DateTime?         @map("checked_in_at")
+  tableNumberSnapshot String?         @map("table_number_snapshot")
+  assignedByUserId  String?           @map("assigned_by_user_id")
+  assignedAt        DateTime?         @map("assigned_at")
+  currentVisitId    String?           @map("current_visit_id")
+  activeSessionId   String?           @map("active_session_id")
   completedAt       DateTime?         @map("completed_at")
   cancelledAt       DateTime?         @map("cancelled_at")
   noShowAt          DateTime?         @map("no_show_at")
