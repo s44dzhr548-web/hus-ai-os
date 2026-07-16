@@ -15,6 +15,7 @@ import {
 } from "@/lib/timezone";
 import { onSessionCompleted } from "@/lib/visit-tracking";
 import { triggerAfterVisitWhatsApp } from "@/lib/after-visit-whatsapp/service";
+import { transitionReservationStatus } from "@/lib/reservation-audit";
 
 export const TABLE_SESSION_STATUSES: TableSessionStatus[] = [
   "WAITING",
@@ -255,10 +256,22 @@ export async function finalizeTableSession(
   }
 
   if (tableSession.reservationId) {
-    await prisma.reservation.update({
-      where: { id: tableSession.reservationId },
-      data: { status: "COMPLETED", completedAt: endedAt },
-    });
+    await transitionReservationStatus(
+      tableSession.reservationId,
+      tableSession.restaurantId,
+      "COMPLETED",
+      {
+        completedAt: endedAt,
+        sessionEndedAt: endedAt,
+        completedByUserId: closedBy?.staffUserId ?? null,
+        activeSessionId: null,
+      },
+      {
+        userId: closedBy?.staffUserId ?? undefined,
+        userName: closedBy?.staffName ?? undefined,
+      },
+      "SESSION_COMPLETED"
+    );
   }
 
   try {

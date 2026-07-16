@@ -11,6 +11,7 @@ import { effectiveMinimumSpend } from "@/lib/table-meta";
 import { displayTableNumber } from "@/lib/table-number-normalize";
 import { onCustomerRegistered } from "@/lib/visit-tracking";
 import { requestMeta } from "@/lib/request-meta";
+import { recordReservationStatusChange } from "@/lib/reservation-audit";
 import type { NextRequest } from "next/server";
 
 type StaffCtx = { userId?: string; userName?: string };
@@ -228,6 +229,7 @@ export async function seatReservationFromBooking(
         status: "SEATED",
         arrivedAt: r.arrivedAt ?? now,
         checkedInAt: r.checkedInAt ?? now,
+        seatedAt: now,
         assignedAt: r.assignedAt ?? now,
         assignedByUserId: staff.userId ?? r.assignedByUserId,
         currentVisitId: visit.id,

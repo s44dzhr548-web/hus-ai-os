@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import ReservationsClient from "@/components/reservations/reservations-client";
 
 export default function ReservationsHistoryPage() {
-  redirect("/dashboard/customers?tab=reservations");
+  return <ReservationsClient mode="history" />;
 }

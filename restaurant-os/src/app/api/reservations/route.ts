@@ -2,16 +2,52 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRestaurantRole } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { assertFeature } from "@/lib/permissions-engine";
-import { upsertCustomerProfile, serializeReservation, suggestBestTable } from "@/lib/reception";
+import { upsertCustomerProfile, suggestBestTable } from "@/lib/reception";
 import {
   checkReservationConflict,
   effectiveMinimumSpend,
   upsertManualTable,
 } from "@/lib/table-meta";
+import {
+  queryReservations,
+  getReservationStats,
+  nextReservationNumber,
+  exportReservationsCsv,
+  buildReservationOrderBy,
+  serializeRegisterRow,
+} from "@/lib/reservation-register";
+import {
+  logReservationAudit,
+  recordReservationStatusChange,
+} from "@/lib/reservation-audit";
 
 export const dynamic = "force-dynamic";
 
 const RECEPTION_ROLES = ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "CASHIER", "WAITER"];
+
+function parseQuery(req: NextRequest, restaurantId: string) {
+  const p = req.nextUrl.searchParams;
+  return {
+    restaurantId,
+    mode: (p.get("mode") as "active" | "history" | "all") || "all",
+    q: p.get("q") || undefined,
+    status: p.get("status") || undefined,
+    quick: p.get("quick") || undefined,
+    branchId: p.get("branchId") || undefined,
+    tableId: p.get("tableId") || undefined,
+    source: p.get("source") || undefined,
+    createdByUserId: p.get("createdByUserId") || undefined,
+    guestCount: p.get("guestCount") ? parseInt(p.get("guestCount")!) : undefined,
+    reservationDateFrom: p.get("reservationDateFrom") || undefined,
+    reservationDateTo: p.get("reservationDateTo") || undefined,
+    createdFrom: p.get("createdFrom") || undefined,
+    createdTo: p.get("createdTo") || undefined,
+    sortBy: p.get("sortBy") || undefined,
+    sortDir: (p.get("sortDir") as "asc" | "desc") || "asc",
+    page: p.get("page") ? parseInt(p.get("page")!) : 1,
+    pageSize: p.get("pageSize") ? parseInt(p.get("pageSize")!) : 50,
+  };
+}
 
 export async function GET(req: NextRequest) {
   const { restaurantId, error } = await requireRestaurantRole(RECEPTION_ROLES);
@@ -20,41 +56,35 @@ export async function GET(req: NextRequest) {
   const featureErr = await assertFeature(restaurantId!, "reception");
   if (featureErr) return featureErr;
 
-  const status = req.nextUrl.searchParams.get("status");
-  const dateFrom = req.nextUrl.searchParams.get("dateFrom");
-  const dateTo = req.nextUrl.searchParams.get("dateTo");
-
-  let statusFilter: unknown = undefined;
-  if (status && status !== "all") {
-    statusFilter =
-      status === "CONFIRMED"
-        ? { in: ["CONFIRMED", "APPROVED"] as const }
-        : (status as never);
+  if (req.nextUrl.searchParams.get("export") === "csv") {
+    const q = parseQuery(req, restaurantId!);
+    q.pageSize = 5000;
+    q.page = 1;
+    const { reservations } = await queryReservations(q);
+    const csv = exportReservationsCsv(reservations);
+    return new NextResponse(csv, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="reservations-${Date.now()}.csv"`,
+      },
+    });
   }
 
-  const reservations = await prisma.reservation.findMany({
-    where: {
-      restaurantId: restaurantId!,
-      ...(statusFilter ? { status: statusFilter as never } : {}),
-      ...(dateFrom || dateTo
-        ? {
-            date: {
-              ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
-              ...(dateTo ? { lte: new Date(dateTo) } : {}),
-            },
-          }
-        : {}),
-    },
-    orderBy: [{ date: "asc" }, { time: "asc" }],
-  });
+  const q = parseQuery(req, restaurantId!);
+  const [result, stats, branches] = await Promise.all([
+    queryReservations(q),
+    getReservationStats(restaurantId!, q.branchId),
+    prisma.branch.findMany({
+      where: { restaurantId: restaurantId!, isActive: true },
+      select: { id: true, name: true, nameAr: true },
+    }),
+  ]);
 
-  return NextResponse.json({
-    reservations: reservations.map(serializeReservation),
-  });
+  return NextResponse.json({ ...result, stats, branches });
 }
 
 export async function POST(req: NextRequest) {
-  const { restaurantId, error } = await requireRestaurantRole(RECEPTION_ROLES);
+  const { restaurantId, session, error } = await requireRestaurantRole(RECEPTION_ROLES);
   if (error) return error;
 
   const featureErr = await assertFeature(restaurantId!, "reception");
@@ -75,6 +105,7 @@ export async function POST(req: NextRequest) {
     autoAssign,
     preferredArea,
     minimumSpendAmount,
+    source = "dashboard",
   } = body;
 
   if (!customerName?.trim() || !customerPhone?.trim() || !date || !time) {
@@ -83,6 +114,11 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+
+  const staff = {
+    userId: session?.user?.id,
+    userName: session?.user?.name ?? undefined,
+  };
 
   const guestNum = parseInt(String(guestCount)) || 2;
   let assignedTableId = tableId;
@@ -178,11 +214,14 @@ export async function POST(req: NextRequest) {
     customerPhone.trim()
   );
 
+  const reservationNumber = await nextReservationNumber(restaurantId!);
+
   const reservation = await prisma.reservation.create({
     data: {
       restaurantId: restaurantId!,
       branchId: assignedBranchId,
       customerProfileId: profile.id,
+      reservationNumber,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
       guestCount: guestNum,
@@ -191,6 +230,7 @@ export async function POST(req: NextRequest) {
       occasion: occasion?.trim() || null,
       notes: notes?.trim() || null,
       preferredArea: preferredArea?.trim() || tableZone || null,
+      source: String(source),
       tableId: assignedTableId || null,
       tableNumber,
       tableLabel,
@@ -198,8 +238,28 @@ export async function POST(req: NextRequest) {
       tableZone,
       minimumSpendAmount: minSpend,
       status: "PENDING",
+      createdByUserId: staff.userId ?? null,
+      updatedByUserId: staff.userId ?? null,
+    },
+    include: {
+      branch: { select: { id: true, name: true, nameAr: true } },
+      table: { select: { id: true, number: true, label: true, displayNumber: true } },
+      tableSession: { select: { id: true, endedAt: true, startedAt: true } },
     },
   });
 
-  return NextResponse.json(serializeReservation(reservation), { status: 201 });
+  await recordReservationStatusChange(reservation.id, null, "PENDING", staff, "إنشاء الحجز");
+  await logReservationAudit(
+    restaurantId!,
+    reservation.id,
+    "RESERVATION_CREATED",
+    staff,
+    null,
+    { reservationNumber, customerName: reservation.customerName }
+  );
+
+  const staffNames = new Map<string, string | null>();
+  if (staff.userId) staffNames.set(staff.userId, staff.userName ?? null);
+
+  return NextResponse.json(serializeRegisterRow(reservation, staffNames), { status: 201 });
 }

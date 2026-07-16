@@ -1020,6 +1020,7 @@ model Reservation {
   restaurantId      String            @map("restaurant_id")
   branchId          String?           @map("branch_id")
   customerProfileId String?           @map("customer_profile_id")
+  reservationNumber String?           @map("reservation_number")
   customerName      String            @map("customer_name")
   customerPhone     String            @map("customer_phone")
   guestCount        Int               @default(2) @map("guest_count")
@@ -1029,6 +1030,7 @@ model Reservation {
   occasion          String?
   notes             String?
   preferredArea     String?           @map("preferred_area")
+  source            String?           @default("dashboard")
   tableId           String?           @map("table_id")
   tableNumber       Int?              @map("table_number")
   tableLabel        String?           @map("table_label")
@@ -1039,16 +1041,25 @@ model Reservation {
   depositAmount     Decimal?          @map("deposit_amount")
   depositStatus     DepositStatus?    @map("deposit_status")
   depositPaymentId  String?           @map("deposit_payment_id")
+  confirmedAt       DateTime?         @map("confirmed_at")
+  confirmedByUserId String?           @map("confirmed_by_user_id")
   arrivedAt         DateTime?         @map("arrived_at")
   checkedInAt       DateTime?         @map("checked_in_at")
+  seatedAt          DateTime?         @map("seated_at")
   tableNumberSnapshot String?         @map("table_number_snapshot")
   assignedByUserId  String?           @map("assigned_by_user_id")
   assignedAt        DateTime?         @map("assigned_at")
   currentVisitId    String?           @map("current_visit_id")
   activeSessionId   String?           @map("active_session_id")
+  sessionEndedAt    DateTime?         @map("session_ended_at")
   completedAt       DateTime?         @map("completed_at")
+  completedByUserId String?           @map("completed_by_user_id")
   cancelledAt       DateTime?         @map("cancelled_at")
+  rejectedAt        DateTime?         @map("rejected_at")
   noShowAt          DateTime?         @map("no_show_at")
+  createdByUserId   String?           @map("created_by_user_id")
+  updatedByUserId   String?           @map("updated_by_user_id")
+  archivedAt        DateTime?         @map("archived_at")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
@@ -1057,9 +1068,45 @@ model Reservation {
   table           DiningTable?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
   customerProfile CustomerProfile? @relation(fields: [customerProfileId], references: [id], onDelete: SetNull)
   tableSession    TableSession?
+  statusHistory   ReservationStatusHistory[]
+  auditLogs       ReservationAuditLog[]
 
   @@index([restaurantId, status, date])
+  @@index([restaurantId, createdAt])
+  @@index([restaurantId, reservationNumber])
   @@map("reservations")
+}
+
+model ReservationStatusHistory {
+  id              String             @id @default(cuid())
+  reservationId   String             @map("reservation_id")
+  previousStatus  ReservationStatus? @map("previous_status")
+  newStatus       ReservationStatus  @map("new_status")
+  changedAt       DateTime           @default(now()) @map("changed_at")
+  changedByUserId String?            @map("changed_by_user_id")
+  note            String?
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([reservationId, changedAt])
+  @@map("reservation_status_history")
+}
+
+model ReservationAuditLog {
+  id            String   @id @default(cuid())
+  restaurantId  String   @map("restaurant_id")
+  reservationId String   @map("reservation_id")
+  action        String
+  userId        String?  @map("user_id")
+  userName      String?  @map("user_name")
+  oldValues     Json?    @map("old_values")
+  newValues     Json?    @map("new_values")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, reservationId, createdAt])
+  @@map("reservation_audit_logs")
 }
 
 model WaitingListEntry {
