@@ -27,7 +27,7 @@ async function api(method, pathname, body) {
 const patch = await api("PATCH", `/v9/projects/${projectId}?teamId=${teamId}`, {
   rootDirectory: "restaurant-os",
   buildCommand:
-    "prisma generate && prisma migrate deploy && next build",
+    "prisma generate && node scripts/migrate-deploy-retry.mjs && next build",
   installCommand: "npm install",
   framework: "nextjs",
 });

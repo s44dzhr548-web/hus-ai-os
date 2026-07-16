@@ -1,4 +1,5 @@
 {
+  "buildCommand": "prisma generate && node scripts/migrate-deploy-retry.mjs && next build",
   "crons": [
     {
       "path": "/api/cron/subscriptions",
