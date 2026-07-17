@@ -9,57 +9,77 @@ import {
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 20;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { error } = await requirePlatformAdmin();
   if (error) return error;
 
-  const view = await getPlatformMetaAdminView();
-  return NextResponse.json(view);
+  try {
+    const skipHealth = req.nextUrl.searchParams.get("health") === "0";
+    const view = await getPlatformMetaAdminView({ skipHealth });
+    return NextResponse.json(view);
+  } catch (e) {
+    console.error("[platform/meta GET]", e);
+    const msg = e instanceof Error ? e.message : "فشل تحميل الإعدادات";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: NextRequest) {
   const { session, error } = await requirePlatformAdmin();
   if (error) return error;
 
-  const body = await req.json();
-  await savePlatformMetaConfig({
-    facebookAppName: body.facebookAppName,
-    clientId: body.clientId,
-    clientSecret: body.clientSecret,
-    webhookVerifyToken: body.webhookVerifyToken,
-    userId: session!.user.id,
-  });
+  try {
+    const body = await req.json();
+    await savePlatformMetaConfig({
+      facebookAppName: body.facebookAppName,
+      clientId: body.clientId,
+      clientSecret: body.clientSecret,
+      webhookVerifyToken: body.webhookVerifyToken,
+      userId: session!.user.id,
+    });
 
-  const view = await getPlatformMetaAdminView();
-  return NextResponse.json({ ok: true, ...view });
+    const view = await getPlatformMetaAdminView({ skipHealth: true });
+    return NextResponse.json({ ok: true, ...view });
+  } catch (e) {
+    console.error("[platform/meta PATCH]", e);
+    const msg = e instanceof Error ? e.message : "فشل حفظ الإعدادات";
+    return NextResponse.json({ error: msg }, { status: 400 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   const { error } = await requirePlatformAdmin();
   if (error) return error;
 
-  const body = await req.json();
-  const action = body.action as string;
+  try {
+    const body = await req.json();
+    const action = body.action as string;
 
-  if (action === "test_connection") {
-    const result = await testPlatformMetaConnection();
-    const health = await runPlatformMetaHealthCheck();
-    return NextResponse.json({ ...result, health });
+    if (action === "test_connection") {
+      const result = await testPlatformMetaConnection();
+      const health = await runPlatformMetaHealthCheck();
+      return NextResponse.json({ ...result, health });
+    }
+
+    if (action === "dismiss_alert" && body.id) {
+      await prisma.platformAdminAlert.updateMany({
+        where: { id: body.id },
+        data: { isRead: true },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "refresh_health") {
+      const health = await runPlatformMetaHealthCheck();
+      return NextResponse.json({ health });
+    }
+
+    return NextResponse.json({ error: "إجراء غير مدعوم" }, { status: 400 });
+  } catch (e) {
+    console.error("[platform/meta POST]", e);
+    const msg = e instanceof Error ? e.message : "فشل تنفيذ الإجراء";
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
-
-  if (action === "dismiss_alert" && body.id) {
-    await prisma.platformAdminAlert.updateMany({
-      where: { id: body.id },
-      data: { isRead: true },
-    });
-    return NextResponse.json({ ok: true });
-  }
-
-  if (action === "refresh_health") {
-    const health = await runPlatformMetaHealthCheck();
-    return NextResponse.json({ health });
-  }
-
-  return NextResponse.json({ error: "إجراء غير مدعوم" }, { status: 400 });
 }

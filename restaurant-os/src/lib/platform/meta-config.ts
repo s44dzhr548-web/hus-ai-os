@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { encryptToken, decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
 import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
 import { whatsAppWebhookUrl } from "@/lib/marketing/whatsapp-business";
+import { fetchWithTimeout, isAbortError } from "@/lib/fetch-with-timeout";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 const CONFIG_ID = "default";
@@ -92,7 +93,7 @@ export async function isMetaOAuthReady(): Promise<boolean> {
   return Boolean(creds.clientId && creds.clientSecret);
 }
 
-export async function getPlatformMetaAdminView() {
+export async function getPlatformMetaAdminView(opts?: { skipHealth?: boolean }) {
   const creds = await resolveMetaCredentials();
   const alerts = await prisma.platformAdminAlert.findMany({
     where: { kind: "META_OAUTH_SETUP", isRead: false },
@@ -111,7 +112,7 @@ export async function getPlatformMetaAdminView() {
     oauthReady: Boolean(creds.clientId && creds.clientSecret),
     encryptionReady: canEncryptTokens(),
     pendingAlerts: alerts,
-    health: await runPlatformMetaHealthCheck(),
+    health: opts?.skipHealth ? [] : await runPlatformMetaHealthCheck(),
   };
 }
 
@@ -123,7 +124,9 @@ export async function savePlatformMetaConfig(input: {
   userId?: string;
 }) {
   if (!canEncryptTokens()) {
-    throw new Error("تشفير المنصة غير مفعّل — تواصل مع الدعم الفني");
+    throw new Error(
+      "MARKETING_TOKEN_SECRET غير مضبوط على الخادم (٣٢ حرفاً على الأقل) — لا يمكن حفظ الرموز المشفّرة"
+    );
   }
 
   const existing = await prisma.platformMetaConfig.findUnique({ where: { id: CONFIG_ID } });
@@ -203,13 +206,16 @@ export async function runPlatformMetaHealthCheck(): Promise<PlatformMetaHealthIt
   if (oauthOk && creds.clientId && creds.clientSecret) {
     try {
       const appToken = `${creds.clientId}|${creds.clientSecret}`;
-      const res = await fetch(`${GRAPH}/${creds.clientId}?fields=id,name`, {
+      const res = await fetchWithTimeout(`${GRAPH}/${creds.clientId}?fields=id,name`, {
         headers: { Authorization: `Bearer ${appToken}` },
+        timeoutMs: 8000,
       });
       templateOk = res.ok;
       templateDetail = templateOk ? "Graph API يستجيب" : "فشل الاتصال بـ Graph API";
-    } catch {
-      templateDetail = "تعذّر الاتصال بـ Graph API";
+    } catch (e) {
+      templateDetail = isAbortError(e)
+        ? "انتهت مهلة الاتصال بـ Graph API"
+        : "تعذّر الاتصال بـ Graph API";
     }
   }
 
@@ -245,8 +251,9 @@ export async function testPlatformMetaConnection(): Promise<{ ok: boolean; messa
 
   try {
     const appToken = `${creds.clientId}|${creds.clientSecret}`;
-    const res = await fetch(`${GRAPH}/${creds.clientId}?fields=id,name`, {
+    const res = await fetchWithTimeout(`${GRAPH}/${creds.clientId}?fields=id,name`, {
       headers: { Authorization: `Bearer ${appToken}` },
+      timeoutMs: 8000,
     });
     const data = (await res.json()) as { id?: string; name?: string; error?: { message?: string } };
     if (!res.ok) {
@@ -254,6 +261,9 @@ export async function testPlatformMetaConnection(): Promise<{ ok: boolean; messa
     }
     return { ok: true, message: "تم التحقق من تطبيق Meta بنجاح", appName: data.name };
   } catch (e) {
+    if (isAbortError(e)) {
+      return { ok: false, message: "انتهت مهلة اختبار الاتصال بـ Meta" };
+    }
     return { ok: false, message: e instanceof Error ? e.message : "خطأ في الاتصال" };
   }
 }

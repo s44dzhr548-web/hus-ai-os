@@ -24,6 +24,33 @@ type MetaView = {
   health: HealthItem[];
 };
 
+const SAVE_TIMEOUT_MS = 15000;
+
+async function apiFetch(path: string, init?: RequestInit & { timeoutMs?: number }) {
+  const timeoutMs = init?.timeoutMs ?? SAVE_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(path, { ...init, signal: controller.signal });
+    let data: Record<string, unknown> = {};
+    try {
+      data = await res.json();
+    } catch {
+      data = { error: "استجابة غير صالحة من الخادم" };
+    }
+    return { res, data };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function formatFetchError(e: unknown): string {
+  if (e instanceof Error && e.name === "AbortError") {
+    return "انتهت مهلة الطلب (١٥ ثانية) — حاول مرة أخرى";
+  }
+  return "تعذّر الاتصال بالخادم";
+}
+
 export default function PlatformMetaPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -31,6 +58,7 @@ export default function PlatformMetaPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
   const [testResult, setTestResult] = useState("");
   const [view, setView] = useState<MetaView | null>(null);
   const [form, setForm] = useState({
@@ -42,18 +70,44 @@ export default function PlatformMetaPage() {
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/platform/meta");
-    const data = await res.json();
-    if (res.ok) {
-      setView(data);
-      setForm({
-        facebookAppName: data.facebookAppName || "",
-        clientId: data.clientId || "",
-        clientSecret: "",
-        webhookVerifyToken: "",
-      });
+    try {
+      const { res, data } = await apiFetch("/api/platform/meta?health=0", { timeoutMs: 15000 });
+      if (res.ok) {
+        const d = data as MetaView;
+        setView(d);
+        setForm({
+          facebookAppName: d.facebookAppName || "",
+          clientId: d.clientId || "",
+          clientSecret: "",
+          webhookVerifyToken: "",
+        });
+        void refreshHealth();
+      } else {
+        setMessageIsError(true);
+        setMessage(String(data.error || "فشل تحميل الإعدادات"));
+      }
+    } catch (e) {
+      setMessageIsError(true);
+      setMessage(formatFetchError(e));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  }
+
+  async function refreshHealth() {
+    try {
+      const { res, data } = await apiFetch("/api/platform/meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "refresh_health" }),
+        timeoutMs: 15000,
+      });
+      if (res.ok && Array.isArray(data.health)) {
+        setView((v) => (v ? { ...v, health: data.health as HealthItem[] } : v));
+      }
+    } catch {
+      /* health is non-blocking */
+    }
   }
 
   useEffect(() => {
@@ -67,34 +121,56 @@ export default function PlatformMetaPage() {
   async function save() {
     setSaving(true);
     setMessage("");
-    const res = await fetch("/api/platform/meta", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    setSaving(false);
-    if (!res.ok) {
-      setMessage(data.error || "فشل الحفظ");
-      return;
+    setMessageIsError(false);
+    try {
+      const { res, data } = await apiFetch("/api/platform/meta", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+        timeoutMs: SAVE_TIMEOUT_MS,
+      });
+      if (!res.ok) {
+        setMessageIsError(true);
+        setMessage(String(data.error || "فشل الحفظ"));
+        return;
+      }
+      setView(data as MetaView);
+      setForm((f) => ({ ...f, clientSecret: "", webhookVerifyToken: "" }));
+      setMessageIsError(false);
+      setMessage("تم حفظ إعدادات Meta");
+      void refreshHealth();
+    } catch (e) {
+      setMessageIsError(true);
+      setMessage(formatFetchError(e));
+    } finally {
+      setSaving(false);
     }
-    setView(data);
-    setForm((f) => ({ ...f, clientSecret: "", webhookVerifyToken: "" }));
-    setMessage("تم حفظ إعدادات Meta");
   }
 
   async function testConnection() {
     setTesting(true);
     setTestResult("");
-    const res = await fetch("/api/platform/meta", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "test_connection" }),
-    });
-    const data = await res.json();
-    setTesting(false);
-    setTestResult(data.ok ? `✓ ${data.message}${data.appName ? ` (${data.appName})` : ""}` : `✗ ${data.message}`);
-    if (data.health) setView((v) => (v ? { ...v, health: data.health } : v));
+    try {
+      const { res, data } = await apiFetch("/api/platform/meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test_connection" }),
+        timeoutMs: SAVE_TIMEOUT_MS,
+      });
+      const ok = Boolean(data.ok);
+      setTestResult(
+        ok
+          ? `✓ ${String(data.message || "")}${data.appName ? ` (${String(data.appName)})` : ""}`
+          : `✗ ${String(data.message || data.error || "فشل الاختبار")}`
+      );
+      if (Array.isArray(data.health)) {
+        setView((v) => (v ? { ...v, health: data.health as HealthItem[] } : v));
+      }
+    } catch (e) {
+      setTestResult(`✗ ${formatFetchError(e)}`);
+    } finally {
+      setTesting(false);
+    }
   }
 
   if (status === "loading" || loading) return <LoadingSpinner />;
@@ -183,6 +259,12 @@ export default function PlatformMetaPage() {
           />
         </label>
 
+        {!view?.encryptionReady && (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            MARKETING_TOKEN_SECRET غير مضبوط على الخادم — لا يمكن حفظ Client Secret أو Webhook Verify Token
+            حتى يُضاف متغير التشفير (٣٢ حرفاً على الأقل) في إعدادات Vercel.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 pt-2">
           <Button onClick={save} loading={saving}>
             Save
@@ -191,7 +273,9 @@ export default function PlatformMetaPage() {
             Test Connection
           </Button>
         </div>
-        {message && <p className="text-sm text-emerald-700">{message}</p>}
+        {message && (
+          <p className={`text-sm ${messageIsError ? "text-red-600" : "text-emerald-700"}`}>{message}</p>
+        )}
         {testResult && <p className="text-sm text-gray-700">{testResult}</p>}
         {view && (
           <p className="text-xs text-gray-500">

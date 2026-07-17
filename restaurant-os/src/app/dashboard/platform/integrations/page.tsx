@@ -37,6 +37,26 @@ export default function PlatformIntegrationsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
+
+  const SAVE_TIMEOUT_MS = 15000;
+
+  async function apiFetch(path: string, init?: RequestInit) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SAVE_TIMEOUT_MS);
+    try {
+      const res = await fetch(path, { ...init, signal: controller.signal });
+      let data: Record<string, unknown> = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { error: "استجابة غير صالحة من الخادم" };
+      }
+      return { res, data };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -72,31 +92,55 @@ export default function PlatformIntegrationsPage() {
   async function save() {
     setSaving(true);
     setMessage("");
-    const res = await fetch("/api/platform/integrations", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ platformKey: selected, ...form }),
-    });
-    const data = await res.json();
-    setSaving(false);
-    if (!res.ok) {
-      setMessage(data.error || "فشل الحفظ");
-      return;
+    setMessageIsError(false);
+    try {
+      const { res, data } = await apiFetch("/api/platform/integrations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platformKey: selected, ...form }),
+      });
+      if (!res.ok) {
+        setMessageIsError(true);
+        setMessage(String(data.error || "فشل الحفظ"));
+        return;
+      }
+      setIntegrations((data.integrations as Integration[]) || []);
+      setMessageIsError(false);
+      setMessage("تم الحفظ");
+    } catch (e) {
+      setMessageIsError(true);
+      setMessage(
+        e instanceof Error && e.name === "AbortError"
+          ? "انتهت مهلة الحفظ (١٥ ثانية) — حاول مرة أخرى"
+          : "تعذّر الاتصال بالخادم"
+      );
+    } finally {
+      setSaving(false);
     }
-    setIntegrations(data.integrations || []);
-    setMessage("تم الحفظ");
   }
 
   async function test() {
     setTesting(true);
-    const res = await fetch("/api/platform/integrations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "test_connection", platformKey: selected }),
-    });
-    const data = await res.json();
-    setTesting(false);
-    setMessage(data.ok ? `✓ ${data.message}` : `✗ ${data.message}`);
+    setMessageIsError(false);
+    try {
+      const { res, data } = await apiFetch("/api/platform/integrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test_connection", platformKey: selected }),
+      });
+      const ok = Boolean(data.ok);
+      setMessageIsError(!ok);
+      setMessage(ok ? `✓ ${String(data.message || "")}` : `✗ ${String(data.message || data.error || "فشل")}`);
+    } catch (e) {
+      setMessageIsError(true);
+      setMessage(
+        e instanceof Error && e.name === "AbortError"
+          ? "انتهت مهلة الاختبار (١٥ ثانية)"
+          : "تعذّر الاتصال بالخادم"
+      );
+    } finally {
+      setTesting(false);
+    }
   }
 
   if (status === "loading" || loading) return <LoadingSpinner />;
@@ -164,7 +208,9 @@ export default function PlatformIntegrationsPage() {
             <Button onClick={save} loading={saving}>Save</Button>
             <Button variant="outline" onClick={test} loading={testing}>Test Connection</Button>
           </div>
-          {message && <p className="text-sm text-gray-700">{message}</p>}
+          {message && (
+            <p className={`text-sm ${messageIsError ? "text-red-600" : "text-gray-700"}`}>{message}</p>
+          )}
           <p className="text-xs text-gray-500">Source: {current.source}</p>
         </Card>
       )}

@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { encryptToken, decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
 import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
 import { resolveMetaCredentials } from "@/lib/platform/meta-config";
+import { fetchWithTimeout, isAbortError } from "@/lib/fetch-with-timeout";
 
 export const ADS_INTEGRATION_KEYS = [
   "META",
@@ -239,7 +240,9 @@ export async function saveAdsIntegration(
   }
 ) {
   if (!canEncryptTokens()) {
-    throw new Error("تشفير المنصة غير مفعّل");
+    throw new Error(
+      "MARKETING_TOKEN_SECRET غير مضبوط على الخادم (٣٢ حرفاً على الأقل) — لا يمكن حفظ الرموز المشفّرة"
+    );
   }
 
   const def = ADS_INTEGRATION_DEFS[platformKey];
@@ -277,13 +280,15 @@ export async function testAdsIntegration(platformKey: AdsIntegrationKey): Promis
   if (platformKey === "META") {
     try {
       const appToken = `${creds.clientId}|${creds.clientSecret}`;
-      const res = await fetch(`https://graph.facebook.com/v21.0/${creds.clientId}?fields=id,name`, {
+      const res = await fetchWithTimeout(`https://graph.facebook.com/v21.0/${creds.clientId}?fields=id,name`, {
         headers: { Authorization: `Bearer ${appToken}` },
+        timeoutMs: 8000,
       });
       const data = (await res.json()) as { name?: string; error?: { message?: string } };
       if (!res.ok) return { ok: false, message: data.error?.message || "فشل الاتصال" };
       return { ok: true, message: `Meta App: ${data.name || creds.clientId}` };
     } catch (e) {
+      if (isAbortError(e)) return { ok: false, message: "انتهت مهلة اختبار الاتصال بـ Meta" };
       return { ok: false, message: e instanceof Error ? e.message : "خطأ في الاتصال" };
     }
   }
