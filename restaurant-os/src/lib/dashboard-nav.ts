@@ -24,6 +24,7 @@ import {
   Activity,
   Sparkles,
   Music,
+  Bot,
 } from "lucide-react";
 import {
   PLATFORM_ADMIN_ROLE,
@@ -55,6 +56,7 @@ export const RECEPTION_STAFF_ROUTES = [
   "/dashboard/gifts",
   "/dashboard/wishes",
   "/dashboard/song-requests",
+  "/dashboard/ai-assistant",
   "/dashboard/staff/activity",
   "/dashboard/staff/login-history",
 ];
@@ -82,6 +84,7 @@ export const restaurantNavItems: NavItem[] = [
   { href: "/dashboard/gifts", label: "الإهداءات", icon: Gift, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION"] },
   { href: "/dashboard/wishes", label: "الأمنيات", icon: Sparkles, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION"] },
   { href: "/dashboard/song-requests", label: "طلبات الأغاني", icon: Music, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION"] },
+  { href: "/dashboard/ai-assistant", label: "مساعد Menu OS الذكي", icon: Bot, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "CASHIER", "WAITER"] },
   { href: "/dashboard/reception", label: "الاستقبال", icon: ConciergeBell, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "CASHIER", "WAITER"] },
   { href: "/dashboard/reservations", label: "الحجوزات", icon: CalendarDays, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "CASHIER", "WAITER"] },
   { href: "/dashboard/customers", label: "سجل العملاء", icon: Users, roles: ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "CASHIER", "WAITER"] },

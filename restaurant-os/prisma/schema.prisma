@@ -422,6 +422,9 @@ model Restaurant {
   whatsAppOwnerNotifications WhatsAppOwnerNotification[]
   afterVisitWhatsAppAutomation AfterVisitWhatsAppAutomation?
   whatsAppMessageDeliveries WhatsAppMessageDelivery[]
+  aiAssistantMessages       AiAssistantMessage[]
+  aiAssistantActionLogs     AiAssistantActionLog[]
+  aiAssistantPendingActions AiAssistantPendingAction[]
 
   @@index([ownerId])
   @@map("restaurants")
@@ -1585,6 +1588,60 @@ model MarketingChatMessage {
 
   @@index([restaurantId, createdAt])
   @@map("marketing_chat_messages")
+}
+
+model AiAssistantMessage {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  userId       String?  @map("user_id")
+  role         String
+  content      String
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("ai_assistant_messages")
+}
+
+model AiAssistantActionLog {
+  id                 String   @id @default(cuid())
+  restaurantId       String   @map("restaurant_id")
+  userId             String?  @map("user_id")
+  commandText        String?  @map("command_text")
+  toolName           String   @map("tool_name")
+  inputPayload       Json?    @map("input_payload")
+  beforeState        Json?    @map("before_state")
+  afterState         Json?    @map("after_state")
+  resultSummary      String?  @map("result_summary")
+  status             String
+  confirmationStatus String?  @map("confirmation_status")
+  idempotencyKey     String?  @map("idempotency_key")
+  executedAt         DateTime @default(now()) @map("executed_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, idempotencyKey])
+  @@index([restaurantId, executedAt])
+  @@map("ai_assistant_action_logs")
+}
+
+model AiAssistantPendingAction {
+  id             String   @id @default(cuid())
+  restaurantId   String   @map("restaurant_id")
+  userId         String   @map("user_id")
+  toolName       String   @map("tool_name")
+  inputPayload   Json     @map("input_payload")
+  previewSummary String   @map("preview_summary")
+  commandText    String?  @map("command_text")
+  expiresAt      DateTime @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, userId, createdAt])
+  @@map("ai_assistant_pending_actions")
 }
 
 model MarketingWhatsAppCampaign {
