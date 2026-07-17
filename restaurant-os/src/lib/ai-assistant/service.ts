@@ -5,6 +5,7 @@ import {
   previewWriteAction,
 } from "@/lib/ai-assistant/tools";
 import { logAiAssistantAction } from "@/lib/ai-assistant/audit";
+import { routeFallbackCommand } from "@/lib/ai-assistant/fallback-router";
 import {
   WRITE_TOOLS,
   type AiToolName,
@@ -16,6 +17,66 @@ const PENDING_TTL_MS = 10 * 60 * 1000;
 
 function isWriteTool(name: string): name is AiToolName {
   return (WRITE_TOOLS as string[]).includes(name);
+}
+
+async function handleRoutedTool(
+  toolName: AiToolName,
+  args: Record<string, unknown>,
+  ctx: ToolContext,
+  commandText: string
+): Promise<ChatAssistantResponse> {
+  if (isWriteTool(toolName)) {
+    const preview = previewWriteAction(toolName, args);
+    const expiresAt = new Date(Date.now() + PENDING_TTL_MS);
+    const pending = await prisma.aiAssistantPendingAction.create({
+      data: {
+        restaurantId: ctx.restaurantId,
+        userId: ctx.userId,
+        toolName,
+        inputPayload: args as never,
+        previewSummary: preview,
+        commandText,
+        expiresAt,
+      },
+    });
+    await logAiAssistantAction({
+      restaurantId: ctx.restaurantId,
+      userId: ctx.userId,
+      commandText,
+      toolName,
+      inputPayload: args,
+      status: "pending",
+      confirmationStatus: "not_required",
+      resultSummary: preview,
+    });
+    return {
+      message: `يتطلب هذا الإجراء تأكيدك:\n${preview}\n\nاضغط «تأكيد التنفيذ» للمتابعة أو «إلغاء».`,
+      pendingAction: {
+        pendingActionId: pending.id,
+        toolName,
+        previewSummary: preview,
+        expiresAt: expiresAt.toISOString(),
+      },
+    };
+  }
+
+  const result = await executeAiTool(toolName, args, ctx);
+  await logAiAssistantAction({
+    restaurantId: ctx.restaurantId,
+    userId: ctx.userId,
+    commandText,
+    toolName,
+    inputPayload: args,
+    beforeState: result.beforeState,
+    afterState: result.afterState,
+    resultSummary: result.summary,
+    status: result.ok ? "success" : "failed",
+    confirmationStatus: "not_required",
+  });
+  return {
+    message: result.summary,
+    toolResults: [{ tool: toolName, summary: result.summary, data: result.data }],
+  };
 }
 
 export async function processAssistantMessage(params: {
@@ -32,9 +93,24 @@ export async function processAssistantMessage(params: {
     userRole: params.userRole,
   };
 
+  const fallback = routeFallbackCommand(params.message);
+  const useOpenAi = Boolean(process.env.OPENAI_API_KEY);
+
+  if (fallback && !useOpenAi) {
+    return handleRoutedTool(fallback.tool, fallback.args, ctx, params.message);
+  }
+
   let turn = await runOpenAiAssistantTurn({ userMessage: params.message });
   const toolResults: Array<{ tool: string; summary: string; data?: unknown }> = [];
   let pendingAction: ChatAssistantResponse["pendingAction"];
+
+  if (!turn.toolCalls.length && fallback && useOpenAi) {
+    return handleRoutedTool(fallback.tool, fallback.args, ctx, params.message);
+  }
+
+  if (!turn.toolCalls.length && !turn.text && fallback) {
+    return handleRoutedTool(fallback.tool, fallback.args, ctx, params.message);
+  }
 
   for (let depth = 0; depth < 5; depth++) {
     if (!turn.toolCalls.length) break;
