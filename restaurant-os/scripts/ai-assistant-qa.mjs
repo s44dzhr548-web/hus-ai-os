@@ -90,9 +90,7 @@ async function main() {
 
   const t3 = await chat(cookie, "كم عدد زوار أمس؟");
   results.yesterdayVisitors =
-    t3.status === 200 && (t3.data.toolResults?.length || t3.data.message?.content)
-      ? "PASS"
-      : "FAIL";
+    t3.status === 200 && (t3.data.toolResults?.length || t3.data.reply) ? "PASS" : "FAIL";
   console.log(`Yesterday visitors: ${results.yesterdayVisitors}`);
 
   const t4 = await chat(cookie, "اعرض الأمنيات الجديدة");
