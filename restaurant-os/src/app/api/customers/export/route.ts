@@ -10,6 +10,7 @@ import {
   resolveDateRange,
   toCsv,
 } from "@/lib/customer-history";
+import { buildCustomerReports } from "@/lib/customer-reports";
 import {
   serializeCustomerVisit,
   serializeReservation,
@@ -55,7 +56,119 @@ export async function GET(req: NextRequest) {
   let csv = "";
   let filename = "export.csv";
 
-  if (type === "reservations") {
+  if (type === "reports") {
+    const period = (sp.get("period") || sp.get("preset") || "today") as Parameters<
+      typeof buildCustomerReports
+    >[3];
+    const reports = await buildCustomerReports(
+      restaurantId!,
+      from,
+      to,
+      period,
+      sp.get("branchId") || undefined,
+      businessConfig
+    );
+
+    const summaryRows = [
+      {
+        metric: "registeredCustomers",
+        label: "عدد العملاء المسجلين",
+        value: reports.registeredCustomers ?? reports.totalVisits,
+      },
+      {
+        metric: "totalCompanions",
+        label: "إجمالي المرافقين",
+        value: reports.totalCompanions ?? 0,
+      },
+      {
+        metric: "totalVenueVisitors",
+        label: "إجمالي زوار المكان",
+        value: reports.totalVenueVisitors ?? 0,
+      },
+      {
+        metric: "averageGroupSize",
+        label: "متوسط المجموعة",
+        value: reports.averageGroupSize ?? 0,
+      },
+      {
+        metric: "largestGroup",
+        label: "أكبر مجموعة",
+        value: reports.largestGroup ?? 0,
+      },
+      {
+        metric: "uniqueVisitors",
+        label: "الزوار الفريدون",
+        value: reports.uniqueVisitors,
+      },
+      {
+        metric: "totalVisits",
+        label: "عدد الزيارات",
+        value: reports.totalVisits,
+      },
+      {
+        metric: "afterMidnightEntries",
+        label: "داخلين بعد منتصف الليل",
+        value: reports.afterMidnightEntries ?? 0,
+      },
+    ];
+
+    const visitRows = (reports.visitDetails ?? []).map((v) => ({
+      customerName: v.customerName,
+      customerPhone: showPhone ? v.customerPhone ?? "" : applyPhonePrivacy({ customerPhone: v.customerPhone }, role).customerPhone ?? "",
+      companionsCount: v.companionsCount ?? 0,
+      totalPeople: v.totalPeople ?? "",
+      tableNumber: v.tableNumber ?? "",
+      tableLabel: v.tableLabel ?? "",
+      checkedInAt: v.checkedInAt ?? "",
+      exitedAt: v.exitedAt ?? "",
+      sessionDuration: v.sessionDurationDisplay ?? "",
+      visitStatus: v.visitStatus ?? "",
+    }));
+
+    const topRows = reports.mostFrequentCustomers.map((c) => ({
+      customerName: c.customerName,
+      customerPhone: showPhone ? c.customerPhone ?? "" : applyPhonePrivacy({ customerPhone: c.customerPhone }, role).customerPhone ?? "",
+      visitCount: c.visitCount,
+      totalCompanions: c.totalCompanions ?? 0,
+      totalPeopleBrought: c.totalPeopleBrought ?? 0,
+      averageGroupSize: c.averageGroupSize ?? 0,
+      largestGroup: c.largestGroup ?? 0,
+      totalSpending: c.totalSpending,
+    }));
+
+    const summaryCsv = toCsv(["metric", "label", "value"], summaryRows);
+    const visitsCsv = toCsv(
+      [
+        "customerName",
+        "customerPhone",
+        "companionsCount",
+        "totalPeople",
+        "tableNumber",
+        "tableLabel",
+        "checkedInAt",
+        "exitedAt",
+        "sessionDuration",
+        "visitStatus",
+      ],
+      visitRows
+    );
+    const topCsv = toCsv(
+      [
+        "customerName",
+        "customerPhone",
+        "visitCount",
+        "totalCompanions",
+        "totalPeopleBrought",
+        "averageGroupSize",
+        "largestGroup",
+        "totalSpending",
+      ],
+      topRows
+    );
+
+    csv = `${summaryCsv}\r\n\r\n${visitsCsv}\r\n\r\n${topCsv}`;
+    filename = "visitor-reports.csv";
+  } else if (type === "reservations") {
     const reservations = await prisma.reservation.findMany({
       where: {
         restaurantId: restaurantId!,
@@ -137,10 +250,13 @@ export async function GET(req: NextRequest) {
         customerName: s.customerName,
         customerPhone: showPhone ? s.customerPhone : applyPhonePrivacy(s, role).customerPhone,
         tableNumber: s.tableNumber ?? "",
+        companionsCount: s.companionsCount ?? 0,
+        totalPeople: s.totalPeople ?? s.guestCount,
         guestCount: s.guestCount,
         minimumSpendAmount: s.minimumSpendAmount ?? "",
         arrivalTime: s.arrivalTime,
         endTime: s.endTime ?? "",
+        exitedAt: s.exitedAt ?? "",
         totalBill: s.totalBill,
         ordersCount: s.ordersCount,
         visitStatus: s.visitStatus,
@@ -153,10 +269,13 @@ export async function GET(req: NextRequest) {
         "customerName",
         "customerPhone",
         "tableNumber",
+        "companionsCount",
+        "totalPeople",
         "guestCount",
         "minimumSpendAmount",
         "arrivalTime",
         "endTime",
+        "exitedAt",
         "totalBill",
         "ordersCount",
         "visitStatus",

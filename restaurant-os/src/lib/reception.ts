@@ -13,6 +13,7 @@ import {
   formatRiyadhTime,
   LEGACY_UNAVAILABLE,
 } from "@/lib/timezone";
+import { resolveGuestCountWithDefault } from "@/lib/visit-group-size";
 import { onSessionCompleted } from "@/lib/visit-tracking";
 import { triggerAfterVisitWhatsApp } from "@/lib/after-visit-whatsapp/service";
 import { transitionReservationStatus } from "@/lib/reservation-audit";
@@ -603,6 +604,10 @@ export function serializeCustomerVisit(
     return LEGACY_UNAVAILABLE;
   };
 
+  const group = resolveGuestCountWithDefault({
+    visitGuestCount: v.guestCount,
+  });
+
   return {
     id: v.id,
     customerName: v.customerName,
@@ -616,7 +621,10 @@ export function serializeCustomerVisit(
     tableId: v.tableId ?? null,
     branchId: v.branchId ?? null,
     source: v.source ?? null,
-    guestCount: v.guestCount,
+    guestCount: group.guestCount ?? v.guestCount,
+    companionsCount: group.companionsCount ?? Math.max(v.guestCount - 1, 0),
+    totalPeople: group.totalPeople ?? v.guestCount,
+    guestCountUnknown: group.guestCountUnknown,
     minimumSpendAmount:
       v.minimumSpendAmount != null ? Number(v.minimumSpendAmount) : null,
     previousTables: Array.isArray(v.previousTables) ? v.previousTables : [],

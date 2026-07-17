@@ -775,7 +775,19 @@ function getPrimaryAction(
     return { label: "تأكيد", onClick: () => onPatch(row.id, { action: "confirm" }) };
   }
   if (["APPROVED", "CONFIRMED"].includes(row.status)) {
-    return { label: "وصل العميل", onClick: () => onPatch(row.id, { action: "mark_arrived" }) };
+    return {
+      label: "وصل العميل",
+      onClick: () => {
+        const raw = window.prompt(
+          "عدد الأشخاص الذين وصلوا (شامل العميل):",
+          String(row.guestCount)
+        );
+        if (raw == null) return;
+        const guestCount = parseInt(raw, 10);
+        if (!Number.isFinite(guestCount) || guestCount < 1) return;
+        onPatch(row.id, { action: "mark_arrived", guestCount });
+      },
+    };
   }
   if (["ARRIVED", "CHECKED_IN"].includes(row.status)) {
     return { label: "تعيين طاولة", onClick: () => onAssign(row) };

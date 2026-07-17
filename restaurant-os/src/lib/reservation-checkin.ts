@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import type { DiningTable, Reservation, ReservationStatus } from "@prisma/client";
+import type { DiningTable, Reservation, ReservationStatus, Prisma } from "@prisma/client";
 import {
   isActiveSession,
   serializeTableSession,
@@ -59,7 +59,11 @@ export async function resolveReservationTable(
   return null;
 }
 
-export async function markReservationArrived(reservationId: string, restaurantId: string) {
+export async function markReservationArrived(
+  reservationId: string,
+  restaurantId: string,
+  actualGuestCount?: number
+) {
   return prisma.$transaction(async (tx) => {
     const r = await tx.reservation.findFirst({
       where: { id: reservationId, restaurantId },
@@ -67,18 +71,43 @@ export async function markReservationArrived(reservationId: string, restaurantId
     if (!r) throw new Error("الحجز غير موجود");
 
     if (["ARRIVED", "CHECKED_IN", "SEATED", "CONVERTED"].includes(r.status)) {
+      if (actualGuestCount != null && actualGuestCount >= 1) {
+        return tx.reservation.update({
+          where: { id: reservationId },
+          data: { actualArrivedGuestCount: actualGuestCount } as Prisma.ReservationUpdateInput,
+        });
+      }
       return r;
     }
 
     const now = new Date();
-    return tx.reservation.update({
+    const effectiveCount =
+      actualGuestCount != null && actualGuestCount >= 1 ? actualGuestCount : undefined;
+
+    const updated = await tx.reservation.update({
       where: { id: reservationId },
       data: {
         status: "ARRIVED",
         arrivedAt: r.arrivedAt ?? now,
         checkedInAt: r.checkedInAt ?? now,
-      },
+        ...(effectiveCount != null ? { actualArrivedGuestCount: effectiveCount } : {}),
+      } as Prisma.ReservationUpdateInput,
     });
+
+    if (effectiveCount != null && r.currentVisitId) {
+      await tx.customerVisit.update({
+        where: { id: r.currentVisitId },
+        data: { guestCount: effectiveCount },
+      });
+      if (r.activeSessionId) {
+        await tx.tableSession.update({
+          where: { id: r.activeSessionId },
+          data: { guestCount: effectiveCount },
+        });
+      }
+    }
+
+    return updated;
   });
 }
 
@@ -128,7 +157,8 @@ export async function seatReservationFromBooking(
   table: DiningTable,
   staff: StaffCtx,
   req?: NextRequest,
-  minimumSpendAmount?: number | null
+  minimumSpendAmount?: number | null,
+  actualGuestCount?: number
 ) {
   const r0 = await prisma.reservation.findFirst({
     where: { id: reservationId, restaurantId },
@@ -174,6 +204,13 @@ export async function seatReservationFromBooking(
       table.minimumSpendAmount != null ? Number(table.minimumSpendAmount) : null
     );
     const displayNum = snap.tableNumberSnapshot || String(table.number);
+    const effectiveGuestCount =
+      actualGuestCount != null && actualGuestCount >= 1
+        ? actualGuestCount
+        : (r as Reservation & { actualArrivedGuestCount?: number | null }).actualArrivedGuestCount != null &&
+            (r as Reservation & { actualArrivedGuestCount?: number | null }).actualArrivedGuestCount! >= 1
+          ? (r as Reservation & { actualArrivedGuestCount?: number | null }).actualArrivedGuestCount!
+          : r.guestCount;
 
     const visit = await tx.customerVisit.create({
       data: {
@@ -181,7 +218,7 @@ export async function seatReservationFromBooking(
         customerProfileId: profile.id,
         customerName: r.customerName,
         customerPhone: r.customerPhone,
-        guestCount: r.guestCount,
+        guestCount: effectiveGuestCount,
         notes: r.notes,
         tableNumber: table.number,
         tableDisplayNumber: displayNum,
@@ -215,7 +252,7 @@ export async function seatReservationFromBooking(
         reservationId: r.id,
         customerName: r.customerName,
         customerPhone: r.customerPhone,
-        guestCount: r.guestCount,
+        guestCount: effectiveGuestCount,
         minimumSpendAmount: minSpend,
         status: "SEATED",
         notes: r.notes,
@@ -272,9 +309,18 @@ export async function confirmArrivalWithTable(
   restaurantId: string,
   table: DiningTable,
   staff: StaffCtx,
-  opts?: { startSession?: boolean; minimumSpendAmount?: number | null; req?: NextRequest }
+  opts?: {
+    startSession?: boolean;
+    minimumSpendAmount?: number | null;
+    actualGuestCount?: number;
+    req?: NextRequest;
+  }
 ) {
-  await markReservationArrived(reservationId, restaurantId);
+  await markReservationArrived(
+    reservationId,
+    restaurantId,
+    opts?.actualGuestCount
+  );
   await assignReservationTable(
     reservationId,
     restaurantId,
@@ -290,7 +336,8 @@ export async function confirmArrivalWithTable(
       table,
       staff,
       opts.req,
-      opts?.minimumSpendAmount
+      opts?.minimumSpendAmount,
+      opts?.actualGuestCount
     );
   }
 

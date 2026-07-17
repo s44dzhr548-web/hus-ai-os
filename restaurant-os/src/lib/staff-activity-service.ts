@@ -5,6 +5,7 @@ import {
   type BusinessDayConfig,
 } from "@/lib/business-day";
 import { actualEntryBroadWhere, filterByActualEntry } from "@/lib/actual-entry";
+import { resolveGuestCountWithDefault } from "@/lib/visit-group-size";
 import {
   AUDIT_ACTION_LABELS_AR,
   STAFF_AUDIT_ACTIONS,
@@ -559,11 +560,19 @@ export async function buildVisitReports(
       tableNumber: true,
       tableDisplayNumber: true,
       branchId: true,
+      guestCount: true,
       tableSessions: {
         select: {
           id: true,
           startedAt: true,
-          reservation: { select: { arrivedAt: true } },
+          guestCount: true,
+          reservation: {
+            select: {
+              arrivedAt: true,
+              guestCount: true,
+              actualArrivedGuestCount: true,
+            } as Prisma.ReservationSelect,
+          },
         },
       },
     },
@@ -578,9 +587,12 @@ export async function buildVisitReports(
     })),
     from,
     to
-  );
+  ) as Array<
+    (typeof visitsRaw)[number] & { actualEntryAt: Date; reservation: (typeof visitsRaw)[number]["tableSessions"][number]["reservation"] | null }
+  >;
 
   const entriesByDate = new Map<string, number>();
+  const venuePeopleByDate = new Map<string, number>();
   const exitsByDate = new Map<string, number>();
   const entryHours = new Map<number, number>();
   const exitHours = new Map<number, number>();
@@ -590,12 +602,24 @@ export async function buildVisitReports(
   let durationCount = 0;
 
   for (const v of visits) {
+    const linkedSession = v.tableSessions.find((s) => s.reservation) ?? v.tableSessions[0];
+    const group = resolveGuestCountWithDefault({
+      visitGuestCount: v.guestCount,
+      actualArrivedGuestCount: linkedSession?.reservation?.actualArrivedGuestCount ?? null,
+      reservationGuestCount: linkedSession?.reservation?.guestCount ?? null,
+      sessionGuestCount: linkedSession?.guestCount ?? null,
+    });
+
     const bd = businessDateForTimestamp(
       v.actualEntryAt,
       timezone,
       businessDayStartHour
     );
     entriesByDate.set(bd, (entriesByDate.get(bd) ?? 0) + 1);
+    venuePeopleByDate.set(
+      bd,
+      (venuePeopleByDate.get(bd) ?? 0) + (group.totalPeople ?? 0)
+    );
     const hour = new Date(
       v.actualEntryAt.toLocaleString("en-US", { timeZone: timezone })
     ).getHours();
@@ -628,6 +652,7 @@ export async function buildVisitReports(
 
   return {
     customersEnteredByDate: Object.fromEntries(entriesByDate),
+    venuePeopleByDate: Object.fromEntries(venuePeopleByDate),
     customersExitedByDate: Object.fromEntries(exitsByDate),
     avgSessionDurationMinutes:
       durationCount > 0 ? Math.round(durationSum / durationCount) : 0,

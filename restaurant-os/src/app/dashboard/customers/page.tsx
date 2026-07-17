@@ -73,6 +73,23 @@ interface VisitRow {
   visitStatus: string;
   totalBill: number;
   guestCount: number;
+  companionsCount?: number;
+  totalPeople?: number;
+  exitedAtDisplay?: string;
+}
+
+interface ReportVisitRow {
+  visitId: string;
+  customerName: string;
+  customerPhone?: string | null;
+  companionsCount?: number | null;
+  totalPeople?: number | null;
+  tableNumber?: string | null;
+  tableLabel?: string | null;
+  checkedInAt?: string | null;
+  exitedAt?: string | null;
+  sessionDurationDisplay?: string;
+  visitStatus?: string;
 }
 
 interface Reports {
@@ -95,10 +112,21 @@ interface Reports {
     avgSession?: string;
     completedSessions?: string;
     activeSessions?: string;
+    registeredCustomers?: string;
+    totalCompanions?: string;
+    totalVenueVisitors?: string;
+    averageGroupSize?: string;
+    largestGroup?: string;
   };
   uniqueVisitors: number;
   totalVisits: number;
   actualEntries?: number;
+  registeredCustomers?: number;
+  totalCompanions?: number;
+  totalVenueVisitors?: number;
+  averageGroupSize?: number;
+  largestGroup?: number;
+  visitDetails?: ReportVisitRow[];
   noShows: number;
   repeatCustomers: number;
   vipVisitors: number;
@@ -115,6 +143,10 @@ interface Reports {
     visitCount: number;
     totalSpending: number;
     isVip: boolean;
+    totalCompanions?: number;
+    totalPeopleBrought?: number;
+    averageGroupSize?: number;
+    largestGroup?: number;
   }[];
 }
 
@@ -393,6 +425,11 @@ export default function CustomersPage() {
                 <Download className="h-4 w-4" /> CSV
               </Button>
             )}
+            {tab === "reports" && (
+              <Button size="sm" variant="outline" onClick={() => exportCsv("reports")}>
+                <Download className="h-4 w-4" /> CSV
+              </Button>
+            )}
           </div>
         </div>
       </Card>
@@ -410,15 +447,19 @@ export default function CustomersPage() {
             </p>
           )}
           {[
-            { label: reports.labels?.actualEntries ?? "عدد الداخلين الفعلي", value: reports.actualEntries ?? reports.totalVisits },
+            { label: reports.labels?.registeredCustomers ?? "عدد العملاء المسجلين", value: reports.registeredCustomers ?? reports.totalVisits },
+            { label: reports.labels?.totalCompanions ?? "إجمالي المرافقين", value: reports.totalCompanions ?? 0 },
+            { label: reports.labels?.totalVenueVisitors ?? "إجمالي زوار المكان", value: reports.totalVenueVisitors ?? 0 },
+            { label: reports.labels?.averageGroupSize ?? "متوسط المجموعة", value: reports.averageGroupSize != null ? `${reports.averageGroupSize} أشخاص` : "—" },
+            { label: reports.labels?.largestGroup ?? "أكبر مجموعة", value: reports.largestGroup ?? 0 },
             { label: reports.labels?.visitors ?? "الزوار الفريدون", value: reports.uniqueVisitors },
-            { label: reports.labels?.totalVisits ?? "إجمالي الزيارات", value: reports.totalVisits },
+            { label: reports.labels?.totalVisits ?? "عدد الزيارات", value: reports.totalVisits },
+            { label: reports.labels?.afterMidnight ?? "عدد الداخلين بعد منتصف الليل", value: reports.afterMidnightEntries ?? 0 },
             { label: reports.labels?.repeatCustomers ?? "العملاء المتكررون", value: reports.repeatCustomers },
             { label: reports.labels?.vipVisitors ?? "عملاء VIP", value: reports.vipVisitors },
             { label: reports.labels?.noShows ?? "لم يحضروا", value: reports.noShows },
             { label: reports.labels?.firstEntry ?? "وقت أول دخول", value: reports.firstEntryAt ?? "—" },
             { label: reports.labels?.lastEntry ?? "وقت آخر دخول", value: reports.lastEntryAt ?? "—" },
-            { label: reports.labels?.afterMidnight ?? "عدد الداخلين بعد منتصف الليل", value: reports.afterMidnightEntries ?? 0 },
             { label: reports.labels?.avgSession ?? "متوسط مدة الجلسة", value: reports.avgSessionDurationMinutes != null ? `${reports.avgSessionDurationMinutes} دقيقة` : "—" },
             { label: reports.labels?.completedSessions ?? "عدد الجلسات المكتملة", value: reports.completedSessions ?? 0 },
             { label: reports.labels?.activeSessions ?? "عدد الجلسات النشطة", value: reports.activeSessions ?? 0 },
@@ -430,22 +471,74 @@ export default function CustomersPage() {
           ))}
           <Card className="col-span-full p-4">
             <h3 className="mb-3 font-semibold">{reports.labels?.topVisitors ?? "الأكثر زيارة"}</h3>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {reports.mostFrequentCustomers.length === 0 ? (
                 <p className="text-sm text-gray-500">لا توجد زيارات في هذه الفترة</p>
               ) : (
                 reports.mostFrequentCustomers.map((c) => (
-                  <div key={c.id} className="flex justify-between text-sm">
-                    <span>
-                      {c.customerName} {c.isVip && <Badge>VIP</Badge>}
-                    </span>
-                    <span>
-                      {c.visitCount} زيارة · {c.totalSpending} ر.س
-                    </span>
+                  <div key={c.id} className="rounded border border-gray-100 p-3 text-sm">
+                    <div className="flex flex-wrap justify-between gap-2 font-medium">
+                      <span>
+                        {c.customerName} {c.isVip && <Badge>VIP</Badge>}
+                      </span>
+                      <span>{c.visitCount} زيارة · {c.totalSpending} ر.س</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-600">
+                      {c.totalCompanions ?? 0} مرافقًا · {c.totalPeopleBrought ?? 0} زائرًا إجمالًا ·
+                      متوسط المجموعة {c.averageGroupSize ?? 0} · أكبر مجموعة {c.largestGroup ?? 0}
+                    </p>
                   </div>
                 ))
               )}
             </div>
+          </Card>
+          <Card className="col-span-full overflow-x-auto p-0">
+            <div className="border-b px-4 py-3">
+              <h3 className="font-semibold">جدول زيارات العملاء</h3>
+            </div>
+            <table className="w-full min-w-[960px] text-sm">
+              <thead>
+                <tr className="border-b bg-slate-50 text-right text-xs">
+                  <th className="px-2 py-2">العميل</th>
+                  <th className="px-2 py-2">الجوال</th>
+                  <th className="px-2 py-2">عدد المرافقين</th>
+                  <th className="px-2 py-2">إجمالي المجموعة</th>
+                  <th className="px-2 py-2">الطاولة</th>
+                  <th className="px-2 py-2">وقت الدخول</th>
+                  <th className="px-2 py-2">وقت الخروج</th>
+                  <th className="px-2 py-2">مدة الجلسة</th>
+                  <th className="px-2 py-2">الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(reports.visitDetails ?? []).length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-6 text-center text-gray-500">
+                      لا توجد زيارات في هذه الفترة
+                    </td>
+                  </tr>
+                ) : (
+                  (reports.visitDetails ?? []).map((v) => (
+                    <tr key={v.visitId} className="border-b hover:bg-slate-50">
+                      <td className="px-2 py-2 font-medium">{v.customerName}</td>
+                      <td className="px-2 py-2">{v.customerPhone || "—"}</td>
+                      <td className="px-2 py-2">{v.companionsCount ?? 0}</td>
+                      <td className="px-2 py-2">{v.totalPeople ?? "—"}</td>
+                      <td className="px-2 py-2">
+                        {v.tableNumber ?? "—"}
+                        {v.tableLabel ? ` (${v.tableLabel})` : ""}
+                      </td>
+                      <td className="px-2 py-2">{v.checkedInAt ?? "—"}</td>
+                      <td className="px-2 py-2">{v.exitedAt ?? "—"}</td>
+                      <td className="px-2 py-2">{v.sessionDurationDisplay ?? "—"}</td>
+                      <td className="px-2 py-2">
+                        <Badge>{VISIT_STATUS_LABELS[v.visitStatus ?? ""] || v.visitStatus}</Badge>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </Card>
         </div>
       ) : tab === "customers" ? (
@@ -507,6 +600,8 @@ export default function CustomersPage() {
               <tr className="border-b bg-slate-50 text-right text-xs">
                 <th className="px-2 py-2">الاسم</th>
                 <th className="px-2 py-2">الجوال</th>
+                <th className="px-2 py-2">المرافقون</th>
+                <th className="px-2 py-2">إجمالي المجموعة</th>
                 <th className="px-2 py-2">تاريخ الزيارة</th>
                 <th className="px-2 py-2">وقت الدخول</th>
                 <th className="px-2 py-2">وقت الجلوس</th>
@@ -525,6 +620,8 @@ export default function CustomersPage() {
                 <tr key={v.id} className="border-b hover:bg-slate-50">
                   <td className="px-2 py-2 font-medium">{v.customerName}</td>
                   <td className="px-2 py-2">{v.customerPhone || "—"}</td>
+                  <td className="px-2 py-2">{v.companionsCount ?? Math.max(v.guestCount - 1, 0)}</td>
+                  <td className="px-2 py-2">{v.totalPeople ?? v.guestCount}</td>
                   <td className="px-2 py-2">{v.visitDateDisplay}</td>
                   <td className="px-2 py-2">{v.enteredAtDisplay}</td>
                   <td className="px-2 py-2">{v.seatedAtDisplay}</td>

@@ -11,7 +11,11 @@ import {
   isAfterMidnightEntry,
   resolveActualEntryAt,
 } from "@/lib/actual-entry";
-import { formatRiyadhDateTime } from "@/lib/timezone";
+import { formatRiyadhDateTime, formatRiyadhTime, formatDurationMinutes } from "@/lib/timezone";
+import {
+  resolveGuestCountWithDefault,
+  sumVenuePeople,
+} from "@/lib/visit-group-size";
 import type { BusinessDayConfig } from "@/lib/business-day";
 
 export type { ReportPeriod } from "@/lib/business-day";
@@ -54,6 +58,11 @@ export function reportPeriodLabels(period: ReportPeriod): {
   avgSession: string;
   completedSessions: string;
   activeSessions: string;
+  registeredCustomers: string;
+  totalCompanions: string;
+  totalVenueVisitors: string;
+  averageGroupSize: string;
+  largestGroup: string;
 } {
   const suffix = (() => {
     switch (period) {
@@ -91,6 +100,11 @@ export function reportPeriodLabels(period: ReportPeriod): {
     avgSession: withSuffix("متوسط مدة الجلسة", "متوسط مدة الجلسة"),
     completedSessions: withSuffix("جلسات مكتملة", "عدد الجلسات المكتملة"),
     activeSessions: withSuffix("جلسات نشطة", "عدد الجلسات النشطة"),
+    registeredCustomers: withSuffix("عدد العملاء المسجلين", "عدد العملاء المسجلين"),
+    totalCompanions: withSuffix("إجمالي المرافقين", "إجمالي المرافقين"),
+    totalVenueVisitors: withSuffix("إجمالي زوار المكان", "إجمالي زوار المكان"),
+    averageGroupSize: withSuffix("متوسط عدد الأشخاص لكل زيارة", "متوسط المجموعة"),
+    largestGroup: withSuffix("أكبر مجموعة", "أكبر مجموعة"),
   };
 }
 
@@ -124,9 +138,16 @@ export async function buildCustomerReports(
           customerName: true,
           customerPhone: true,
           totalBill: true,
+          guestCount: true,
           enteredAt: true,
           createdAt: true,
+          exitedAt: true,
+          endTime: true,
           visitStatus: true,
+          tableId: true,
+          tableNumber: true,
+          tableDisplayNumber: true,
+          tableLabel: true,
           sessionDurationMinutes: true,
           sessionStartedAt: true,
           sessionEndedAt: true,
@@ -136,7 +157,15 @@ export async function buildCustomerReports(
               startedAt: true,
               endedAt: true,
               status: true,
-              reservation: { select: { arrivedAt: true } },
+              guestCount: true,
+              reservation: {
+                select: {
+                  id: true,
+                  arrivedAt: true,
+                  guestCount: true,
+                  actualArrivedGuestCount: true,
+                } as Prisma.ReservationSelect,
+              },
             },
           },
           customerProfile: { select: { isVip: true } },
@@ -199,28 +228,46 @@ export async function buildCustomerReports(
     ]);
 
   const visitsWithReservation = visitsRaw.map((v) => {
-    const reservationArrived = v.tableSessions.find((s) => s.reservation?.arrivedAt)
-      ?.reservation;
+    const linkedSession = v.tableSessions.find((s) => s.reservation) ?? v.tableSessions[0];
+    const reservation = linkedSession?.reservation ?? null;
+    const sessionGuestCount = linkedSession?.guestCount ?? null;
     return {
       ...v,
-      reservation: reservationArrived ?? null,
+      reservation,
+      sessionGuestCount,
     };
   });
 
   const filtered = filterByActualEntry(visitsWithReservation, from, to).filter(
     (v) => !isQaTestRecord(v.customerName)
-  );
+  ) as Array<(typeof visitsWithReservation)[number] & { actualEntryAt: Date }>;
 
-  const totalVisits = filtered.length;
+  const enriched = filtered.map((v) => {
+    const group = resolveGuestCountWithDefault({
+      visitGuestCount: v.guestCount,
+      actualArrivedGuestCount: v.reservation?.actualArrivedGuestCount ?? null,
+      reservationGuestCount: v.reservation?.guestCount ?? null,
+      sessionGuestCount: v.sessionGuestCount,
+    });
+    return { ...v, ...group };
+  });
+
+  const venueTotals = sumVenuePeople(enriched);
+  const totalVisits = enriched.length;
   const actualEntries = totalVisits;
+  const registeredCustomers = venueTotals.registeredCustomers;
+  const totalCompanions = venueTotals.totalCompanions;
+  const totalVenueVisitors = venueTotals.totalVenueVisitors;
 
+  let largestGroup = 0;
   let firstEntryAt: Date | null = null;
   let lastEntryAt: Date | null = null;
   let afterMidnightEntries = 0;
   let durationSum = 0;
   let durationCount = 0;
 
-  for (const v of filtered) {
+  for (const v of enriched) {
+    if (v.guestCount != null && v.guestCount > largestGroup) largestGroup = v.guestCount;
     if (!firstEntryAt || v.actualEntryAt < firstEntryAt) firstEntryAt = v.actualEntryAt;
     if (!lastEntryAt || v.actualEntryAt > lastEntryAt) lastEntryAt = v.actualEntryAt;
     if (isAfterMidnightEntry(v.actualEntryAt, timezone, businessDayStartHour)) {
@@ -240,6 +287,36 @@ export async function buildCustomerReports(
     }
   }
 
+  const averageGroupSize =
+    registeredCustomers > 0
+      ? Math.round((totalVenueVisitors / registeredCustomers) * 10) / 10
+      : 0;
+
+  const visitDetails = enriched
+    .sort((a, b) => b.actualEntryAt.getTime() - a.actualEntryAt.getTime())
+    .slice(0, 500)
+    .map((v) => {
+      const exitedAt = v.exitedAt ?? v.endTime ?? null;
+      return {
+        visitId: v.id,
+        customerId: v.customerProfileId,
+        customerName: v.customerName,
+        customerPhone: v.customerPhone,
+        reservationId: v.reservation?.id ?? null,
+        tableId: v.tableId,
+        tableNumber: v.tableDisplayNumber ?? (v.tableNumber != null ? String(v.tableNumber) : null),
+        tableLabel: v.tableLabel,
+        checkedInAt: formatRiyadhDateTime(v.actualEntryAt),
+        exitedAt: exitedAt ? formatRiyadhDateTime(exitedAt) : null,
+        guestCount: v.guestCount,
+        companionsCount: v.companionsCount,
+        totalPeople: v.totalPeople,
+        guestCountUnknown: v.guestCountUnknown,
+        sessionDurationDisplay: formatDurationMinutes(v.sessionDurationMinutes),
+        visitStatus: v.visitStatus,
+      };
+    });
+
   const byCustomer = new Map<
     string,
     {
@@ -249,16 +326,28 @@ export async function buildCustomerReports(
       visitCount: number;
       totalSpending: number;
       isVip: boolean;
+      totalCompanions: number;
+      totalPeopleBrought: number;
+      largestGroup: number;
+      groupSizeSum: number;
     }
   >();
 
-  for (const v of filtered) {
+  for (const v of enriched) {
     const key = v.customerProfileId || v.customerPhone || v.customerName;
     const spend = Number(v.totalBill ?? 0);
+    const people = v.totalPeople ?? 0;
+    const companions = v.companionsCount ?? 0;
     const existing = byCustomer.get(key);
     if (existing) {
       existing.visitCount += 1;
       existing.totalSpending += spend;
+      existing.totalCompanions += companions;
+      existing.totalPeopleBrought += people;
+      existing.groupSizeSum += people;
+      if ((v.guestCount ?? 0) > existing.largestGroup) {
+        existing.largestGroup = v.guestCount ?? 0;
+      }
     } else {
       byCustomer.set(key, {
         id: v.customerProfileId || key,
@@ -267,6 +356,10 @@ export async function buildCustomerReports(
         visitCount: 1,
         totalSpending: spend,
         isVip: v.customerProfile?.isVip ?? false,
+        totalCompanions: companions,
+        totalPeopleBrought: people,
+        largestGroup: v.guestCount ?? 0,
+        groupSizeSum: people,
       });
     }
   }
@@ -275,8 +368,21 @@ export async function buildCustomerReports(
   const repeatCustomers = [...byCustomer.values()].filter((c) => c.visitCount >= 2).length;
   const vipVisitors = [...byCustomer.values()].filter((c) => c.isVip).length;
   const mostFrequentCustomers = [...byCustomer.values()]
-    .sort((a, b) => b.visitCount - a.visitCount || b.totalSpending - a.totalSpending)
-    .slice(0, 10);
+    .sort((a, b) => b.visitCount - a.visitCount || b.totalPeopleBrought - a.totalPeopleBrought)
+    .slice(0, 10)
+    .map((c) => ({
+      id: c.id,
+      customerName: c.customerName,
+      customerPhone: c.customerPhone,
+      visitCount: c.visitCount,
+      totalSpending: c.totalSpending,
+      isVip: c.isVip,
+      totalCompanions: c.totalCompanions,
+      totalPeopleBrought: c.totalPeopleBrought,
+      averageGroupSize:
+        c.visitCount > 0 ? Math.round((c.groupSizeSum / c.visitCount) * 10) / 10 : 0,
+      largestGroup: c.largestGroup,
+    }));
 
   const labels = reportPeriodLabels(period);
 
@@ -291,6 +397,12 @@ export async function buildCustomerReports(
     uniqueVisitors,
     totalVisits,
     actualEntries,
+    registeredCustomers,
+    totalCompanions,
+    totalVenueVisitors,
+    averageGroupSize,
+    largestGroup,
+    visitDetails,
     repeatCustomers,
     noShows,
     vipVisitors,

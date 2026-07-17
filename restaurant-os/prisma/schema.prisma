@@ -1025,6 +1025,7 @@ model Reservation {
   customerName      String            @map("customer_name")
   customerPhone     String            @map("customer_phone")
   guestCount        Int               @default(2) @map("guest_count")
+  actualArrivedGuestCount Int?        @map("actual_arrived_guest_count")
   gender            String?
   date              DateTime
   time              String

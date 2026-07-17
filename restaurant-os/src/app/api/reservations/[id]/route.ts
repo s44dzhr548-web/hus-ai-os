@@ -275,7 +275,13 @@ export async function PATCH(
 
   if (action === "mark_arrived" || action === "customer_arrived") {
     try {
-      const updated = await markReservationArrived(id, restaurantId!);
+      const guestCount =
+        body.guestCount != null ? parseInt(String(body.guestCount), 10) : undefined;
+      const updated = await markReservationArrived(
+        id,
+        restaurantId!,
+        guestCount != null && guestCount >= 1 ? guestCount : undefined
+      );
       return NextResponse.json(await withPresentGuests(updated));
     } catch (e) {
       return NextResponse.json(
@@ -297,6 +303,8 @@ export async function PATCH(
           body.minimumSpendAmount != null && body.minimumSpendAmount !== ""
             ? parseFloat(String(body.minimumSpendAmount))
             : undefined,
+        actualGuestCount:
+          body.guestCount != null ? parseInt(String(body.guestCount), 10) : undefined,
         req,
       });
       return NextResponse.json(
@@ -335,7 +343,8 @@ export async function PATCH(
         table,
         staff,
         req,
-        minSpend
+        minSpend,
+        body.guestCount != null ? parseInt(String(body.guestCount), 10) : undefined
       );
 
       return NextResponse.json(
