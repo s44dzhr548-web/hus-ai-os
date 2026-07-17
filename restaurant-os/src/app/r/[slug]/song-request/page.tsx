@@ -55,7 +55,7 @@ function SongRequestForm() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
-  const [sessionBlocked, setSessionBlocked] = useState(false);
+  const [sessionBlocked, setSessionBlocked] = useState(!tableId);
   const [requests, setRequests] = useState<SongRow[]>([]);
 
   useEffect(() => {

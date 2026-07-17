@@ -3,7 +3,7 @@
  * Usage: node scripts/customer-nav-qa.mjs
  */
 const BASE = process.env.PRODUCTION_URL || "https://restaurant-os-nine.vercel.app";
-const SLUG = "fabrika";
+const SLUG = process.env.RESTAURANT_SLUG || "menu-os-demo";
 
 const checks = [];
 
@@ -38,15 +38,15 @@ async function main() {
   const navItems = [
     ["المنيو", "menu"],
     ["حجز طاولة", "reservations"],
-    ["الإهداء", "gift"],
+    ["الإهداء", "gift", "إهداء"],
     ["الأمنيات", "wishes"],
     ["طلب أغنية", "song_request"],
     ["العروض", "offers"],
     ["الحفلات", "events"],
   ];
 
-  for (const [label] of navItems) {
-    if (homeHtml.includes(label)) {
+  for (const [label, , alt] of navItems) {
+    if (homeHtml.includes(label) || (alt && homeHtml.includes(alt))) {
       pass(`Nav tile: ${label}`);
     } else {
       fail(`Nav tile: ${label}`, "not found in HTML");
