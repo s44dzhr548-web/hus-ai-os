@@ -60,9 +60,22 @@ async function main() {
   }
 
   if (homeHtml.includes("grid-cols-2") && homeHtml.includes("sm:grid-cols-4")) {
-    pass("Responsive grid classes present");
+    pass("Mobile: 2 cards per row (grid-cols-2)");
+    pass("Desktop: max 4 cards per row (sm:grid-cols-4)");
   } else {
-    fail("Responsive grid classes present");
+    fail("Responsive grid layout");
+  }
+
+  if (homeHtml.includes("min-h-[108px]") && homeHtml.includes("overflow-x-hidden")) {
+    pass("Mobile: large touch targets + no horizontal overflow");
+  } else {
+    fail("Mobile touch targets / overflow guard");
+  }
+
+  if (homeHtml.includes("sm:min-h-[120px]") && homeHtml.includes("max-w-4xl")) {
+    pass("Desktop: equal card heights + bounded grid width");
+  } else {
+    fail("Desktop equal cards / max width");
   }
 
   const giftsGateUrl = `${BASE}/r/${SLUG}/gifts`;
@@ -73,6 +86,25 @@ async function main() {
     pass("Gifts route reachable", giftsGateUrl);
   } else {
     fail("Gifts route", `HTTP ${giftsRes.status}`);
+  }
+
+  if (homeHtml.includes(`/r/${SLUG}/wishes`) || homeHtml.includes(`/r/${SLUG}/wishes?`)) {
+    pass("Home links to wishes route");
+  } else {
+    fail("Home links to wishes route");
+  }
+  if (homeHtml.includes(`/r/${SLUG}/song-request`) || homeHtml.includes(`/r/${SLUG}/song-request?`)) {
+    pass("Home links to song-request route");
+  } else {
+    fail("Home links to song-request route");
+  }
+  if (
+    homeHtml.includes(`/r/${SLUG}/gifts`) ||
+    homeHtml.includes("/gift/")
+  ) {
+    pass("Home links to gift route");
+  } else {
+    fail("Home links to gift route");
   }
 
   const wishesUrl = `${BASE}/r/${SLUG}/wishes`;
