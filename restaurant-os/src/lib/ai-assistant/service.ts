@@ -96,20 +96,25 @@ export async function processAssistantMessage(params: {
   const fallback = routeFallbackCommand(params.message);
   const useOpenAi = Boolean(process.env.OPENAI_API_KEY);
 
-  if (fallback && !useOpenAi) {
+  if (fallback) {
     return handleRoutedTool(fallback.tool, fallback.args, ctx, params.message);
+  }
+
+  if (!useOpenAi) {
+    return {
+      message:
+        "لم أفهم الأمر. جرّب: «اعرض حجوزات اليوم»، «كم عدد زوار أمس؟»، «هل واتساب متصل؟»",
+    };
   }
 
   let turn = await runOpenAiAssistantTurn({ userMessage: params.message });
   const toolResults: Array<{ tool: string; summary: string; data?: unknown }> = [];
   let pendingAction: ChatAssistantResponse["pendingAction"];
 
-  if (!turn.toolCalls.length && fallback && useOpenAi) {
-    return handleRoutedTool(fallback.tool, fallback.args, ctx, params.message);
-  }
-
-  if (!turn.toolCalls.length && !turn.text && fallback) {
-    return handleRoutedTool(fallback.tool, fallback.args, ctx, params.message);
+  if (!turn.toolCalls.length && !turn.text) {
+    return {
+      message: "لم أتمكن من معالجة الطلب. حاول صياغة الأمر بشكل أوضح.",
+    };
   }
 
   for (let depth = 0; depth < 5; depth++) {

@@ -22,7 +22,7 @@ const WRITE_PATTERNS: Array<{
   parse: (m: RegExpMatchArray) => Record<string, unknown>;
 }> = [
   {
-    re: /ع[يّ]?[n]?\s*(?:الحجز\s*)?(?:رقم\s*)?([A-Za-z0-9-]+)\s*على\s*طاولة\s*(\d+)/i,
+    re: /(?:عيّ?ن|عين)\s*(?:الحجز\s*)?(?:رقم\s*)?([A-Za-z0-9-]+)\s*على\s*طاولة\s*(\d+)/i,
     tool: "assign_table",
     parse: (m) => ({ reservationNumber: m[1], tableNumber: m[2] }),
   },
