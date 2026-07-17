@@ -5,13 +5,14 @@
  * Usage: node scripts/fabrika-customer-features-e2e.mjs [baseUrl]
  */
 const BASE = process.argv[2] || process.env.PRODUCTION_URL || "https://restaurant-os-nine.vercel.app";
-const SLUG = process.env.RESTAURANT_SLUG || "menu-os-demo";
+const SLUG_OVERRIDE = process.env.RESTAURANT_SLUG || "";
 const QA_TAG = `QA-E2E-NAV-${Date.now()}`;
 const ADMIN_EMAIL = process.env.QA_ADMIN_EMAIL || "admin@menuos.sa";
 const ADMIN_PASSWORD = process.env.QA_ADMIN_PASSWORD || "admin123456";
 
 const summary = {
-  url: `${BASE}/r/${SLUG}`,
+  slug: "",
+  url: "",
   gifts: "FAIL",
   wishes: "FAIL",
   songRequests: "FAIL",
@@ -21,15 +22,89 @@ async function json(res) {
   return res.json().catch(() => ({}));
 }
 
+function parseSetCookie(res, prev = "") {
+  const parts = new Set(prev ? prev.split("; ").filter(Boolean) : []);
+  for (const c of res.headers.getSetCookie?.() || []) {
+    parts.add(c.split(";")[0]);
+  }
+  return [...parts].join("; ");
+}
+
+function isFabrikaCandidate(r) {
+  if (!r?.slug || r.slug === "menu-os-demo" || r.isActive === false) return false;
+  const label = `${r.name || ""} ${r.nameAr || ""} ${r.slug}`;
+  return /fabrika|fabraka|فابريك/i.test(label);
+}
+
+function rankFabrikaCandidates(list) {
+  return [...list].sort((a, b) => {
+    const aFabrika = a.slug.startsWith("fabrika-") ? 1 : 0;
+    const bFabrika = b.slug.startsWith("fabrika-") ? 1 : 0;
+    if (bFabrika !== aFabrika) return bFabrika - aFabrika;
+    const aLounge = /لاونج|lounge/i.test(`${a.name} ${a.nameAr}`) ? 1 : 0;
+    const bLounge = /لاونج|lounge/i.test(`${b.name} ${b.nameAr}`) ? 1 : 0;
+    return bLounge - aLounge;
+  });
+}
+
+async function resolveFabrikaRestaurant(cookie) {
+  if (SLUG_OVERRIDE) {
+    const list = await json(
+      await fetch(`${BASE}/api/restaurants/switch`, { headers: { Cookie: cookie } })
+    );
+    const match = (Array.isArray(list) ? list : []).find((r) => r.slug === SLUG_OVERRIDE);
+    if (!match) throw new Error(`RESTAURANT_SLUG not found: ${SLUG_OVERRIDE}`);
+    return match;
+  }
+
+  const list = await json(
+    await fetch(`${BASE}/api/restaurants/switch`, { headers: { Cookie: cookie } })
+  );
+  const candidates = rankFabrikaCandidates(
+    (Array.isArray(list) ? list : []).filter(isFabrikaCandidate)
+  );
+  if (!candidates.length) throw new Error("No Fabrika restaurant found");
+
+  let best = candidates[0];
+  let bestTables = -1;
+  for (const candidate of candidates.slice(0, 5)) {
+    const switchRes = await fetch(`${BASE}/api/restaurants/switch`, {
+      method: "POST",
+      headers: { Cookie: cookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ restaurantId: candidate.id }),
+    });
+    const scopedCookie = parseSetCookie(switchRes, cookie);
+    const reception = await json(
+      await fetch(`${BASE}/api/reception`, { headers: { Cookie: scopedCookie } })
+    );
+    const tableCount = reception.cards?.length ?? 0;
+    if (tableCount > bestTables) {
+      bestTables = tableCount;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+async function switchToRestaurant(cookie, restaurantId) {
+  const res = await fetch(`${BASE}/api/restaurants/switch`, {
+    method: "POST",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ restaurantId }),
+  });
+  if (!res.ok) throw new Error(`Switch restaurant failed: HTTP ${res.status}`);
+  return parseSetCookie(res, cookie);
+}
+
 async function login() {
   const csrfRes = await fetch(`${BASE}/api/auth/csrf`);
   const { csrfToken } = await json(csrfRes);
-  const cookies = csrfRes.headers.getSetCookie?.() || [];
+  let cookie = parseSetCookie(csrfRes);
   const loginRes = await fetch(`${BASE}/api/auth/callback/credentials`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Cookie: cookies.map((c) => c.split(";")[0]).join("; "),
+      Cookie: cookie,
     },
     body: new URLSearchParams({
       csrfToken,
@@ -40,28 +115,34 @@ async function login() {
     }),
     redirect: "manual",
   });
-  return [
-    ...cookies.map((c) => c.split(";")[0]),
-    ...(loginRes.headers.getSetCookie?.() || []).map((c) => c.split(";")[0]),
-  ].join("; ");
+  return parseSetCookie(loginRes, cookie);
 }
 
 async function ensureActiveSessions(cookie) {
   const headers = { Cookie: cookie, "Content-Type": "application/json" };
   const reception = await json(await fetch(`${BASE}/api/reception`, { headers: { Cookie: cookie } }));
 
-  const active = reception.cards?.filter((c) => c.session) || [];
-  const empty = reception.cards?.filter((c) => !c.session && c.table?.id) || [];
+  const byTable = new Map();
+  for (const card of reception.cards || []) {
+    if (card.session && card.table?.id) {
+      byTable.set(card.table.id, {
+        tableId: card.table.id,
+        tableNumber: card.table.number,
+      });
+    }
+  }
 
-  const created = [];
-  while (active.length + created.length < 2 && empty.length > 0) {
+  const empty = (reception.cards || []).filter((c) => !c.session && c.table?.id);
+  let phoneSuffix = 0;
+
+  while (byTable.size < 2 && empty.length > 0) {
     const table = empty.shift();
     const res = await fetch(`${BASE}/api/reception`, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        customerName: `${QA_TAG} Guest ${created.length + 1}`,
-        customerPhone: `0509${String(Date.now()).slice(-6)}`,
+        customerName: `${QA_TAG} Guest ${byTable.size + 1}`,
+        customerPhone: `0509${String(Date.now() + phoneSuffix++).slice(-6)}`,
         guestCount: 2,
         tableId: table.table.id,
         branchId: table.table.branchId,
@@ -69,22 +150,16 @@ async function ensureActiveSessions(cookie) {
     });
     const data = await json(res);
     if (res.ok && data.tableId) {
-      created.push({ tableId: data.tableId, sessionId: data.id });
-      active.push({ session: data, table: table.table });
+      byTable.set(data.tableId, {
+        tableId: data.tableId,
+        tableNumber: table.tableDisplayNumber || table.table.number,
+      });
+    } else {
+      console.log(`WARN  Could not open session on table ${table.table.id}:`, data.error || res.status);
     }
   }
 
-  const sessions = reception.cards?.filter((c) => c.session).map((c) => ({
-    tableId: c.table.id,
-    tableNumber: c.table.number,
-  })) || [];
-
-  for (const c of created) {
-    const card = reception.cards?.find((x) => x.table.id === c.tableId);
-    sessions.push({ tableId: c.tableId, tableNumber: card?.table?.number || "?" });
-  }
-
-  return sessions.slice(0, 2);
+  return [...byTable.values()].slice(0, 2);
 }
 
 async function findMenuProduct(tableId) {
@@ -100,7 +175,24 @@ async function findMenuProduct(tableId) {
 }
 
 async function main() {
-  console.log(`\nFabrika Customer Features E2E\n${summary.url}\nQA tag: ${QA_TAG}\n`);
+  let cookie;
+  try {
+    cookie = await login();
+    console.log("PASS  Staff login");
+  } catch (e) {
+    console.error("FAIL  Staff login", e.message);
+    printSummary();
+    process.exit(1);
+  }
+
+  const fabrika = await resolveFabrikaRestaurant(cookie);
+  summary.slug = fabrika.slug;
+  summary.url = `${BASE}/r/${fabrika.slug}`;
+  cookie = await switchToRestaurant(cookie, fabrika.id);
+
+  console.log(`\nFabrika Customer Features E2E`);
+  console.log(`Resolved: ${fabrika.nameAr || fabrika.name} (${fabrika.slug})`);
+  console.log(`${summary.url}\nQA tag: ${QA_TAG}\n`);
 
   const homeRes = await fetch(summary.url);
   const homeHtml = await homeRes.text();
@@ -118,14 +210,10 @@ async function main() {
     }
   }
 
-  let cookie;
-  try {
-    cookie = await login();
-    console.log("PASS  Staff login");
-  } catch (e) {
-    console.error("FAIL  Staff login", e.message);
-    printSummary();
-    process.exit(1);
+  if (homeHtml.includes(`/r/${summary.slug}/wishes?`) || homeHtml.includes(`/r/${summary.slug}/wishes`)) {
+    console.log("PASS  Wishes route preserves restaurant slug");
+  } else {
+    console.log("FAIL  Wishes route link missing");
   }
 
   const authHeaders = { Cookie: cookie, "Content-Type": "application/json" };
@@ -256,7 +344,8 @@ async function main() {
 
 function printSummary() {
   console.log("\n=== Fabrika Customer Features E2E Summary ===");
-  console.log(`Production URL: ${summary.url}`);
+  console.log(`Fabrika slug:   ${summary.slug || "(unknown)"}`);
+  console.log(`Production URL: ${summary.url || "(unknown)"}`);
   console.log(`Gifts:          ${summary.gifts}`);
   console.log(`Wishes:         ${summary.wishes}`);
   console.log(`Song Requests:  ${summary.songRequests}`);
