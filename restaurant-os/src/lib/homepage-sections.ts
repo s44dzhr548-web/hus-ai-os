@@ -1,3 +1,19 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  UtensilsCrossed,
+  CalendarDays,
+  Gift,
+  Sparkles,
+  Music,
+  Tag,
+  PartyPopper,
+  MapPin,
+  Package,
+  Star,
+  Phone,
+  MessageCircle,
+} from "lucide-react";
+
 export type HomepageSectionId =
   | "menu"
   | "reservations"
@@ -9,7 +25,8 @@ export type HomepageSectionId =
   | "whatsapp"
   | "events"
   | "wishes"
-  | "gift";
+  | "gift"
+  | "song_request";
 
 export interface HomepageSectionConfig {
   id: HomepageSectionId;
@@ -18,6 +35,17 @@ export interface HomepageSectionConfig {
   enabled: boolean;
   order: number;
 }
+
+/** Primary customer landing navigation (max 7 tiles) */
+export const PRIMARY_NAV_SECTION_IDS: HomepageSectionId[] = [
+  "menu",
+  "reservations",
+  "gift",
+  "wishes",
+  "song_request",
+  "offers",
+  "events",
+];
 
 const SECTION_DEFINITIONS: Record<
   HomepageSectionId,
@@ -30,40 +58,61 @@ const SECTION_DEFINITIONS: Record<
     titleEn: "Reserve Table",
     enabled: true,
   },
+  gift: { id: "gift", titleAr: "الإهداء", titleEn: "Gifts", enabled: true },
+  wishes: { id: "wishes", titleAr: "الأمنيات", titleEn: "Wishes", enabled: true },
+  song_request: {
+    id: "song_request",
+    titleAr: "طلب أغنية",
+    titleEn: "Song Request",
+    enabled: true,
+  },
   offers: { id: "offers", titleAr: "العروض", titleEn: "Offers", enabled: true },
+  events: { id: "events", titleAr: "الحفلات", titleEn: "Events", enabled: true },
   branches: {
     id: "branches",
     titleAr: "الفروع",
     titleEn: "Branches",
-    enabled: true,
+    enabled: false,
   },
   track_order: {
     id: "track_order",
     titleAr: "تتبع الطلب",
     titleEn: "Track Order",
-    enabled: true,
+    enabled: false,
   },
   rate_visit: {
     id: "rate_visit",
     titleAr: "تقييم الزيارة",
     titleEn: "Rate Visit",
-    enabled: true,
+    enabled: false,
   },
-  contact: { id: "contact", titleAr: "تواصل", titleEn: "Contact", enabled: true },
+  contact: { id: "contact", titleAr: "تواصل", titleEn: "Contact", enabled: false },
   whatsapp: {
     id: "whatsapp",
     titleAr: "واتساب",
     titleEn: "WhatsApp",
-    enabled: true,
+    enabled: false,
   },
-  events: { id: "events", titleAr: "الحفلات", titleEn: "Events", enabled: false },
-  wishes: { id: "wishes", titleAr: "الأمنيات", titleEn: "Wishes", enabled: false },
-  gift: { id: "gift", titleAr: "إهداء طاولة", titleEn: "Gift a Table", enabled: false },
+};
+
+const PRIMARY_ORDER: Record<HomepageSectionId, number> = {
+  menu: 0,
+  reservations: 1,
+  gift: 2,
+  wishes: 3,
+  song_request: 4,
+  offers: 5,
+  events: 6,
+  branches: 10,
+  track_order: 11,
+  rate_visit: 12,
+  contact: 13,
+  whatsapp: 14,
 };
 
 export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionConfig[] = Object.values(
   SECTION_DEFINITIONS
-).map((s, order) => ({ ...s, order }));
+).map((s) => ({ ...s, order: PRIMARY_ORDER[s.id] }));
 
 export function parseHomepageSections(raw: unknown): HomepageSectionConfig[] {
   const byId = new Map<HomepageSectionId, HomepageSectionConfig>();
@@ -95,6 +144,7 @@ export function serializeHomepageSections(sections: HomepageSectionConfig[]) {
   return sections.map((s, i) => ({ ...s, order: i }));
 }
 
+/** Legacy emoji icons for admin preview fallback */
 export const SECTION_ICONS: Record<HomepageSectionId, string> = {
   menu: "🍽",
   reservations: "🪑",
@@ -105,6 +155,59 @@ export const SECTION_ICONS: Record<HomepageSectionId, string> = {
   contact: "📞",
   whatsapp: "💬",
   events: "🎉",
-  wishes: "💫",
+  wishes: "✨",
   gift: "🎁",
+  song_request: "🎵",
 };
+
+export const SECTION_LUCIDE_ICONS: Record<HomepageSectionId, LucideIcon> = {
+  menu: UtensilsCrossed,
+  reservations: CalendarDays,
+  gift: Gift,
+  wishes: Sparkles,
+  song_request: Music,
+  offers: Tag,
+  events: PartyPopper,
+  branches: MapPin,
+  track_order: Package,
+  rate_visit: Star,
+  contact: Phone,
+  whatsapp: MessageCircle,
+};
+
+export type CustomerFeatureFlags = {
+  tableGiftsEnabled?: boolean;
+  customerWishesEnabled?: boolean;
+  customerSongRequestsEnabled?: boolean;
+};
+
+export function filterSectionsByFeatureFlags(
+  sections: HomepageSectionConfig[],
+  flags: CustomerFeatureFlags
+): HomepageSectionConfig[] {
+  return sections.filter((s) => {
+    if (s.id === "gift" && flags.tableGiftsEnabled === false) return false;
+    if (s.id === "wishes" && flags.customerWishesEnabled === false) return false;
+    if (s.id === "song_request" && flags.customerSongRequestsEnabled === false) {
+      return false;
+    }
+    return true;
+  });
+}
+
+export function resolvePrimaryNavSections(
+  sections: HomepageSectionConfig[],
+  flags: CustomerFeatureFlags
+): HomepageSectionConfig[] {
+  const enabled = filterSectionsByFeatureFlags(
+    sections.filter((s) => s.enabled),
+    flags
+  );
+  const primarySet = new Set(PRIMARY_NAV_SECTION_IDS);
+  return enabled
+    .filter((s) => primarySet.has(s.id))
+    .sort(
+      (a, b) =>
+        PRIMARY_NAV_SECTION_IDS.indexOf(a.id) - PRIMARY_NAV_SECTION_IDS.indexOf(b.id)
+    );
+}

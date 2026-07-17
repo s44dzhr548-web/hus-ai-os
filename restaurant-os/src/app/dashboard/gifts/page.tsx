@@ -24,6 +24,8 @@ export default function GiftsDashboardPage() {
     acceptanceTimeoutMinutes: 2,
     allowAnonymous: true,
     showSenderName: true,
+    wishesEnabled: false,
+    songRequestsEnabled: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -73,19 +75,27 @@ export default function GiftsDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="إدارة الإهداء بين الطاولات"
-        description="Table Gifts — مراقبة الهدايا والإعدادات"
+        title="تجربة العميل — الإهداء والأمنيات والأغاني"
+        description="إدارة الإهداء بين الطاولات، الأمنيات، وطلبات الأغاني"
         action={
-          <Link href="/dashboard/settings">
-            <Button variant="outline">إعدادات المطعم</Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/dashboard/wishes">
+              <Button variant="outline">الأمنيات</Button>
+            </Link>
+            <Link href="/dashboard/song-requests">
+              <Button variant="outline">طلبات الأغاني</Button>
+            </Link>
+            <Link href="/dashboard/settings">
+              <Button variant="outline">إعدادات المطعم</Button>
+            </Link>
+          </div>
         }
       />
 
       <Card className="space-y-4 p-4">
         <h3 className="flex items-center gap-2 font-semibold">
           <Gift className="h-5 w-5 text-amber-500" />
-          إعدادات الإهداء
+          إعدادات تجربة العميل
         </h3>
         <label className="flex items-center gap-2">
           <input
@@ -93,8 +103,30 @@ export default function GiftsDashboardPage() {
             checked={settings.enabled}
             onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
           />
-          تفعيل الإهداء بين الطاولات
+          تفعيل الإهداء
         </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={settings.wishesEnabled}
+            onChange={(e) =>
+              setSettings({ ...settings, wishesEnabled: e.target.checked })
+            }
+          />
+          تفعيل الأمنيات
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={settings.songRequestsEnabled}
+            onChange={(e) =>
+              setSettings({ ...settings, songRequestsEnabled: e.target.checked })
+            }
+          />
+          تفعيل طلب الأغاني
+        </label>
+        <hr className="border-gray-200" />
+        <p className="text-sm font-medium text-gray-700">إعدادات الإهداء</p>
         <label className="block text-sm">
           مهلة القبول (دقائق)
           <input

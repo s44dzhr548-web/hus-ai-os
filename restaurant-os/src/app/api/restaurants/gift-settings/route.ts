@@ -16,13 +16,24 @@ export async function GET() {
 
   const r = await prisma.restaurant.findUnique({
     where: { id: restaurantId! },
-    select: { tableGiftsEnabled: true, tableGiftsSettingsJson: true },
+    select: {
+      tableGiftsEnabled: true,
+      tableGiftsSettingsJson: true,
+      customerWishesEnabled: true,
+      customerSongRequestsEnabled: true,
+    },
   });
 
+  const giftSettings = r
+    ? parseTableGiftSettings(r.tableGiftsEnabled, r.tableGiftsSettingsJson)
+    : DEFAULT_TABLE_GIFT_SETTINGS;
+
   return NextResponse.json({
-    settings: r
-      ? parseTableGiftSettings(r.tableGiftsEnabled, r.tableGiftsSettingsJson)
-      : DEFAULT_TABLE_GIFT_SETTINGS,
+    settings: {
+      ...giftSettings,
+      wishesEnabled: r?.customerWishesEnabled ?? false,
+      songRequestsEnabled: r?.customerSongRequestsEnabled ?? false,
+    },
   });
 }
 
@@ -45,10 +56,34 @@ export async function PATCH(req: NextRequest) {
     data: {
       tableGiftsEnabled: enabled,
       tableGiftsSettingsJson: settingsJson,
+      ...(typeof body.wishesEnabled === "boolean"
+        ? { customerWishesEnabled: body.wishesEnabled }
+        : {}),
+      ...(typeof body.songRequestsEnabled === "boolean"
+        ? { customerSongRequestsEnabled: body.songRequestsEnabled }
+        : {}),
     },
   });
 
+  const r = await prisma.restaurant.findUnique({
+    where: { id: restaurantId! },
+    select: {
+      tableGiftsEnabled: true,
+      tableGiftsSettingsJson: true,
+      customerWishesEnabled: true,
+      customerSongRequestsEnabled: true,
+    },
+  });
+
+  const giftSettings = r
+    ? parseTableGiftSettings(r.tableGiftsEnabled, r.tableGiftsSettingsJson)
+    : DEFAULT_TABLE_GIFT_SETTINGS;
+
   return NextResponse.json({
-    settings: parseTableGiftSettings(enabled, settingsJson),
+    settings: {
+      ...giftSettings,
+      wishesEnabled: r?.customerWishesEnabled ?? false,
+      songRequestsEnabled: r?.customerSongRequestsEnabled ?? false,
+    },
   });
 }

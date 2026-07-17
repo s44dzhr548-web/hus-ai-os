@@ -192,6 +192,34 @@ enum TableGiftStatus {
   REFUNDED
 }
 
+enum CustomerWishType {
+  OCCASION
+  CONGRATULATION
+  SPECIAL_REQUEST
+  NOTE
+}
+
+enum CustomerWishStatus {
+  SUBMITTED
+  ACCEPTED
+  COMPLETED
+  REJECTED
+}
+
+enum SongRequestTarget {
+  SAME_TABLE
+  OTHER_TABLE
+  WHOLE_RESTAURANT
+}
+
+enum SongRequestStatus {
+  PENDING_REVIEW
+  ACCEPTED
+  REJECTED
+  PLAYING
+  PLAYED
+}
+
 enum OptionGroupType {
   SIZE
   ADDON
@@ -329,6 +357,8 @@ model Restaurant {
   monitoringSettingsJson  Json?    @map("monitoring_settings_json")
   tableGiftsEnabled       Boolean  @default(false) @map("table_gifts_enabled")
   tableGiftsSettingsJson  Json?    @map("table_gifts_settings_json")
+  customerWishesEnabled   Boolean  @default(false) @map("customer_wishes_enabled")
+  customerSongRequestsEnabled Boolean @default(false) @map("customer_song_requests_enabled")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -383,6 +413,8 @@ model Restaurant {
   staffActivityLogs        StaffActivityLog[]
   ownerNotifications       OwnerNotification[]
   tableGifts               TableGift[]
+  customerWishes           CustomerWish[]
+  songRequests             SongRequest[]
   staffAuditEvents         StaffAuditEvent[]
   whatsAppBusinessConnection WhatsAppBusinessConnection?
   whatsAppBusinessProfile    WhatsAppBusinessProfile?
@@ -421,6 +453,8 @@ model Branch {
   reservations Reservation[]
   waitingList   WaitingListEntry[]
   tableGifts    TableGift[]
+  customerWishes CustomerWish[]
+  songRequests  SongRequest[]
   customerVisits CustomerVisit[]
   afterVisitWhatsAppAutomations AfterVisitWhatsAppAutomation[]
 
@@ -481,6 +515,8 @@ model DiningTable {
   reservations  Reservation[]
   giftsSent     TableGift[] @relation("GiftSenderTable")
   giftsReceived TableGift[] @relation("GiftReceiverTable")
+  customerWishes CustomerWish[]
+  songRequests  SongRequest[]
   customerVisits CustomerVisit[]
 
   @@unique([branchId, number])
@@ -955,6 +991,8 @@ model TableSession {
   auditLogs        SessionAuditLog[]
   giftsSent        TableGift[] @relation("GiftSenderSession")
   giftsReceived    TableGift[] @relation("GiftReceiverSession")
+  customerWishes   CustomerWish[]
+  songRequests     SongRequest[]
 
   @@index([restaurantId, status])
   @@index([tableId, endedAt])
@@ -1014,6 +1052,61 @@ model TableGift {
   @@index([receiverSessionId, status])
   @@index([expiresAt])
   @@map("table_gifts")
+}
+
+model CustomerWish {
+  id           String             @id @default(cuid())
+  restaurantId String             @map("restaurant_id")
+  branchId     String?            @map("branch_id")
+  tableId      String             @map("table_id")
+  sessionId    String             @map("session_id")
+  tableNumber  String?            @map("table_number")
+  customerName String?            @map("customer_name")
+  type         CustomerWishType
+  message      String
+  status       CustomerWishStatus @default(SUBMITTED)
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  respondedAt  DateTime?          @map("responded_at")
+  completedAt  DateTime?          @map("completed_at")
+
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch     Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  table      DiningTable  @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  session    TableSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, status])
+  @@index([sessionId])
+  @@map("customer_wishes")
+}
+
+model SongRequest {
+  id                String            @id @default(cuid())
+  restaurantId      String            @map("restaurant_id")
+  branchId          String?           @map("branch_id")
+  tableId           String            @map("table_id")
+  sessionId         String            @map("session_id")
+  tableNumber       String?           @map("table_number")
+  songName          String            @map("song_name")
+  artistName        String?           @map("artist_name")
+  linkUrl           String?           @map("link_url")
+  dedicationMessage String?           @map("dedication_message")
+  target            SongRequestTarget @default(SAME_TABLE)
+  targetTableId     String?           @map("target_table_id")
+  targetTableNumber String?           @map("target_table_number")
+  status            SongRequestStatus @default(PENDING_REVIEW)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  playedAt          DateTime?         @map("played_at")
+
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  branch     Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  table      DiningTable  @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  session    TableSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, status])
+  @@index([sessionId])
+  @@map("song_requests")
 }
 
 model Reservation {

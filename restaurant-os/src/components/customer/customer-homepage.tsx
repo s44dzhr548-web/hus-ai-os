@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CustomerBranding } from "@/lib/restaurant-branding";
 import type { HomepageSectionId } from "@/lib/homepage-sections";
-import { SECTION_ICONS } from "@/lib/homepage-sections";
+import { SECTION_LUCIDE_ICONS } from "@/lib/homepage-sections";
 import { buildWhatsAppOrderLink } from "@/lib/whatsapp";
 import { Clock, Star, X } from "lucide-react";
 
@@ -24,6 +24,7 @@ interface CustomerHomepageProps {
   slug: string;
   tableId?: string | null;
   tableNumber?: number | null;
+  hasActiveSession?: boolean;
   whatsappNumber?: string | null;
   locale?: "ar" | "en";
   context?: CustomerHomepageContext;
@@ -33,6 +34,7 @@ function sectionHref(
   id: HomepageSectionId,
   slug: string,
   tableId: string | null | undefined,
+  hasActiveSession: boolean,
   whatsapp: string | null | undefined,
   name: string
 ): string {
@@ -61,21 +63,21 @@ function sectionHref(
       }
       return "#";
     case "events":
-    case "wishes":
       if (whatsapp) {
-        const labels: Record<string, string> = {
-          events: "استفسار عن حفلة",
-          wishes: "أمنية خاصة",
-        };
         return buildWhatsAppOrderLink(whatsapp, {
           orderNumber: 0,
           totalAmount: 0,
-          items: [{ name: labels[id] || name, quantity: 1 }],
+          items: [{ name: "استفسار عن حفلة", quantity: 1 }],
         });
       }
       return "#";
     case "gift":
-      return tableId ? `/gift/${tableId}` : `/r/${slug}`;
+      if (tableId && hasActiveSession) return `/gift/${tableId}`;
+      return `/r/${slug}/gifts${tableId ? `?table=${tableId}` : ""}`;
+    case "wishes":
+      return `/r/${slug}/wishes${tableId ? `?table=${tableId}` : ""}`;
+    case "song_request":
+      return `/r/${slug}/song-request${tableId ? `?table=${tableId}` : ""}`;
     default:
       return "#";
   }
@@ -98,6 +100,7 @@ export function CustomerHomepage({
   slug,
   tableId,
   tableNumber,
+  hasActiveSession = false,
   whatsappNumber,
   locale = "ar",
   context = {},
@@ -262,32 +265,36 @@ export function CustomerHomepage({
             {lang === "en" ? branding.ctaTextEn : branding.ctaText}
           </Link>
 
-          {/* Action grid */}
-          <div className="mx-auto grid w-full max-w-lg grid-cols-2 gap-3 sm:max-w-2xl sm:grid-cols-4 sm:gap-4">
+          {/* Action grid — 2 cols mobile, 4 cols desktop */}
+          <div className="mx-auto grid w-full max-w-lg grid-cols-2 gap-3 sm:max-w-4xl sm:grid-cols-4 sm:gap-4">
             {branding.sections.map((section, index) => {
               const href = sectionHref(
                 section.id,
                 slug,
                 tableId,
+                hasActiveSession,
                 whatsappNumber,
                 section.titleAr
               );
               const title = lang === "en" ? section.titleEn : section.titleAr;
               const external = href.startsWith("http") || href === "#";
               const disabled = href === "#";
+              const Icon = SECTION_LUCIDE_ICONS[section.id];
 
               const inner = (
                 <>
-                  <span className="text-2xl sm:text-3xl" aria-hidden>
-                    {SECTION_ICONS[section.id]}
-                  </span>
+                  <Icon
+                    className="h-8 w-8 sm:h-9 sm:w-9"
+                    style={{ color: branding.primaryColor }}
+                    aria-hidden
+                  />
                   <span className="mt-2 text-sm font-semibold leading-tight sm:text-base">
                     {title}
                   </span>
                 </>
               );
 
-              const className = `${cardClass(branding.cardStyle)} group flex min-h-[100px] flex-col items-center justify-center rounded-2xl p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-[var(--brand-primary)]/50 ${disabled ? "pointer-events-none opacity-50" : ""}`;
+              const className = `${cardClass(branding.cardStyle)} group flex min-h-[108px] flex-col items-center justify-center rounded-2xl p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-[var(--brand-primary)]/50 sm:min-h-[120px] ${disabled ? "pointer-events-none opacity-50" : ""}`;
               const style = {
                 borderColor: `${branding.primaryColor}44`,
                 animationDelay: `${index * 60 + 300}ms`,

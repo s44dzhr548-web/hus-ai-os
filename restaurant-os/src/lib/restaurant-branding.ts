@@ -3,6 +3,8 @@ import { fontCss } from "@/lib/restaurant-links";
 import {
   DEFAULT_HOMEPAGE_SECTIONS,
   parseHomepageSections,
+  resolvePrimaryNavSections,
+  type CustomerFeatureFlags,
   type HomepageSectionConfig,
 } from "@/lib/homepage-sections";
 import {
@@ -47,6 +49,9 @@ type RestaurantBrandingRow = {
   cardStyle?: string | null;
   homepageSections?: unknown;
   landingPageConfig?: unknown;
+  tableGiftsEnabled?: boolean;
+  customerWishesEnabled?: boolean;
+  customerSongRequestsEnabled?: boolean;
   primaryColor?: string | null;
   secondaryColor?: string | null;
   backgroundColor?: string | null;
@@ -61,12 +66,26 @@ type RestaurantBrandingRow = {
 
 export function resolveCustomerBranding(
   restaurant: RestaurantBrandingRow,
-  locale: "ar" | "en" = "ar"
+  locale: "ar" | "en" = "ar",
+  featureFlags?: CustomerFeatureFlags
 ): CustomerBranding {
   const name =
     locale === "en"
       ? restaurant.nameEn || restaurant.nameAr || restaurant.name || ""
       : restaurant.nameAr || restaurant.name || "";
+
+  const flags: CustomerFeatureFlags = {
+    tableGiftsEnabled: featureFlags?.tableGiftsEnabled ?? restaurant.tableGiftsEnabled ?? false,
+    customerWishesEnabled:
+      featureFlags?.customerWishesEnabled ?? restaurant.customerWishesEnabled ?? false,
+    customerSongRequestsEnabled:
+      featureFlags?.customerSongRequestsEnabled ??
+      restaurant.customerSongRequestsEnabled ??
+      false,
+  };
+
+  const allSections = parseHomepageSections(restaurant.homepageSections);
+  const sections = resolvePrimaryNavSections(allSections, flags);
 
   return {
     logoUrl: restaurant.logoUrl ?? null,
@@ -94,7 +113,7 @@ export function resolveCustomerBranding(
       (locale === "en" ? restaurant.ctaTextEn || restaurant.ctaText : restaurant.ctaText) ||
       (locale === "en" ? "Explore Menu" : "استكشف المنيو"),
     ctaTextEn: restaurant.ctaTextEn || "Explore Menu",
-    sections: parseHomepageSections(restaurant.homepageSections).filter((s) => s.enabled),
+    sections,
     landingConfig: parseLandingPageConfig(restaurant.landingPageConfig),
   };
 }
@@ -133,6 +152,9 @@ export const BRANDING_SELECT = {
   cardStyle: true,
   homepageSections: true,
   landingPageConfig: true,
+  tableGiftsEnabled: true,
+  customerWishesEnabled: true,
+  customerSongRequestsEnabled: true,
   primaryColor: true,
   secondaryColor: true,
   backgroundColor: true,

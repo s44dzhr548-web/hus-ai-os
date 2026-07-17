@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { CustomerHomepage } from "@/components/customer/customer-homepage";
 import { BRANDING_SELECT, resolveCustomerBranding } from "@/lib/restaurant-branding";
 import { getLandingContext } from "@/lib/landing-context";
+import { getActiveSessionForTable } from "@/lib/reception";
 
 export default async function RestaurantSlugPage({
   params,
@@ -39,6 +40,8 @@ export default async function RestaurantSlugPage({
     restaurant.workingHours
   );
 
+  const activeSession = table ? await getActiveSessionForTable(table.id) : null;
+
   return (
     <CustomerHomepage
       branding={branding}
@@ -47,6 +50,7 @@ export default async function RestaurantSlugPage({
       slug={slug}
       tableId={table?.id}
       tableNumber={table?.number}
+      hasActiveSession={!!activeSession}
       whatsappNumber={restaurant.whatsappNumber}
       context={{ ...context, phone: restaurant.phone }}
     />
