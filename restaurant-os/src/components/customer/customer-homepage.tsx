@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CustomerBranding } from "@/lib/restaurant-branding";
 import type { HomepageSectionId } from "@/lib/homepage-sections";
-import { SECTION_LUCIDE_ICONS } from "@/lib/homepage-sections";
+import { SECTION_LUCIDE_ICONS, FEATURE_SECTION_EMOJI } from "@/lib/homepage-sections";
 import { buildWhatsAppOrderLink } from "@/lib/whatsapp";
 import { Clock, Star, X } from "lucide-react";
 
@@ -280,14 +280,21 @@ export function CustomerHomepage({
               const external = href.startsWith("http") || href === "#";
               const disabled = href === "#";
               const Icon = SECTION_LUCIDE_ICONS[section.id];
+              const emoji = FEATURE_SECTION_EMOJI[section.id];
 
               const inner = (
                 <>
-                  <Icon
-                    className="h-8 w-8 sm:h-9 sm:w-9"
-                    style={{ color: branding.primaryColor }}
-                    aria-hidden
-                  />
+                  {emoji ? (
+                    <span className="text-2xl sm:text-3xl" aria-hidden>
+                      {emoji}
+                    </span>
+                  ) : (
+                    <Icon
+                      className="h-8 w-8 sm:h-9 sm:w-9"
+                      style={{ color: branding.primaryColor }}
+                      aria-hidden
+                    />
+                  )}
                   <span className="mt-2 text-sm font-semibold leading-tight sm:text-base">
                     {title}
                   </span>

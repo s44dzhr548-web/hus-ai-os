@@ -181,15 +181,29 @@ export type CustomerFeatureFlags = {
   customerSongRequestsEnabled?: boolean;
 };
 
+/** Maps customer feature sections to restaurant DB flags */
+export const FEATURE_FLAG_BY_SECTION: Partial<
+  Record<HomepageSectionId, keyof CustomerFeatureFlags>
+> = {
+  gift: "tableGiftsEnabled",
+  wishes: "customerWishesEnabled",
+  song_request: "customerSongRequestsEnabled",
+};
+
+export const FEATURE_SECTION_EMOJI: Partial<Record<HomepageSectionId, string>> = {
+  gift: "🎁",
+  wishes: "✨",
+  song_request: "🎵",
+};
+
 export function filterSectionsByFeatureFlags(
   sections: HomepageSectionConfig[],
   flags: CustomerFeatureFlags
 ): HomepageSectionConfig[] {
   return sections.filter((s) => {
-    if (s.id === "gift" && flags.tableGiftsEnabled === false) return false;
-    if (s.id === "wishes" && flags.customerWishesEnabled === false) return false;
-    if (s.id === "song_request" && flags.customerSongRequestsEnabled === false) {
-      return false;
+    const flagKey = FEATURE_FLAG_BY_SECTION[s.id];
+    if (flagKey) {
+      return flags[flagKey] === true;
     }
     return true;
   });
@@ -199,15 +213,26 @@ export function resolvePrimaryNavSections(
   sections: HomepageSectionConfig[],
   flags: CustomerFeatureFlags
 ): HomepageSectionConfig[] {
-  const enabled = filterSectionsByFeatureFlags(
-    sections.filter((s) => s.enabled),
-    flags
-  );
-  const primarySet = new Set(PRIMARY_NAV_SECTION_IDS);
-  return enabled
-    .filter((s) => primarySet.has(s.id))
-    .sort(
-      (a, b) =>
-        PRIMARY_NAV_SECTION_IDS.indexOf(a.id) - PRIMARY_NAV_SECTION_IDS.indexOf(b.id)
-    );
+  const byId = new Map<HomepageSectionId, HomepageSectionConfig>();
+  for (const def of DEFAULT_HOMEPAGE_SECTIONS) {
+    byId.set(def.id, { ...def });
+  }
+  for (const s of sections) {
+    if (byId.has(s.id)) {
+      byId.set(s.id, { ...byId.get(s.id)!, ...s });
+    }
+  }
+
+  return PRIMARY_NAV_SECTION_IDS.flatMap((id) => {
+    const section = byId.get(id)!;
+    const flagKey = FEATURE_FLAG_BY_SECTION[id];
+
+    if (flagKey) {
+      if (flags[flagKey] !== true) return [];
+      return [{ ...section, enabled: true }];
+    }
+
+    if (!section.enabled) return [];
+    return [section];
+  });
 }

@@ -38,6 +38,7 @@
     "test:wishes-qa": "node scripts/wishes-qa.mjs",
     "test:song-request-qa": "node scripts/song-request-qa.mjs",
     "test:customer-nav-full": "node scripts/customer-nav-qa.mjs && node scripts/gifts-health-qa.mjs && node scripts/wishes-qa.mjs && node scripts/song-request-qa.mjs && node scripts/fabrika-regression-test.mjs",
+    "test:fabrika-customer-e2e": "node scripts/fabrika-customer-features-e2e.mjs",
     "test:reception-table-qa": "node scripts/reception-table-qa.mjs",
     "test:reservation-register-qa": "node scripts/reservation-register-qa.mjs",
     "test:table-management": "node scripts/table-management-test.mjs",
