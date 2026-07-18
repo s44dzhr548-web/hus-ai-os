@@ -35,12 +35,12 @@ export function approvalLabel(type: ApprovalType): string {
 }
 
 function scopeKey(restaurantScope?: string | null, branchScope?: string | null): {
-  restaurantScope: string | null;
-  branchScope: string | null;
+  restaurantScope: string;
+  branchScope: string;
 } {
   return {
-    restaurantScope: restaurantScope ?? null,
-    branchScope: branchScope ?? null,
+    restaurantScope: restaurantScope?.trim() || "",
+    branchScope: branchScope?.trim() || "",
   };
 }
 
@@ -621,8 +621,8 @@ export async function validateAndExecute(params: {
         permissionKey: params.permissionKey,
         enabled: true,
         revokedAt: null,
-        restaurantScope: null,
-        branchScope: null,
+        restaurantScope: "",
+        branchScope: "",
       },
     });
 
