@@ -24,17 +24,20 @@ export async function GET() {
     sampleOAuthUrl = await getOAuthStartUrl("META", "preview-restaurant-id");
   }
 
-  return NextResponse.json({
-    ok: appIdValid && Boolean(creds.clientSecret),
-    appId: sanitizeMetaAppIdForLog(creds.clientId),
-    appIdValid,
-    hasSecret: Boolean(creds.clientSecret),
-    redirectUri,
-    source: creds.source,
-    oauthReady: Boolean(creds.clientId && creds.clientSecret && appIdValid),
-    sampleOAuthUrl: sampleOAuthUrl
-      ? sampleOAuthUrl.replace(/client_id=[^&]+/, `client_id=${sanitizeMetaAppIdForLog(creds.clientId)}`)
-      : null,
-    requiredEnv: ["META_APP_ID", "META_APP_SECRET", "META_ADS_REDIRECT_URI"],
-  });
+  return NextResponse.json(
+    {
+      ok: appIdValid && Boolean(creds.clientSecret),
+      appId: sanitizeMetaAppIdForLog(creds.clientId),
+      appIdValid,
+      hasSecret: Boolean(creds.clientSecret),
+      redirectUri,
+      source: creds.source,
+      oauthReady: Boolean(creds.clientId && creds.clientSecret && appIdValid),
+      sampleOAuthUrl: sampleOAuthUrl
+        ? sampleOAuthUrl.replace(/client_id=[^&]+/, `client_id=${sanitizeMetaAppIdForLog(creds.clientId)}`)
+        : null,
+      requiredEnv: ["META_APP_ID", "META_APP_SECRET", "META_ADS_REDIRECT_URI"],
+    },
+    { headers: { "Content-Type": "application/json; charset=utf-8" } }
+  );
 }

@@ -1,5 +1,3 @@
-import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
-
 /** Canonical Meta Ads OAuth callback path for Menu OS production. */
 export const META_ADS_CALLBACK_PATH = "/api/integrations/meta/callback";
 
@@ -21,10 +19,18 @@ function firstEnv(keys: readonly string[]): string | null {
   return null;
 }
 
-export function getMetaAdsOAuthRedirectUri(): string {
+/** Production canonical callback — must match Meta App settings and META_ADS_REDIRECT_URI. */
+export const META_PRODUCTION_CALLBACK_URI =
+  "https://restaurant-os-nine.vercel.app/api/integrations/meta/callback";
+
+export function getCanonicalMetaRedirectUri(): string {
   const override = process.env.META_ADS_REDIRECT_URI?.trim();
-  if (override) return override;
-  return `${resolveAppBaseUrl()}${META_ADS_CALLBACK_PATH}`;
+  if (override) return override.replace(/\/$/, "");
+  return META_PRODUCTION_CALLBACK_URI;
+}
+
+export function getMetaAdsOAuthRedirectUri(): string {
+  return getCanonicalMetaRedirectUri();
 }
 
 export function resolveMetaAdsEnvCredentials(): {

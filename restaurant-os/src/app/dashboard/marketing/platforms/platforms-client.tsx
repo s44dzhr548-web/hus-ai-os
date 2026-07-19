@@ -5,7 +5,20 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { MkLoading, MkPageHeader } from "@/components/marketing/marketing-shell";
 import { Button } from "@/components/ui";
+import { isMetaOAuthErrorCode, META_OAUTH_ERROR_MESSAGES_AR } from "@/lib/marketing/meta-oauth-errors";
 import { cn } from "@/lib/utils";
+
+function metaOAuthErrorMessage(code: string | null, detail: string | null): string | null {
+  if (!code) return null;
+  if (isMetaOAuthErrorCode(code)) {
+    const base = META_OAUTH_ERROR_MESSAGES_AR[code];
+    if (detail && code !== "oauth_denied") {
+      return `${base} (${detail})`;
+    }
+    return base;
+  }
+  return `تعذّر إكمال الربط — ${code}`;
+}
 
 const META_CONNECT_HREF = "/api/integrations/meta/connect";
 
@@ -106,7 +119,7 @@ function MetaAdsConnectLink({
       data-testid="meta-ads-connect-button"
       className={classes}
     >
-      ربط حساب Meta Ads
+      ربط حساب Meta
     </a>
   );
 }
@@ -152,11 +165,11 @@ export default function PlatformsClient({
   }, [initialPlatforms.length, load]);
 
   useEffect(() => {
-    if (searchParams.get("success") === "1") setMessage("✓ تم ربط حساب Meta Ads بنجاح");
+    if (searchParams.get("success") === "1") setMessage("✓ تم ربط حساب Meta بنجاح");
     const err = searchParams.get("error");
-    if (err === "oauth_denied") setMessage("تم إلغاء تسجيل الدخول إلى Meta");
-    else if (err === "oauth_failed") setMessage("خطأ في الربط — تحقق من Meta App ID وRedirect URI");
-    else if (err) setMessage("تعذّر إكمال الربط — حاول مجدداً");
+    const detail = searchParams.get("detail");
+    const errMsg = metaOAuthErrorMessage(err, detail);
+    if (errMsg) setMessage(errMsg);
     if (searchParams.get("selectAccount") === "meta") {
       void fetch("/api/marketing/connections/meta/select-account")
         .then((r) => r.json())
