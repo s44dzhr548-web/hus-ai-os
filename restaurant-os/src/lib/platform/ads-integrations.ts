@@ -1,7 +1,10 @@
 import prisma from "@/lib/prisma";
 import { encryptToken, decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
 import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
-import { resolveMetaCredentials } from "@/lib/platform/meta-config";
+import {
+  getMetaAdsOAuthRedirectUri,
+  isValidMetaAppId,
+} from "@/lib/platform/meta-ads-env";
 import { fetchWithTimeout, isAbortError } from "@/lib/fetch-with-timeout";
 
 export const ADS_INTEGRATION_KEYS = [
@@ -34,8 +37,8 @@ export const ADS_INTEGRATION_DEFS: Record<AdsIntegrationKey, AdsIntegrationDefin
     label: "Meta Developer App",
     labelAr: "Meta Ads",
     brandColor: "#0081FB",
-    envClientId: "META_ADS_CLIENT_ID",
-    envClientSecret: "META_ADS_CLIENT_SECRET",
+    envClientId: "META_APP_ID",
+    envClientSecret: "META_APP_SECRET",
     authUrl: "https://www.facebook.com/v21.0/dialog/oauth",
     tokenUrl: "https://graph.facebook.com/v21.0/oauth/access_token",
     defaultScopes: ["ads_management", "ads_read", "business_management"],
@@ -125,6 +128,7 @@ function envOrNull(key: string): string | null {
 }
 
 export function getAdsOAuthRedirectUri(platformKey: AdsIntegrationKey): string {
+  if (platformKey === "META") return getMetaAdsOAuthRedirectUri();
   const base = resolveAppBaseUrl();
   return `${base}/api/marketing/connections/${platformKey.toLowerCase()}/callback`;
 }
@@ -138,30 +142,54 @@ export async function resolveAdsIntegration(platformKey: AdsIntegrationKey): Pro
   const def = ADS_INTEGRATION_DEFS[platformKey];
   const row = await prisma.platformAdsIntegration.findUnique({ where: { platformKey } });
 
-  let clientId = row?.clientId || envOrNull(def.envClientId);
+  let clientId: string | null = null;
   let clientSecret: string | null = null;
   let webhookVerifyToken: string | null = null;
   let source: AdsIntegrationCredentials["source"] = "none";
 
+  if (row?.clientId) {
+    if (platformKey === "META") {
+      if (isValidMetaAppId(row.clientId)) {
+        clientId = row.clientId;
+        source = "database";
+      }
+    } else {
+      clientId = row.clientId;
+      source = "database";
+    }
+  }
+
+  if (!clientId) {
+    if (platformKey === "META") {
+      clientId =
+        envOrNull("META_APP_ID") ||
+        envOrNull("META_ADS_CLIENT_ID") ||
+        envOrNull(def.envClientId);
+      if (clientId && !isValidMetaAppId(clientId)) clientId = null;
+    } else {
+      clientId = envOrNull(def.envClientId);
+    }
+    if (clientId) source = "environment";
+  }
+
   if (row?.clientSecretEnc && canEncryptTokens()) {
     try {
       clientSecret = decryptToken(row.clientSecretEnc);
-      source = "database";
+      if (source === "none") source = "database";
     } catch {
       clientSecret = null;
     }
   }
   if (!clientSecret) {
-    clientSecret = envOrNull(def.envClientSecret);
-    if (clientSecret) source = source === "database" ? "database" : "environment";
-  }
-
-  if (platformKey === "META" && (!clientId || !clientSecret)) {
-    const meta = await resolveMetaCredentials();
-    if (!clientId) clientId = meta.clientId;
-    if (!clientSecret) clientSecret = meta.clientSecret;
-    if (!webhookVerifyToken) webhookVerifyToken = meta.webhookVerifyToken;
-    if (meta.clientId && meta.clientSecret) source = meta.source === "database" ? "meta_config" : "environment";
+    if (platformKey === "META") {
+      clientSecret =
+        envOrNull("META_APP_SECRET") ||
+        envOrNull("META_ADS_CLIENT_SECRET") ||
+        envOrNull(def.envClientSecret);
+    } else {
+      clientSecret = envOrNull(def.envClientSecret);
+    }
+    if (clientSecret && source === "none") source = "environment";
   }
 
   if (row?.webhookVerifyTokenEnc && canEncryptTokens()) {
@@ -173,13 +201,17 @@ export async function resolveAdsIntegration(platformKey: AdsIntegrationKey): Pro
   }
 
   const scopes = row?.oauthScopes?.length ? row.oauthScopes : def.defaultScopes;
+  const redirectUri =
+    platformKey === "META"
+      ? getMetaAdsOAuthRedirectUri()
+      : row?.redirectUriOverride || getAdsOAuthRedirectUri(platformKey);
 
   return {
     platformKey,
-    clientId,
+    clientId: platformKey === "META" && clientId && !isValidMetaAppId(clientId) ? null : clientId,
     clientSecret,
     webhookVerifyToken,
-    redirectUri: row?.redirectUriOverride || getAdsOAuthRedirectUri(platformKey),
+    redirectUri,
     webhookUrl: row?.webhookUrlOverride || getAdsWebhookUrl(platformKey),
     scopes,
     source,
@@ -251,7 +283,13 @@ export async function saveAdsIntegration(
     displayName: input.displayName?.trim() || def.label,
   };
 
-  if (input.clientId !== undefined) data.clientId = input.clientId.trim() || null;
+  if (input.clientId !== undefined) {
+    const trimmed = input.clientId.trim() || null;
+    if (platformKey === "META" && trimmed && !isValidMetaAppId(trimmed)) {
+      throw new Error("Meta App ID يجب أن يكون رقمًا (مثل 123456789012345) — وليس رابط Webhook");
+    }
+    data.clientId = trimmed;
+  }
   if (input.clientSecret?.trim()) data.clientSecretEnc = encryptToken(input.clientSecret.trim());
   if (input.webhookVerifyToken?.trim()) data.webhookVerifyTokenEnc = encryptToken(input.webhookVerifyToken.trim());
   if (input.redirectUriOverride !== undefined) data.redirectUriOverride = input.redirectUriOverride.trim() || null;

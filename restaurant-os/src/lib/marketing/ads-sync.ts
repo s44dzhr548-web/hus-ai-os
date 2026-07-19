@@ -216,24 +216,68 @@ export async function syncAllRestaurantsAds() {
 export async function getOwnerPlatformCards(restaurantId: string) {
   const { OWNER_AD_PLATFORMS } = await import("@/lib/marketing/ads-platforms");
   const { isAdsIntegrationReady } = await import("@/lib/platform/ads-integrations");
+  const {
+    isMetaAdsConfigured,
+    resolveMetaAdsConnectionState,
+    META_CONNECTION_STATE_LABELS,
+    META_CONNECT_URL,
+    metaAdsShowsConnectButton,
+  } = await import("@/lib/marketing/meta-ads-connect");
 
   const connections = await prisma.marketingAdConnection.findMany({ where: { restaurantId } });
   const byPlatform = new Map(connections.map((c) => [c.platform, c]));
+  const metaConfigured = await isMetaAdsConfigured();
 
   return Promise.all(
     OWNER_AD_PLATFORMS.map(async (p) => {
       const conn = byPlatform.get(p.platform);
-      const integrationReady = await isAdsIntegrationReady(p.integrationKey);
+      const integrationReady =
+        p.platform === "META" ? metaConfigured : await isAdsIntegrationReady(p.integrationKey);
       const connected = Boolean(conn?.isActive && conn.accessTokenEnc);
+
+      let connectionState: string | undefined;
+      let connectionStateLabel: string | undefined;
+      let connectUrl: string | null = null;
+      let showConnectButton = false;
+
+      if (p.platform === "META") {
+        const metaState = resolveMetaAdsConnectionState(
+          conn
+            ? {
+                isActive: conn.isActive,
+                accessTokenEnc: conn.accessTokenEnc,
+                syncStatus: conn.syncStatus,
+                tokenExpiresAt: conn.tokenExpiresAt,
+              }
+            : null,
+          metaConfigured
+        );
+        connectionState = metaState;
+        connectionStateLabel = META_CONNECTION_STATE_LABELS[metaState];
+        if (metaAdsShowsConnectButton(metaState)) {
+          connectUrl = META_CONNECT_URL;
+          showConnectButton = true;
+        }
+      }
+
+      const legacyStatus = connected
+        ? "CONNECTED"
+        : integrationReady
+          ? "NOT_CONNECTED"
+          : "PENDING_SETUP";
 
       return {
         key: p.platform,
         labelAr: p.labelAr,
         brandColor: p.brandColor,
         logoLetter: p.logoLetter,
-        status: connected ? "CONNECTED" : integrationReady ? "NOT_CONNECTED" : "PENDING_SETUP",
-        statusLabel: connected ? "Connected" : integrationReady ? "Not Connected" : "بانتظار التفعيل",
+        status: legacyStatus,
+        statusLabel: connectionStateLabel ?? (connected ? "Connected ✅" : integrationReady ? "Not Connected" : "بانتظار التفعيل"),
+        connectionState: connectionState ?? legacyStatus,
+        connectionStateLabel: connectionStateLabel ?? statusLabelFromLegacy(legacyStatus),
         integrationReady,
+        showConnectButton,
+        connectUrl,
         businessName: conn?.businessName ?? null,
         accountName: conn?.accountName ?? null,
         accountId: conn?.accountId ? maskId(conn.accountId) : null,
@@ -244,6 +288,12 @@ export async function getOwnerPlatformCards(restaurantId: string) {
       };
     })
   );
+}
+
+function statusLabelFromLegacy(status: string): string {
+  if (status === "CONNECTED") return "متصل";
+  if (status === "NOT_CONNECTED") return "جاهز للربط";
+  return "غير مهيأ";
 }
 
 function maskId(id: string): string {

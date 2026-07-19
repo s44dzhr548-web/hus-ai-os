@@ -23,7 +23,7 @@ const OBJECTIVES = [
 
 export default function NewCampaignPage() {
   const router = useRouter();
-  const [platforms, setPlatforms] = useState<Array<{ key: string; labelAr: string; status: string }>>([]);
+  const [platforms, setPlatforms] = useState<Array<{ key: string; labelAr: string; status: string; accountName?: string | null }>>([]);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ headline?: string; primaryText?: string; cta?: string } | null>(null);
   const [form, setForm] = useState({
@@ -43,7 +43,13 @@ export default function NewCampaignPage() {
   useEffect(() => {
     fetch("/api/marketing/platforms")
       .then((r) => r.json())
-      .then((d) => setPlatforms((d.platforms || []).filter((p: { status: string }) => p.status === "CONNECTED")));
+      .then((d) => {
+        const connected = (d.platforms || []).filter(
+          (p: { status: string; connectionState?: string }) =>
+            p.connectionState === "CONNECTED" || p.status === "CONNECTED"
+        );
+        setPlatforms(connected);
+      });
   }, []);
 
   async function generateAi(field: "all" | "headline" | "description") {
@@ -108,7 +114,9 @@ export default function NewCampaignPage() {
           >
             {platforms.length === 0 && <option value="">— اربط منصة أولاً —</option>}
             {platforms.map((p) => (
-              <option key={p.key} value={p.key}>{p.labelAr}</option>
+              <option key={p.key} value={p.key}>
+                {p.labelAr}{p.accountName ? ` — ${p.accountName}` : ""}
+              </option>
             ))}
           </select>
 
