@@ -1761,6 +1761,23 @@ model AiEngineerAuditLog {
   @@map("ai_engineer_audit_logs")
 }
 
+model PlatformAiProviderConnection {
+  id                String                  @id @default(cuid())
+  providerKey       String                  @unique @map("provider_key")
+  apiKeyEnc         String?                 @map("api_key_enc")
+  modelId           String?                 @map("model_id")
+  status            MarketingProviderStatus @default(DISCONNECTED)
+  roleAssignments   Json?                   @map("role_assignments")
+  lastTestAt        DateTime?               @map("last_test_at")
+  lastSuccessAt     DateTime?               @map("last_success_at")
+  lastError         String?                 @map("last_error")
+  connectedByUserId String?                 @map("connected_by_user_id")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+
+  @@map("platform_ai_provider_connections")
+}
+
 model MarketingWhatsAppCampaign {
   id              String                @id @default(cuid())
   restaurantId    String                @map("restaurant_id")

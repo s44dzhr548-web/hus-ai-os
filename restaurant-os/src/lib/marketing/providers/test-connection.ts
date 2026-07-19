@@ -1,14 +1,74 @@
 import { encryptToken, decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
 
 export async function testOpenAiKey(apiKey: string): Promise<{ ok: boolean; error?: string }> {
+  return testOpenAiResponses(apiKey, "gpt-4o-mini");
+}
+
+export async function testOpenAiResponses(
+  apiKey: string,
+  model = "gpt-4o-mini"
+): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch("https://api.openai.com/v1/models", {
+    const res = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        input: "ping",
+        max_output_tokens: 8,
+        store: false,
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (res.ok) return { ok: true };
+    const body = await res.text();
+    if (res.status === 401) return { ok: false, error: "المفتاح غير صالح" };
+    return { ok: false, error: body.slice(0, 200) || `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Connection failed" };
+  }
+}
+
+export async function testDeepSeekKey(apiKey: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch("https://api.deepseek.com/models", {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(15000),
     });
     if (res.ok) return { ok: true };
-    const body = await res.text();
-    return { ok: false, error: body.slice(0, 200) || `HTTP ${res.status}` };
+    if (res.status === 401) return { ok: false, error: "المفتاح غير صالح" };
+    return { ok: false, error: `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Connection failed" };
+  }
+}
+
+export async function testGrokKey(apiKey: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch("https://api.x.ai/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (res.ok) return { ok: true };
+    if (res.status === 401) return { ok: false, error: "المفتاح غير صالح" };
+    return { ok: false, error: `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Connection failed" };
+  }
+}
+
+export async function testMistralKey(apiKey: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch("https://api.mistral.ai/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (res.ok) return { ok: true };
+    if (res.status === 401) return { ok: false, error: "المفتاح غير صالح" };
+    return { ok: false, error: `HTTP ${res.status}` };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Connection failed" };
   }
@@ -64,7 +124,7 @@ export async function testProviderConnection(
     case "OPENAI_IMAGES":
     case "OPENAI_AUDIO":
     case "OPENAI_VIDEO":
-      return testOpenAiKey(apiKey);
+      return testOpenAiResponses(apiKey);
     case "CLAUDE":
       return testAnthropicKey(apiKey);
     case "GEMINI":
@@ -72,6 +132,12 @@ export async function testProviderConnection(
     case "GOOGLE_TTS":
     case "GOOGLE_VEO":
       return testGeminiKey(apiKey);
+    case "DEEPSEEK":
+      return testDeepSeekKey(apiKey);
+    case "GROK":
+      return testGrokKey(apiKey);
+    case "MISTRAL":
+      return testMistralKey(apiKey);
     case "CUSTOM_OPENAI":
     case "CUSTOM_IMAGE":
     case "CUSTOM_VIDEO":
@@ -87,12 +153,15 @@ export async function testProviderConnection(
         return { ok: false, error: e instanceof Error ? e.message : "Connection failed" };
       }
     default:
+      if (["DEEPSEEK", "GROK", "MISTRAL", "PERPLEXITY", "OPENROUTER"].includes(providerKey)) {
+        return { ok: false, error: "استخدم اختبار المزوّد المخصص" };
+      }
       if (process.env[`${providerKey}_API_KEY`] || process.env[`${providerKey.replace(/_/g, "")}_API_KEY`]) {
         return { ok: true };
       }
       return {
         ok: false,
-        error: "يتطلب إعداد حساب المطور — لا يمكن التحقق بدون credentials رسمية",
+        error: "يتطلب إعداد حساب المطور — أدخل API Key من لوحة الربط",
       };
   }
 }
