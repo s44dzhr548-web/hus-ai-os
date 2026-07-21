@@ -1,13 +1,27 @@
 import { encryptToken, decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
+import {
+  clampMaxOutputTokens,
+  classifyOpenAiError,
+  classifyOpenAiNetworkError,
+  OPENAI_DEFAULT_TEST_OUTPUT_TOKENS,
+} from "@/lib/openai/responses-api";
 
-export async function testOpenAiKey(apiKey: string): Promise<{ ok: boolean; error?: string }> {
+export type ProviderTestResult = {
+  ok: boolean;
+  error?: string;
+  errorKind?: string;
+  isInvalidKey?: boolean;
+};
+
+export async function testOpenAiKey(apiKey: string): Promise<ProviderTestResult> {
   return testOpenAiResponses(apiKey, "gpt-4o-mini");
 }
 
 export async function testOpenAiResponses(
   apiKey: string,
-  model = "gpt-4o-mini"
-): Promise<{ ok: boolean; error?: string }> {
+  model = "gpt-4o-mini",
+  maxOutputTokens = OPENAI_DEFAULT_TEST_OUTPUT_TOKENS
+): Promise<ProviderTestResult> {
   try {
     const res = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -18,17 +32,28 @@ export async function testOpenAiResponses(
       body: JSON.stringify({
         model,
         input: "ping",
-        max_output_tokens: 8,
+        max_output_tokens: clampMaxOutputTokens(maxOutputTokens),
         store: false,
       }),
       signal: AbortSignal.timeout(20000),
     });
     if (res.ok) return { ok: true };
     const body = await res.text();
-    if (res.status === 401) return { ok: false, error: "المفتاح غير صالح" };
-    return { ok: false, error: body.slice(0, 200) || `HTTP ${res.status}` };
+    const classified = classifyOpenAiError(res.status, body);
+    return {
+      ok: false,
+      error: classified.message,
+      errorKind: classified.kind,
+      isInvalidKey: classified.isInvalidKey,
+    };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Connection failed" };
+    const classified = classifyOpenAiNetworkError(e);
+    return {
+      ok: false,
+      error: classified.message,
+      errorKind: classified.kind,
+      isInvalidKey: classified.isInvalidKey,
+    };
   }
 }
 

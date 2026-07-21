@@ -425,6 +425,8 @@ model Restaurant {
   aiAssistantMessages       AiAssistantMessage[]
   aiAssistantActionLogs     AiAssistantActionLog[]
   aiAssistantPendingActions AiAssistantPendingAction[]
+  aiAccess                  RestaurantAiAccess?
+  aiUsageLogs               RestaurantAiUsageLog[]
 
   @@index([ownerId])
   @@map("restaurants")
@@ -1778,6 +1780,36 @@ model PlatformAiProviderConnection {
   @@map("platform_ai_provider_connections")
 }
 
+model RestaurantAiAccess {
+  id                  String   @id @default(cuid())
+  restaurantId        String   @unique @map("restaurant_id")
+  enabledRoles        Json     @default("[]") @map("enabled_roles")
+  dailyRequestLimit   Int      @default(200) @map("daily_request_limit")
+  monthlyRequestLimit Int      @default(3000) @map("monthly_request_limit")
+  monthlyCostLimitSar Decimal  @default(500) @map("monthly_cost_limit_sar") @db.Decimal(10, 2)
+  servicePaused       Boolean  @default(false) @map("service_paused")
+  updatedByUserId     String?  @map("updated_by_user_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("restaurant_ai_access")
+}
+
+model RestaurantAiUsageLog {
+  id               String   @id @default(cuid())
+  restaurantId     String   @map("restaurant_id")
+  roleId           String   @map("role_id")
+  estimatedCostSar Decimal  @default(0) @map("estimated_cost_sar") @db.Decimal(10, 4)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("restaurant_ai_usage_logs")
+}
+
 model MarketingWhatsAppCampaign {
   id              String                @id @default(cuid())
   restaurantId    String                @map("restaurant_id")
@@ -2318,13 +2350,14 @@ model WhatsAppOwnerNotification {
 }
 
 model PlatformMetaConfig {
-  id                    String   @id @default("default")
-  facebookAppName       String?  @map("facebook_app_name")
-  clientId              String?  @map("client_id")
-  clientSecretEnc       String?  @map("client_secret_enc")
-  webhookVerifyTokenEnc String?  @map("webhook_verify_token_enc")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-  updatedByUserId       String?  @map("updated_by_user_id")
+  id                      String   @id @default("default")
+  facebookAppName         String?  @map("facebook_app_name")
+  clientId                String?  @map("client_id")
+  clientSecretEnc         String?  @map("client_secret_enc")
+  webhookVerifyTokenEnc   String?  @map("webhook_verify_token_enc")
+  whatsappAccessTokenEnc  String?  @map("whatsapp_access_token_enc")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+  updatedByUserId         String?  @map("updated_by_user_id")
 
   @@map("platform_meta_config")
 }

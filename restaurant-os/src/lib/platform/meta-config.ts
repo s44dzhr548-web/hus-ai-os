@@ -3,14 +3,15 @@ import { encryptToken, decryptToken, canEncryptTokens } from "@/lib/marketing/en
 import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
 import { whatsAppWebhookUrl } from "@/lib/marketing/whatsapp-business";
 import { fetchWithTimeout, isAbortError } from "@/lib/fetch-with-timeout";
+import { testWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
 
-const GRAPH = "https://graph.facebook.com/v21.0";
 const CONFIG_ID = "default";
 
 export type MetaCredentials = {
   clientId: string | null;
   clientSecret: string | null;
   webhookVerifyToken: string | null;
+  whatsappAccessToken: string | null;
   source: "database" | "environment" | "none";
   facebookAppName: string | null;
 };
@@ -34,6 +35,10 @@ function envWebhookVerifyToken(): string | null {
   return process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || null;
 }
 
+function envWhatsAppAccessToken(): string | null {
+  return process.env.WHATSAPP_ACCESS_TOKEN?.trim() || null;
+}
+
 export function getMetaOAuthRedirectUri(): string {
   return `${resolveAppBaseUrl()}/api/marketing/whatsapp/oauth/callback`;
 }
@@ -44,6 +49,7 @@ export async function resolveMetaCredentials(): Promise<MetaCredentials> {
   let clientId = row?.clientId || envClientId();
   let clientSecret: string | null = null;
   let webhookVerifyToken: string | null = null;
+  let whatsappAccessToken: string | null = null;
   let source: MetaCredentials["source"] = "none";
 
   if (row?.clientSecretEnc && canEncryptTokens()) {
@@ -75,7 +81,20 @@ export async function resolveMetaCredentials(): Promise<MetaCredentials> {
     webhookVerifyToken = envWebhookVerifyToken();
   }
 
-  if (source === "none" && (clientId || clientSecret)) {
+  if (row?.whatsappAccessTokenEnc && canEncryptTokens()) {
+    try {
+      whatsappAccessToken = decryptToken(row.whatsappAccessTokenEnc);
+      if (source === "none") source = "database";
+    } catch {
+      whatsappAccessToken = null;
+    }
+  }
+  if (!whatsappAccessToken) {
+    whatsappAccessToken = envWhatsAppAccessToken();
+    if (whatsappAccessToken && source === "none") source = "environment";
+  }
+
+  if (source === "none" && (clientId || clientSecret || whatsappAccessToken)) {
     source = "environment";
   }
 
@@ -83,6 +102,7 @@ export async function resolveMetaCredentials(): Promise<MetaCredentials> {
     clientId,
     clientSecret,
     webhookVerifyToken,
+    whatsappAccessToken,
     source,
     facebookAppName: row?.facebookAppName || null,
   };
@@ -105,6 +125,7 @@ export async function getPlatformMetaAdminView(opts?: { skipHealth?: boolean }) 
     facebookAppName: creds.facebookAppName,
     clientId: creds.clientId,
     hasClientSecret: Boolean(creds.clientSecret),
+    hasWhatsAppAccessToken: Boolean(creds.whatsappAccessToken),
     redirectUri: getMetaOAuthRedirectUri(),
     webhookUrl: whatsAppWebhookUrl(),
     hasWebhookVerifyToken: Boolean(creds.webhookVerifyToken),
@@ -121,6 +142,7 @@ export async function savePlatformMetaConfig(input: {
   clientId?: string;
   clientSecret?: string;
   webhookVerifyToken?: string;
+  whatsappAccessToken?: string;
   userId?: string;
 }) {
   if (!canEncryptTokens()) {
@@ -135,6 +157,7 @@ export async function savePlatformMetaConfig(input: {
     clientId?: string;
     clientSecretEnc?: string;
     webhookVerifyTokenEnc?: string;
+    whatsappAccessTokenEnc?: string;
     updatedByUserId?: string;
   } = { updatedByUserId: input.userId };
 
@@ -150,12 +173,15 @@ export async function savePlatformMetaConfig(input: {
   if (input.webhookVerifyToken?.trim()) {
     data.webhookVerifyTokenEnc = encryptToken(input.webhookVerifyToken.trim());
   }
+  if (input.whatsappAccessToken?.trim()) {
+    data.whatsappAccessTokenEnc = encryptToken(input.whatsappAccessToken.trim());
+  }
 
   if (!existing && !data.clientId && !envClientId()) {
     throw new Error("Client ID مطلوب");
   }
 
-  return prisma.platformMetaConfig.upsert({
+  await prisma.platformMetaConfig.upsert({
     where: { id: CONFIG_ID },
     create: {
       id: CONFIG_ID,
@@ -163,10 +189,23 @@ export async function savePlatformMetaConfig(input: {
       clientId: data.clientId ?? envClientId(),
       clientSecretEnc: data.clientSecretEnc ?? null,
       webhookVerifyTokenEnc: data.webhookVerifyTokenEnc ?? null,
+      whatsappAccessTokenEnc: data.whatsappAccessTokenEnc ?? null,
       updatedByUserId: input.userId,
     },
     update: data,
   });
+
+  let connectionTest: { ok: boolean; message: string; name?: string; id?: string } | undefined;
+  if (input.whatsappAccessToken?.trim()) {
+    connectionTest = await testPlatformMetaConnection(input.whatsappAccessToken.trim());
+  } else {
+    const creds = await resolveMetaCredentials();
+    if (creds.whatsappAccessToken) {
+      connectionTest = await testPlatformMetaConnection(creds.whatsappAccessToken);
+    }
+  }
+
+  return { connectionTest };
 }
 
 export async function runPlatformMetaHealthCheck(): Promise<PlatformMetaHealthItem[]> {
@@ -189,29 +228,27 @@ export async function runPlatformMetaHealthCheck(): Promise<PlatformMetaHealthIt
     detail: webhookOk ? "رمز التحقق وعنوان Webhook جاهزان" : "بانتظار رمز التحقق",
   });
 
-  const cloudOk = canEncryptTokens();
+  const whatsappTokenOk = Boolean(creds.whatsappAccessToken);
   items.push({
     id: "cloud_api",
     label: "Cloud API Ready",
-    ok: cloudOk && oauthOk,
-    detail: cloudOk
-      ? oauthOk
-        ? "التشفير وOAuth جاهزان"
-        : "OAuth غير مكتمل"
-      : "تشفير الرموز غير مفعّل",
+    ok: whatsappTokenOk && canEncryptTokens(),
+    detail: whatsappTokenOk
+      ? "WhatsApp Access Token configured"
+      : "WhatsApp Access Token is required",
   });
 
   let templateOk = false;
-  let templateDetail = "تُفحص بعد ربط مطعم";
-  if (oauthOk && creds.clientId && creds.clientSecret) {
+  let templateDetail = "WhatsApp Access Token is required";
+  if (creds.whatsappAccessToken) {
     try {
-      const appToken = `${creds.clientId}|${creds.clientSecret}`;
-      const res = await fetchWithTimeout(`${GRAPH}/${creds.clientId}?fields=id,name`, {
-        headers: { Authorization: `Bearer ${appToken}` },
-        timeoutMs: 8000,
-      });
-      templateOk = res.ok;
-      templateDetail = templateOk ? "Graph API يستجيب" : "فشل الاتصال بـ Graph API";
+      const test = await testWhatsAppAccessToken(creds.whatsappAccessToken);
+      templateOk = test.ok;
+      templateDetail = test.ok
+        ? test.name
+          ? `Connected as ${test.name}`
+          : "WhatsApp connection successful"
+        : test.message;
     } catch (e) {
       templateDetail = isAbortError(e)
         ? "انتهت مهلة الاتصال بـ Graph API"
@@ -243,29 +280,25 @@ export async function runPlatformMetaHealthCheck(): Promise<PlatformMetaHealthIt
   return items;
 }
 
-export async function testPlatformMetaConnection(): Promise<{ ok: boolean; message: string; appName?: string }> {
-  const creds = await resolveMetaCredentials();
-  if (!creds.clientId || !creds.clientSecret) {
-    return { ok: false, message: "بيانات تطبيق Meta غير مكتملة" };
+export async function testPlatformMetaConnection(
+  whatsappAccessToken?: string
+): Promise<{ ok: boolean; message: string; name?: string; id?: string; appName?: string }> {
+  let token = whatsappAccessToken?.trim() || null;
+
+  if (!token) {
+    const creds = await resolveMetaCredentials();
+    token = creds.whatsappAccessToken;
   }
 
-  try {
-    const appToken = `${creds.clientId}|${creds.clientSecret}`;
-    const res = await fetchWithTimeout(`${GRAPH}/${creds.clientId}?fields=id,name`, {
-      headers: { Authorization: `Bearer ${appToken}` },
-      timeoutMs: 8000,
-    });
-    const data = (await res.json()) as { id?: string; name?: string; error?: { message?: string } };
-    if (!res.ok) {
-      return { ok: false, message: data.error?.message || "فشل اختبار الاتصال" };
-    }
-    return { ok: true, message: "تم التحقق من تطبيق Meta بنجاح", appName: data.name };
-  } catch (e) {
-    if (isAbortError(e)) {
-      return { ok: false, message: "انتهت مهلة اختبار الاتصال بـ Meta" };
-    }
-    return { ok: false, message: e instanceof Error ? e.message : "خطأ في الاتصال" };
+  if (!token) {
+    return { ok: false, message: "WhatsApp Access Token is required" };
   }
+
+  const result = await testWhatsAppAccessToken(token);
+  return {
+    ...result,
+    appName: result.name,
+  };
 }
 
 export async function notifyPlatformAdminMetaSetup(restaurantId: string, restaurantName: string) {

@@ -1,6 +1,7 @@
 import type { WhatsAppDeliveryStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
+import { canEncryptTokens } from "@/lib/marketing/encryption";
+import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
 import { sendWhatsAppTemplateMessage } from "./cloud-api";
 import { normalizeWhatsAppPhone, isValidCustomerPhone } from "./phone";
 import { buildReviewUrl, resolveAppBaseUrl } from "./review-url";
@@ -280,7 +281,17 @@ export async function processWhatsAppDeliveryById(deliveryId: string) {
 
   let accessToken: string;
   try {
-    accessToken = decryptToken(connection.accessTokenEnc);
+    accessToken = (await resolveWhatsAppAccessToken()) || "";
+    if (!accessToken) {
+      return prisma.whatsAppMessageDelivery.update({
+        where: { id: deliveryId },
+        data: {
+          status: "FAILED",
+          attemptCount: { increment: 1 },
+          failedReason: "WhatsApp Access Token is required",
+        },
+      });
+    }
   } catch {
     return prisma.whatsAppMessageDelivery.update({
       where: { id: deliveryId },
@@ -367,7 +378,8 @@ export async function sendTestWhatsAppMessage(params: {
   const phone = normalizeWhatsAppPhone(params.testPhone);
   if (!phone) throw new Error("رقم الجوال غير صالح");
 
-  const accessToken = decryptToken(connection.accessTokenEnc);
+  const accessToken = await resolveWhatsAppAccessToken();
+  if (!accessToken) throw new Error("WhatsApp Access Token is required");
   const baseUrl = automation.reviewLinkBase || resolveAppBaseUrl();
   const reviewUrl = buildReviewUrl({
     baseUrl,

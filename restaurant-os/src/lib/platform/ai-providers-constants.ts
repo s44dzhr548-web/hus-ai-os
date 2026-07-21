@@ -78,3 +78,5 @@ export const PLATFORM_BRAIN_ROLES = [
   { id: "MENU_OS_ASSISTANT", labelAr: "مساعد Menu OS" },
   { id: "PLATFORM_ENGINEER", labelAr: "مهندس المنصة الذكي" },
 ] as const;
+
+export type PlatformBrainRoleId = (typeof PLATFORM_BRAIN_ROLES)[number]["id"];

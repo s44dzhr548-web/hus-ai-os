@@ -32,16 +32,17 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
-    await savePlatformMetaConfig({
+    const saveResult = await savePlatformMetaConfig({
       facebookAppName: body.facebookAppName,
       clientId: body.clientId,
       clientSecret: body.clientSecret,
       webhookVerifyToken: body.webhookVerifyToken,
+      whatsappAccessToken: body.whatsappAccessToken,
       userId: session!.user.id,
     });
 
     const view = await getPlatformMetaAdminView({ skipHealth: true });
-    return NextResponse.json({ ok: true, ...view });
+    return NextResponse.json({ ok: true, connectionTest: saveResult.connectionTest, ...view });
   } catch (e) {
     console.error("[platform/meta PATCH]", e);
     const msg = e instanceof Error ? e.message : "فشل حفظ الإعدادات";
@@ -58,7 +59,9 @@ export async function POST(req: NextRequest) {
     const action = body.action as string;
 
     if (action === "test_connection") {
-      const result = await testPlatformMetaConnection();
+      const token =
+        typeof body.whatsappAccessToken === "string" ? body.whatsappAccessToken : undefined;
+      const result = await testPlatformMetaConnection(token);
       const health = await runPlatformMetaHealthCheck();
       return NextResponse.json({ ...result, health });
     }

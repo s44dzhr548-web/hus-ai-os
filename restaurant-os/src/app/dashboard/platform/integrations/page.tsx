@@ -184,8 +184,14 @@ export default function PlatformIntegrationsPage() {
           </div>
 
           <label className="block text-sm">
-            Client ID
-            <Input value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })} className="mt-1 font-mono text-sm" dir="ltr" />
+            {selected === "META" ? "Meta App ID (META_APP_ID)" : "Client ID"}
+            <Input
+              value={form.clientId}
+              onChange={(e) => setForm({ ...form, clientId: e.target.value })}
+              placeholder={selected === "META" ? "123456789012345" : ""}
+              className="mt-1 font-mono text-sm"
+              dir="ltr"
+            />
           </label>
           <label className="block text-sm">
             Client Secret {current.hasClientSecret && "(محفوظ)"}

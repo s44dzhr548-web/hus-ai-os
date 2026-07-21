@@ -8,6 +8,7 @@ import {
 } from "@/lib/marketing/ads-oauth";
 import { ADS_INTEGRATION_DEFS } from "@/lib/platform/ads-integrations";
 import { logMarketingAudit } from "@/lib/marketing/security";
+import { handleMetaAdsOAuthCallback } from "@/lib/marketing/meta-ads-callback";
 import type { MarketingPlatform } from "@prisma/client";
 import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
 
@@ -18,6 +19,11 @@ export async function GET(
   { params }: { params: Promise<{ platform: string }> }
 ) {
   const { platform: platformParam } = await params;
+
+  if (platformParam.toLowerCase() === "meta") {
+    return handleMetaAdsOAuthCallback(req, platformParam);
+  }
+
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
   const base = resolveAppBaseUrl();

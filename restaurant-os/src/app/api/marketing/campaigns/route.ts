@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma, { withTimeout } from "@/lib/prisma";
 import { requireMarketingAccess } from "@/lib/marketing/auth";
 import { checkRateLimit, logMarketingAudit } from "@/lib/marketing/security";
 import type { MarketingCampaignGoal, MarketingPlatform } from "@prisma/client";
@@ -17,14 +17,35 @@ function serializeCampaign(c: Record<string, unknown>) {
 export async function GET() {
   const { error, restaurantId } = await requireMarketingAccess();
   if (error) return error;
+  if (!restaurantId) {
+    return NextResponse.json(
+      { error: "لم يتم تحديد المطعم — اختر مطعماً من القائمة." },
+      { status: 400 }
+    );
+  }
 
-  const campaigns = await prisma.marketingCampaign.findMany({
-    where: { restaurantId: restaurantId!, deletedAt: null },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  try {
+    const campaigns = await withTimeout(
+      prisma.marketingCampaign.findMany({
+        where: { restaurantId, deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+      12000
+    );
 
-  return NextResponse.json({ campaigns: campaigns.map(serializeCampaign) });
+    return NextResponse.json({ campaigns: campaigns.map(serializeCampaign) });
+  } catch (e) {
+    const timedOut = e instanceof Error && e.message === "DATABASE_TIMEOUT";
+    return NextResponse.json(
+      {
+        error: timedOut
+          ? "انتهت مهلة قاعدة البيانات — حاول مجدداً."
+          : "تعذّر جلب الحملات — حاول مجدداً.",
+      },
+      { status: timedOut ? 504 : 500 }
+    );
+  }
 }
 
 export async function POST(req: NextRequest) {

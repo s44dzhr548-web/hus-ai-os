@@ -6,6 +6,8 @@ import {
 } from "@/lib/ai-assistant/tools";
 import { logAiAssistantAction } from "@/lib/ai-assistant/audit";
 import { routeFallbackCommand } from "@/lib/ai-assistant/fallback-router";
+import { resolvePlatformOpenAiForRole } from "@/lib/platform/openai-brain";
+import { assertRestaurantAiAccess } from "@/lib/restaurant-ai-access/service";
 import {
   WRITE_TOOLS,
   type AiToolName,
@@ -94,20 +96,30 @@ export async function processAssistantMessage(params: {
   };
 
   const fallback = routeFallbackCommand(params.message);
-  const useOpenAi = Boolean(process.env.OPENAI_API_KEY);
+  const brain = await resolvePlatformOpenAiForRole("MENU_OS_ASSISTANT");
+  const restaurantAccess = await assertRestaurantAiAccess({
+    restaurantId: params.restaurantId,
+    roleId: "MENU_OS_ASSISTANT",
+  });
+  const useOpenAi = brain.ok && restaurantAccess.ok;
 
   if (fallback) {
     return handleRoutedTool(fallback.tool, fallback.args, ctx, params.message);
   }
 
   if (!useOpenAi) {
-    return {
-      message:
-        "لم أفهم الأمر. جرّب: «اعرض حجوزات اليوم»، «كم عدد زوار أمس؟»، «هل واتساب متصل؟»",
-    };
+    const msg = !restaurantAccess.ok
+      ? restaurantAccess.message
+      : !brain.ok
+        ? brain.message
+        : "لم أفهم الأمر.";
+    return { message: msg };
   }
 
-  let turn = await runOpenAiAssistantTurn({ userMessage: params.message });
+  let turn = await runOpenAiAssistantTurn({
+    restaurantId: params.restaurantId,
+    userMessage: params.message,
+  });
   const toolResults: Array<{ tool: string; summary: string; data?: unknown }> = [];
   let pendingAction: ChatAssistantResponse["pendingAction"];
 
@@ -194,6 +206,7 @@ export async function processAssistantMessage(params: {
     if (!turn.rawResponseId || !readOutputs.length) break;
 
     turn = await runOpenAiAssistantTurn({
+      restaurantId: params.restaurantId,
       userMessage: params.message,
       previousResponseId: turn.rawResponseId,
       toolOutputs: readOutputs,
