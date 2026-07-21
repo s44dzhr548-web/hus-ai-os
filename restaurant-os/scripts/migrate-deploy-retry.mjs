@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import { spawnSync } from "child_process";
+import { loadMigrateEnv } from "./lib/load-migrate-env.mjs";
 
 const maxAttempts = 8;
 const delayMs = 20000;
+
+loadMigrateEnv();
 
 function isAdvisoryLockError(output) {
   const text = String(output || "");
@@ -20,7 +23,11 @@ function isBaselineError(output) {
 
 function isInvalidDbUrlError(output) {
   const text = String(output || "");
-  return text.includes("P1013") || text.includes("database string is invalid");
+  return (
+    text.includes("P1013") ||
+    text.includes("database string is invalid") ||
+    text.includes("missing or invalid DATABASE_URL")
+  );
 }
 
 function run(cmd, args) {
@@ -51,7 +58,7 @@ let baselineAttempted = false;
 
 for (let attempt = 1; attempt <= maxAttempts; attempt++) {
   console.log(`[migrate-deploy-retry] attempt ${attempt}/${maxAttempts}`);
-  const { ok, output } = run("node", ["scripts/migrate-deploy.mjs"]);
+  const { ok, output } = run("npx", ["prisma", "migrate", "deploy"]);
   if (ok) {
     console.log("[migrate-deploy-retry] success");
     process.exit(0);

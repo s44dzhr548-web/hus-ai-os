@@ -1,6 +1,15 @@
 import { readFileSync, existsSync, readdirSync, unlinkSync } from "fs";
 import { resolve, join } from "path";
 
+const DB_ENV_KEYS = [
+  "DIRECT_URL",
+  "DATABASE_URL",
+  "POSTGRES_URL_NON_POOLING",
+  "POSTGRES_URL",
+  "POSTGRES_PRISMA_URL",
+  "SUPABASE_DB_URL",
+];
+
 export function normalizeDbUrl(value) {
   if (!value) return value;
   let val = value.trim();
@@ -30,24 +39,74 @@ export function loadMigrateEnv(envFileName = ".env.migrate.tmp") {
     }
   }
 
-  if (process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = normalizeDbUrl(process.env.DATABASE_URL);
+  loadNeonFallback();
+
+  for (const key of DB_ENV_KEYS) {
+    if (process.env[key]) {
+      process.env[key] = normalizeDbUrl(process.env[key]);
+    }
   }
-  if (process.env.DIRECT_URL) {
-    process.env.DIRECT_URL = normalizeDbUrl(process.env.DIRECT_URL);
+
+  resolveDbEnv();
+}
+
+function loadNeonFallback() {
+  if (isValidDbUrl(process.env.DATABASE_URL) || isValidDbUrl(process.env.DIRECT_URL)) return;
+
+  const candidates = [
+    resolve(process.cwd(), "../.env.neon"),
+    resolve(process.cwd(), "../../.env.neon"),
+    resolve(process.cwd(), ".env.neon"),
+  ];
+
+  for (const file of candidates) {
+    if (!existsSync(file)) continue;
+    const line = readFileSync(file, "utf8")
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.startsWith("postgresql://") || l.startsWith("postgres://"));
+    if (!line) continue;
+
+    const pooled = normalizeDbUrl(line);
+    const direct = normalizeDbUrl(line.replace("-pooler", ""));
+    if (!process.env.DATABASE_URL) process.env.DATABASE_URL = pooled;
+    if (!process.env.DIRECT_URL) process.env.DIRECT_URL = direct;
+    console.log(`[migrate-env] loaded database URL from ${file}`);
+    return;
   }
+}
+
+/** Pick pooled + direct URLs from common Vercel/Supabase/Neon env names. */
+export function resolveDbEnv() {
+  const direct =
+    process.env.DIRECT_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.SUPABASE_DB_URL ||
+    null;
+  const pooled =
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL ||
+    null;
+
+  if (direct) process.env.DIRECT_URL = normalizeDbUrl(direct);
+  if (pooled) process.env.DATABASE_URL = normalizeDbUrl(pooled);
   if (!process.env.DIRECT_URL && process.env.DATABASE_URL) {
     process.env.DIRECT_URL = process.env.DATABASE_URL;
+  }
+  if (!process.env.DATABASE_URL && process.env.DIRECT_URL) {
+    process.env.DATABASE_URL = process.env.DIRECT_URL;
   }
 }
 
 export function isValidDbUrl(url) {
   if (!url || url.length < 20) return false;
+  if (url.includes("[YOUR-PASSWORD]") || url === "placeholder") return false;
   try {
     const parsed = new URL(url);
     return parsed.protocol === "postgresql:" && Boolean(parsed.hostname);
   } catch {
-    return false;
+    return /^postgresql:\/\/.+@.+:\d+\/\w+/i.test(url);
   }
 }
 

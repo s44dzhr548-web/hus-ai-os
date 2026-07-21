@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 import { spawnSync } from "child_process";
-import { assertDbEnv } from "./lib/load-migrate-env.mjs";
+import { loadMigrateEnv, isValidDbUrl } from "./lib/load-migrate-env.mjs";
 
-assertDbEnv();
+loadMigrateEnv();
+
+const url = process.env.DIRECT_URL || process.env.DATABASE_URL;
+if (!isValidDbUrl(url)) {
+  console.error("[migrate-deploy] missing or invalid DATABASE_URL/DIRECT_URL");
+  process.exit(1);
+}
 
 const result = spawnSync("npx", ["prisma", "migrate", "deploy"], {
   stdio: "inherit",
