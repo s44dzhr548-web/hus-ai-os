@@ -46,6 +46,7 @@ export function PlatformAiBrainHub() {
   const [form, setForm] = useState({ apiKey: "", modelId: "", roleAssignments: [] as string[] });
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  const [modalMsg, setModalMsg] = useState<{ type: "error" | "success"; text: string } | null>(null);
 
   const load = useCallback(() => {
     fetch("/api/platform/ai-providers/status")
@@ -60,22 +61,74 @@ export function PlatformAiBrainHub() {
   }, [session, load]);
 
   async function post(path: string, body: object) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "فشل الطلب");
+    let res: Response;
+    try {
+      res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error("تعذر الاتصال بالخادم — تحقق من الشبكة وحاول مرة أخرى");
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err =
+        typeof data.error === "string"
+          ? data.error
+          : typeof data.message === "string"
+            ? data.message
+            : "فشل الطلب";
+      throw new Error(err);
+    }
     return data;
+  }
+
+  function roleLabels(ids: string[]) {
+    return ids
+      .map((id) => PLATFORM_BRAIN_ROLES.find((r) => r.id === id)?.labelAr ?? id)
+      .join(" · ");
+  }
+
+  function validateModalForm(testOnly: boolean) {
+    if (!modal) return "لم يتم اختيار مزوّد";
+    if (!form.modelId.trim()) return "يجب اختيار موديل";
+    if (!testOnly && !form.roleAssignments.length) return "يجب تحديد مهمة واحدة على الأقل";
+    if (!form.apiKey.trim() && !modal.hasSecret) return "API Key مطلوب";
+    if (testOnly && !form.apiKey.trim() && !modal.hasSecret) {
+      return "أدخل API Key أو احفظ مفتاحاً أولاً قبل اختبار الاتصال";
+    }
+    return null;
+  }
+
+  function formatTestSuccess(result: {
+    modelId?: string;
+    modelLabelAr?: string;
+    testedAt?: string;
+  }) {
+    const model = result.modelLabelAr || result.modelId || form.modelId;
+    const testedAt = result.testedAt
+      ? new Date(result.testedAt).toLocaleString("ar-SA")
+      : new Date().toLocaleString("ar-SA");
+    return [
+      "حالة المزود: متصل",
+      "المفتاح: صالح",
+      `الموديل: ${model}`,
+      `آخر اختبار: ${testedAt} — ناجح`,
+    ].join("\n");
   }
 
   async function handleTest(p: ProviderRow) {
     setBusy(`test-${p.key}`);
     setMsg("");
     try {
-      await post("/api/platform/ai-providers/test", { providerKey: p.key });
-      setMsg(`✓ اختبار ${p.nameAr} ناجح`);
+      const result = await post("/api/platform/ai-providers/test", { providerKey: p.key });
+      const successText = formatTestSuccess({
+        modelId: p.modelId,
+        modelLabelAr: p.models.find((m) => m.id === p.modelId)?.labelAr,
+        testedAt: result.testedAt,
+      });
+      setMsg(successText);
       load();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "فشل الاختبار");
@@ -102,31 +155,57 @@ export function PlatformAiBrainHub() {
     if (!modal) return;
     setBusy(testOnly ? "modal-test" : "modal-save");
     setMsg("");
+    setModalMsg(null);
+
+    const validationError = validateModalForm(testOnly);
+    if (validationError) {
+      setModalMsg({ type: "error", text: validationError });
+      setBusy("");
+      return;
+    }
+
     try {
       if (testOnly) {
-        await post("/api/platform/ai-providers/test", {
+        const result = await post("/api/platform/ai-providers/test", {
           providerKey: modal.key,
           ...(form.apiKey ? { apiKey: form.apiKey } : {}),
         });
-        setMsg("✓ اختبار الاتصال ناجح");
+        const modelLabel =
+          modal.models.find((m) => m.id === (result.modelId || form.modelId))?.labelAr ||
+          result.modelId ||
+          form.modelId;
+        const successText = formatTestSuccess({
+          modelId: result.modelId || form.modelId,
+          modelLabelAr: modelLabel,
+          testedAt: result.testedAt,
+        });
+        setModalMsg({ type: "success", text: successText });
+        setMsg(successText);
       } else {
-        if (!form.apiKey.trim() && !modal.hasSecret) {
-          throw new Error("API Key مطلوب");
-        }
-        await post("/api/platform/ai-providers/connect", {
+        const result = await post("/api/platform/ai-providers/connect", {
           providerKey: modal.key,
           apiKey: form.apiKey.trim() || "KEEP",
           modelId: form.modelId,
           roleAssignments: form.roleAssignments,
           testAfterSave: Boolean(form.apiKey.trim()),
         });
-        setMsg(`تم حفظ إعدادات ${modal.nameAr}`);
+        const modelLabel =
+          modal.models.find((m) => m.id === result.modelId)?.labelAr || result.modelId;
+        const successText = [
+          "تم الحفظ بنجاح",
+          `حالة المزود: ${result.statusLabelAr || "متصل"}`,
+          `الموديل: ${modelLabel}`,
+          `المهام المفعلة: ${roleLabels(result.roleAssignments ?? form.roleAssignments)}`,
+        ].join("\n");
+        setMsg(successText);
         setModal(null);
         setForm({ apiKey: "", modelId: "", roleAssignments: [] });
+        setModalMsg(null);
       }
       load();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "فشل");
+      const text = e instanceof Error ? e.message : "فشل حفظ الإعدادات";
+      setModalMsg({ type: "error", text });
     } finally {
       setBusy("");
     }
@@ -137,9 +216,10 @@ export function PlatformAiBrainHub() {
     setForm({
       apiKey: "",
       modelId: p.modelId || p.defaultModel,
-      roleAssignments: p.roleAssignments ?? [],
+      roleAssignments: p.roleAssignments?.length ? p.roleAssignments : ["MENU_OS_ASSISTANT"],
     });
     setMsg("");
+    setModalMsg(null);
   }
 
   if (loading) return <MkLoading />;
@@ -165,7 +245,9 @@ export function PlatformAiBrainHub() {
         </Link>
       </p>
       {msg && (
-        <p className="mb-3 rounded-lg border border-stone-700 px-3 py-2 text-sm text-amber-300">{msg}</p>
+        <p className="mb-3 whitespace-pre-line rounded-lg border border-emerald-700/40 bg-emerald-950/20 px-3 py-2 text-sm text-emerald-200">
+          {msg}
+        </p>
       )}
       <div className="grid gap-4 lg:grid-cols-2">
         {providers.map((p) => (
@@ -234,6 +316,17 @@ export function PlatformAiBrainHub() {
           <MkCard className="max-h-[90vh] w-full max-w-md overflow-y-auto">
             <h3 className="mb-1 text-lg font-bold">إعداد الربط — {modal.nameAr}</h3>
             <p className="mb-4 text-xs opacity-60">المفتاح يُحفظ مشفّراً — لا يُعرض بعد الحفظ</p>
+            {modalMsg && (
+              <p
+                className={`mb-3 whitespace-pre-line rounded-lg border px-3 py-2 text-sm ${
+                  modalMsg.type === "error"
+                    ? "border-red-700/50 bg-red-950/30 text-red-200"
+                    : "border-emerald-700/50 bg-emerald-950/30 text-emerald-200"
+                }`}
+              >
+                {modalMsg.text}
+              </p>
+            )}
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-medium">API Key</label>
@@ -295,22 +388,23 @@ export function PlatformAiBrainHub() {
             <div className="mt-5 flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={busy === "modal-save"}
+                disabled={!!busy}
                 onClick={() => handleSave(false)}
                 className="flex-1 rounded bg-amber-600 py-2 text-sm text-white hover:bg-amber-500 disabled:opacity-50"
               >
-                حفظ
+                {busy === "modal-save" ? "جاري الحفظ…" : "حفظ"}
               </button>
               <button
                 type="button"
-                disabled={busy === "modal-test"}
+                disabled={!!busy}
                 onClick={() => handleSave(true)}
                 className="rounded border border-stone-600 px-4 py-2 text-sm hover:bg-stone-800 disabled:opacity-50"
               >
-                اختبار الاتصال
+                {busy === "modal-test" ? "جاري الاختبار…" : "اختبار الاتصال"}
               </button>
               <button
                 type="button"
+                disabled={!!busy}
                 onClick={() => setModal(null)}
                 className="rounded border border-stone-600 px-4 py-2 text-sm"
               >

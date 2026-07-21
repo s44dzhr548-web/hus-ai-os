@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   PageHeader,
   Card,
@@ -89,6 +90,11 @@ export default function OwnerSettingsPage() {
         title="إعدادات المالك"
         description="إعدادات الحساب والنطاق المخصص"
       />
+      <p className="mb-4 text-sm">
+        <Link href="/dashboard/settings/ai" className="text-emerald-600 underline">
+          الإعدادات → الذكاء الاصطناعي (AI Access)
+        </Link>
+      </p>
 
       <Card className="max-w-2xl">
         <form onSubmit={handleSave} className="space-y-4">

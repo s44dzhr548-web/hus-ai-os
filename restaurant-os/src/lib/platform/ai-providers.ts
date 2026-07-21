@@ -5,6 +5,7 @@ import {
   decryptApiKey,
   testProviderConnection,
   testOpenAiResponses,
+  type ProviderTestResult,
 } from "@/lib/marketing/providers/test-connection";
 import { logPlatformAudit } from "@/lib/platform-audit";
 import {
@@ -74,11 +75,24 @@ export async function listPlatformAiProviderStatus() {
   });
 }
 
-async function runTest(providerKey: PlatformBrainProviderKey, apiKey: string, modelId?: string) {
+async function runTest(
+  providerKey: PlatformBrainProviderKey,
+  apiKey: string,
+  modelId?: string
+): Promise<ProviderTestResult> {
   if (providerKey === "OPENAI") {
     return testOpenAiResponses(apiKey, modelId ?? "gpt-4o-mini");
   }
-  return testProviderConnection(providerKey, apiKey);
+  const result = await testProviderConnection(providerKey, apiKey);
+  return {
+    ok: result.ok,
+    error: result.error,
+    isInvalidKey: result.error?.includes("غير صالح") || result.error?.includes("Invalid API key"),
+  };
+}
+
+function failureStatus(test: { isInvalidKey?: boolean }): "INVALID_KEY" | "NEEDS_RECONNECT" {
+  return test.isInvalidKey ? "INVALID_KEY" : "NEEDS_RECONNECT";
 }
 
 export async function connectPlatformAiProvider(params: {
@@ -102,6 +116,16 @@ export async function connectPlatformAiProvider(params: {
 
   const def = PLATFORM_BRAIN_PROVIDERS[params.providerKey];
   const modelId = params.modelId?.trim() || existing?.modelId || def.defaultModel;
+  if (!modelId) throw new Error("يجب اختيار موديل");
+
+  const roleAssignments =
+    params.roleAssignments !== undefined
+      ? params.roleAssignments
+      : (existing?.roleAssignments as string[] | null) ?? [];
+  if (!roleAssignments.length) {
+    throw new Error("يجب تحديد مهمة واحدة على الأقل");
+  }
+
   const keepExisting = params.apiKey === "KEEP" || !params.apiKey.trim();
 
   let key = params.apiKey?.trim();
@@ -117,13 +141,22 @@ export async function connectPlatformAiProvider(params: {
       where: { providerKey: params.providerKey },
       data: {
         modelId,
-        roleAssignments: params.roleAssignments ?? existing?.roleAssignments ?? [],
+        roleAssignments,
       },
     });
-    return { ok: true, status: existing?.status ?? "CONNECTED", modelId };
+    const cardStatus = existing
+      ? toCardStatus({ ...existing, apiKeyEnc: existing.apiKeyEnc, lastSuccessAt: existing.lastSuccessAt })
+      : ("missing_key" as ProviderCardStatus);
+    return {
+      ok: true,
+      status: existing?.status ?? "CONNECTED",
+      modelId,
+      roleAssignments,
+      statusLabelAr: statusLabelAr(cardStatus, existing?.status ?? "CONNECTED"),
+    };
   }
 
-  let status: "CONNECTED" | "HEALTHY" | "INVALID_KEY" = "CONNECTED";
+  let status: "CONNECTED" | "HEALTHY" | "INVALID_KEY" | "NEEDS_RECONNECT" = "CONNECTED";
   let lastError: string | null = null;
   let lastSuccessAt: Date | null = existing?.lastSuccessAt ?? null;
   let lastTestAt: Date | null = null;
@@ -132,7 +165,7 @@ export async function connectPlatformAiProvider(params: {
     const test = await runTest(params.providerKey, key, modelId);
     lastTestAt = new Date();
     if (!test.ok) {
-      status = "INVALID_KEY";
+      status = failureStatus(test);
       lastError = test.error ?? "فشل الاختبار";
     } else {
       status = "HEALTHY";
@@ -148,7 +181,7 @@ export async function connectPlatformAiProvider(params: {
       apiKeyEnc: enc,
       modelId,
       status,
-      roleAssignments: params.roleAssignments ?? [],
+      roleAssignments,
       lastTestAt,
       lastSuccessAt,
       lastError,
@@ -158,7 +191,7 @@ export async function connectPlatformAiProvider(params: {
       ...(keepExisting ? {} : { apiKeyEnc: enc }),
       modelId,
       status,
-      roleAssignments: params.roleAssignments ?? undefined,
+      roleAssignments,
       lastTestAt,
       lastSuccessAt,
       lastError,
@@ -177,8 +210,23 @@ export async function connectPlatformAiProvider(params: {
   if (status === "INVALID_KEY") {
     throw new Error(lastError ?? "المفتاح غير صالح");
   }
+  if (lastError && params.testAfterSave !== false && status !== "HEALTHY") {
+    throw new Error(lastError);
+  }
 
-  return { ok: true, status, modelId };
+  const cardStatus = toCardStatus({
+    apiKeyEnc: enc,
+    status,
+    lastSuccessAt,
+  });
+
+  return {
+    ok: true,
+    status,
+    modelId,
+    roleAssignments,
+    statusLabelAr: statusLabelAr(cardStatus, status),
+  };
 }
 
 export async function testPlatformAiProvider(params: {
@@ -199,6 +247,7 @@ export async function testPlatformAiProvider(params: {
   const modelId = row?.modelId ?? PLATFORM_BRAIN_PROVIDERS[params.providerKey].defaultModel;
   const test = await runTest(params.providerKey, apiKey, modelId);
   const now = new Date();
+  const failStatus = test.ok ? "HEALTHY" : failureStatus(test);
 
   await prisma.platformAiProviderConnection.upsert({
     where: { providerKey: params.providerKey },
@@ -206,14 +255,14 @@ export async function testPlatformAiProvider(params: {
       providerKey: params.providerKey,
       apiKeyEnc: row?.apiKeyEnc ?? (params.apiKey ? encryptApiKey(params.apiKey) : null),
       modelId,
-      status: test.ok ? "HEALTHY" : "INVALID_KEY",
+      status: failStatus,
       lastTestAt: now,
       lastSuccessAt: test.ok ? now : null,
       lastError: test.ok ? null : test.error ?? "فشل",
       connectedByUserId: params.userId,
     },
     update: {
-      status: test.ok ? "HEALTHY" : "INVALID_KEY",
+      status: failStatus,
       lastTestAt: now,
       lastSuccessAt: test.ok ? now : row?.lastSuccessAt ?? null,
       lastError: test.ok ? null : test.error ?? "فشل",
@@ -228,7 +277,21 @@ export async function testPlatformAiProvider(params: {
     metadata: { ok: test.ok },
   });
 
-  return { ok: test.ok, error: test.error, testedAt: now.toISOString() };
+  const modelLabel =
+    PLATFORM_BRAIN_PROVIDERS[params.providerKey].models.find((m) => m.id === modelId)?.labelAr ||
+    modelId;
+
+  return {
+    ok: test.ok,
+    error: test.error,
+    testedAt: now.toISOString(),
+    modelId,
+    modelLabelAr: modelLabel,
+    statusLabelAr: test.ok ? "متصل" : undefined,
+    keyValid: test.ok,
+    lastTestLabelAr: test.ok ? "ناجح" : "فاشل",
+    roleAssignments: (row?.roleAssignments as string[] | null) ?? [],
+  };
 }
 
 export async function disconnectPlatformAiProvider(params: {

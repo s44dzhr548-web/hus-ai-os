@@ -14,6 +14,7 @@ type MetaView = {
   facebookAppName: string | null;
   clientId: string | null;
   hasClientSecret: boolean;
+  hasWhatsAppAccessToken: boolean;
   redirectUri: string;
   webhookUrl: string;
   hasWebhookVerifyToken: boolean;
@@ -66,6 +67,7 @@ export default function PlatformMetaPage() {
     clientId: "",
     clientSecret: "",
     webhookVerifyToken: "",
+    whatsappAccessToken: "",
   });
 
   async function load() {
@@ -80,6 +82,7 @@ export default function PlatformMetaPage() {
           clientId: d.clientId || "",
           clientSecret: "",
           webhookVerifyToken: "",
+          whatsappAccessToken: "",
         });
         void refreshHealth();
       } else {
@@ -135,9 +138,22 @@ export default function PlatformMetaPage() {
         return;
       }
       setView(data as MetaView);
-      setForm((f) => ({ ...f, clientSecret: "", webhookVerifyToken: "" }));
+      setForm((f) => ({
+        ...f,
+        clientSecret: "",
+        webhookVerifyToken: "",
+        whatsappAccessToken: "",
+      }));
       setMessageIsError(false);
       setMessage("تم حفظ إعدادات Meta");
+      const connectionTest = data.connectionTest as { ok?: boolean; message?: string; name?: string } | undefined;
+      if (connectionTest) {
+        setTestResult(
+          connectionTest.ok
+            ? `✓ ${connectionTest.message || ""}${connectionTest.name ? ` (${connectionTest.name})` : ""}`
+            : `✗ ${connectionTest.message || "Connection failed"}`
+        );
+      }
       void refreshHealth();
     } catch (e) {
       setMessageIsError(true);
@@ -150,17 +166,25 @@ export default function PlatformMetaPage() {
   async function testConnection() {
     setTesting(true);
     setTestResult("");
+    if (!form.whatsappAccessToken.trim() && !view?.hasWhatsAppAccessToken) {
+      setTestResult("✗ WhatsApp Access Token is required");
+      setTesting(false);
+      return;
+    }
     try {
       const { res, data } = await apiFetch("/api/platform/meta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "test_connection" }),
+        body: JSON.stringify({
+          action: "test_connection",
+          whatsappAccessToken: form.whatsappAccessToken.trim() || undefined,
+        }),
         timeoutMs: SAVE_TIMEOUT_MS,
       });
       const ok = Boolean(data.ok);
       setTestResult(
         ok
-          ? `✓ ${String(data.message || "")}${data.appName ? ` (${String(data.appName)})` : ""}`
+          ? `✓ ${String(data.message || "")}${data.name || data.appName ? ` (${String(data.name || data.appName)})` : ""}`
           : `✗ ${String(data.message || data.error || "فشل الاختبار")}`
       );
       if (Array.isArray(data.health)) {
@@ -259,10 +283,25 @@ export default function PlatformMetaPage() {
           />
         </label>
 
+        <label className="block text-sm">
+          <span className="text-gray-600">
+            WhatsApp Access Token{" "}
+            {view?.hasWhatsAppAccessToken && "(محفوظ — اتركه فارغاً للإبقاء)"}
+          </span>
+          <Input
+            type="password"
+            value={form.whatsappAccessToken}
+            onChange={(e) => setForm({ ...form, whatsappAccessToken: e.target.value })}
+            placeholder={view?.hasWhatsAppAccessToken ? "••••••••" : ""}
+            className="mt-1 font-mono text-sm"
+            dir="ltr"
+          />
+        </label>
+
         {!view?.encryptionReady && (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             MARKETING_TOKEN_SECRET غير مضبوط على الخادم — لا يمكن حفظ Client Secret أو Webhook Verify Token
-            حتى يُضاف متغير التشفير (٣٢ حرفاً على الأقل) في إعدادات Vercel.
+            أو WhatsApp Access Token حتى يُضاف متغير التشفير (٣٢ حرفاً على الأقل) في إعدادات Vercel.
           </p>
         )}
         <div className="flex flex-wrap gap-2 pt-2">

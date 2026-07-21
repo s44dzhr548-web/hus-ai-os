@@ -32,7 +32,7 @@ export async function sendWhatsAppTemplateMessage(params: {
     /* use full URL as fallback */
   }
 
-  const url = `https://graph.facebook.com/v21.0/${params.phoneNumberId}/messages`;
+  const url = `https://graph.facebook.com/v23.0/${params.phoneNumberId}/messages`;
 
   const payload = {
     messaging_product: "whatsapp",

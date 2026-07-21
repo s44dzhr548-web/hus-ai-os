@@ -6,8 +6,8 @@ export const MARKETING_ROLES = ["OWNER", "ADMIN", "MARKETING"] as const;
 /** Read-only access to ad platform cards */
 export const ADS_PLATFORM_READ_ROLES = ["OWNER", "ADMIN", "MANAGER", "MARKETING"] as const;
 
-/** Connect/disconnect ad accounts — owner only */
-export const ADS_PLATFORM_CONNECT_ROLES = ["OWNER"] as const;
+/** Connect/disconnect ad accounts — owner or restaurant admin */
+export const ADS_PLATFORM_CONNECT_ROLES = ["OWNER", "ADMIN"] as const;
 
 /** Manager read-only access to WhatsApp Business hub */
 export const WHATSAPP_BUSINESS_READ_ROLES = ["OWNER", "ADMIN", "MANAGER", "MARKETING"] as const;
@@ -74,15 +74,18 @@ export async function requireWhatsAppBusinessOwnerAccess() {
 export const MARKETING_ROUTE_PREFIX = "/dashboard/marketing";
 
 export async function requireAdsPlatformReadAccess() {
-  const { restaurantId, session, error } = await requireRestaurantRole([...ADS_PLATFORM_READ_ROLES]);
+  const { restaurantId, session, error, isPlatformAdmin } = await requireRestaurantRole([
+    ...ADS_PLATFORM_READ_ROLES,
+  ]);
   if (error) return { error, restaurantId: null, session: null, canConnect: false, canEdit: false };
 
   const featureErr = await assertFeature(restaurantId!, "marketing");
   if (featureErr) return { error: featureErr, restaurantId: null, session: null, canConnect: false, canEdit: false };
 
   const role = session?.user?.role;
-  const canConnect = role === "OWNER";
-  const canEdit = role === "OWNER" || role === "ADMIN" || role === "MARKETING";
+  const canConnect =
+    Boolean(isPlatformAdmin) || role === "OWNER" || role === "ADMIN";
+  const canEdit = Boolean(isPlatformAdmin) || role === "OWNER" || role === "ADMIN" || role === "MARKETING";
   return { error: null, restaurantId: restaurantId!, session, canConnect, canEdit };
 }
 
@@ -92,7 +95,7 @@ export async function requireAdsPlatformConnectAccess() {
   if (!result.canConnect) {
     return {
       ...result,
-      error: NextResponse.json({ error: "صلاحية المالك فقط للربط وفصل الحسابات" }, { status: 403 }),
+      error: NextResponse.json({ error: "صلاحية المالك أو مدير المطعم مطلوبة للربط" }, { status: 403 }),
     };
   }
   return result;

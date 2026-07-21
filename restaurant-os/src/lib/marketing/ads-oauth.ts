@@ -142,6 +142,41 @@ export async function exchangeOAuthCode(
   };
 }
 
+export async function discoverAllAdAccounts(
+  platform: MarketingPlatform,
+  accessToken: string
+): Promise<DiscoveredAdAccount[]> {
+  if (platform === "META" || platform === "FACEBOOK" || platform === "INSTAGRAM") {
+    try {
+      const res = await fetch(
+        `${GRAPH}/me/adaccounts?fields=id,name,account_id,currency,timezone_name,business_name&limit=50&access_token=${accessToken}`
+      );
+      const data = (await res.json()) as {
+        data?: Array<{
+          id: string;
+          name?: string;
+          account_id?: string;
+          currency?: string;
+          timezone_name?: string;
+          business_name?: string;
+        }>;
+      };
+      return (data.data || []).map((acct) => ({
+        accountId: acct.account_id || acct.id,
+        accountName: acct.name || acct.business_name || "Meta Ad Account",
+        businessName: acct.business_name || acct.name || null,
+        currency: acct.currency || null,
+        timezone: acct.timezone_name || null,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  const single = await discoverAdAccount(platform, accessToken);
+  return single ? [single] : [];
+}
+
 export async function discoverAdAccount(
   platform: MarketingPlatform,
   accessToken: string

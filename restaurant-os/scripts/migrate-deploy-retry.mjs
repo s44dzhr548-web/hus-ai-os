@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import { spawnSync } from "child_process";
+import { loadMigrateEnv } from "./lib/load-migrate-env.mjs";
 
 const maxAttempts = 8;
 const delayMs = 20000;
+
+loadMigrateEnv();
 
 function isAdvisoryLockError(output) {
   const text = String(output || "");
@@ -13,11 +16,26 @@ function isAdvisoryLockError(output) {
   );
 }
 
+function isBaselineError(output) {
+  const text = String(output || "");
+  return text.includes("P3005") || text.includes("database schema is not empty");
+}
+
+function isInvalidDbUrlError(output) {
+  const text = String(output || "");
+  return (
+    text.includes("P1013") ||
+    text.includes("database string is invalid") ||
+    text.includes("missing or invalid DATABASE_URL")
+  );
+}
+
 function run(cmd, args) {
   const result = spawnSync(cmd, args, {
     encoding: "utf8",
     stdio: ["inherit", "pipe", "pipe"],
     shell: true,
+    env: process.env,
   });
   const output = `${result.stdout || ""}\n${result.stderr || ""}`;
   if (result.stdout) process.stdout.write(result.stdout);
@@ -36,12 +54,30 @@ function isDatabaseUpToDate(output) {
   );
 }
 
+let baselineAttempted = false;
+
 for (let attempt = 1; attempt <= maxAttempts; attempt++) {
   console.log(`[migrate-deploy-retry] attempt ${attempt}/${maxAttempts}`);
   const { ok, output } = run("npx", ["prisma", "migrate", "deploy"]);
   if (ok) {
     console.log("[migrate-deploy-retry] success");
     process.exit(0);
+  }
+
+  if (isBaselineError(output) && !baselineAttempted) {
+    baselineAttempted = true;
+    console.warn("[migrate-deploy-retry] P3005 — baselining existing schema (no reset/push)...");
+    const baseline = run("node", ["scripts/baseline-migrations.mjs"]);
+    if (baseline.ok) {
+      continue;
+    }
+    console.error("[migrate-deploy-retry] baseline failed");
+    process.exit(1);
+  }
+
+  if (isInvalidDbUrlError(output)) {
+    console.error("[migrate-deploy-retry] invalid DATABASE_URL/DIRECT_URL on build environment");
+    process.exit(1);
   }
 
   if (isAdvisoryLockError(output)) {

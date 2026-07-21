@@ -1,5 +1,6 @@
 import { AI_TOOL_DEFINITIONS } from "@/lib/ai-assistant/tools";
 import { sanitizeForOpenAi } from "@/lib/ai-assistant/security";
+import { callPlatformOpenAiResponses } from "@/lib/openai/responses-client";
 
 const SYSTEM_INSTRUCTIONS = `أنت "مساعد Menu OS الذكي" — مساعد تنفيذي لصاحب المطعم وطاقم الاستقبال.
 - افهم الأوامر بالعربية ونفّذها عبر الأدوات المتاحة فقط.
@@ -22,101 +23,34 @@ export type OpenAiTurnResult = {
   rawResponseId?: string;
 };
 
-function parseToolCalls(output: unknown[]): OpenAiToolCall[] {
-  const calls: OpenAiToolCall[] = [];
-  for (const item of output) {
-    const row = item as Record<string, unknown>;
-    if (row.type === "function_call") {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(String(row.arguments || "{}"));
-      } catch {
-        args = {};
-      }
-      calls.push({
-        id: String(row.call_id || row.id || calls.length),
-        name: String(row.name),
-        arguments: args,
-      });
-    }
-  }
-  return calls;
-}
-
-function extractText(output: unknown[]): string {
-  const parts: string[] = [];
-  for (const item of output) {
-    const row = item as Record<string, unknown>;
-    if (row.type === "message") {
-      const content = row.content as Array<{ type?: string; text?: string }> | undefined;
-      for (const block of content || []) {
-        if (block.type === "output_text" && block.text) parts.push(block.text);
-        if (block.text && !block.type) parts.push(block.text);
-      }
-    }
-  }
-  return parts.join("\n").trim();
-}
-
 export async function runOpenAiAssistantTurn(params: {
+  restaurantId: string;
   userMessage: string;
   previousResponseId?: string;
   toolOutputs?: Array<{ callId: string; output: unknown }>;
 }): Promise<OpenAiTurnResult> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) {
-    return {
-      text: "خدمة الذكاء الاصطناعي غير مفعّلة — يرجى ضبط OPENAI_API_KEY على السيرفر.",
-      toolCalls: [],
-    };
-  }
-
-  const body: Record<string, unknown> = {
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+  const result = await callPlatformOpenAiResponses({
+    role: "MENU_OS_ASSISTANT",
+    restaurantId: params.restaurantId,
     instructions: SYSTEM_INSTRUCTIONS,
     tools: AI_TOOL_DEFINITIONS,
-    store: false,
-  };
-
-  if (params.previousResponseId && params.toolOutputs?.length) {
-    body.previous_response_id = params.previousResponseId;
-    body.input = params.toolOutputs.map((t) => ({
-      type: "function_call_output",
-      call_id: t.callId,
-      output: JSON.stringify(sanitizeForOpenAi(t.output)),
-    }));
-  } else {
-    body.input = params.userMessage;
-  }
-
-  const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(45000),
+    input: params.userMessage,
+    previousResponseId: params.previousResponseId,
+    toolOutputs: params.toolOutputs?.map((t) => ({
+      callId: t.callId,
+      output: sanitizeForOpenAi(t.output),
+    })),
+    store: true,
+    logTag: "ai-assistant",
   });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    console.error("[ai-assistant] OpenAI error", res.status, errText.slice(0, 500));
-    return {
-      text: "تعذر الاتصال بخدمة الذكاء الاصطناعي. حاول مرة أخرى.",
-      toolCalls: [],
-    };
+  if (!result.ok) {
+    return { text: result.message, toolCalls: [] };
   }
 
-  const data = (await res.json()) as {
-    id?: string;
-    output?: unknown[];
-  };
-
-  const output = data.output || [];
   return {
-    text: extractText(output),
-    toolCalls: parseToolCalls(output),
-    rawResponseId: data.id,
+    text: result.text,
+    toolCalls: result.toolCalls,
+    rawResponseId: result.rawResponseId,
   };
 }

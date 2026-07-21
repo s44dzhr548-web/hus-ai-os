@@ -701,6 +701,17 @@ async function simulateExecution(
   const def = getPermissionDef(permissionKey);
   if (!def) return { ok: false, summary: "صلاحية غير معروفة" };
 
+  if (permissionKey === "read_openai_status") {
+    const { getPlatformOpenAiPublicStatus } = await import("@/lib/platform/openai-brain");
+    const status = await getPlatformOpenAiPublicStatus();
+    return {
+      ok: true,
+      summary: status.connected
+        ? `OpenAI متصل — الموديل: ${status.modelId} (بدون عرض مفتاح)`
+        : "OpenAI غير متصل في AI Brain",
+    };
+  }
+
   const readOnly = [
     "read_platform_health",
     "read_error_logs",

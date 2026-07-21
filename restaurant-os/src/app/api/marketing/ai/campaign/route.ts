@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
     context: body.context,
   });
 
+  if ("error" in copy) {
+    return NextResponse.json({ error: copy.error }, { status: 400 });
+  }
+
   await logMarketingAudit({
     restaurantId: restaurantId!,
     userId: session?.user?.id,

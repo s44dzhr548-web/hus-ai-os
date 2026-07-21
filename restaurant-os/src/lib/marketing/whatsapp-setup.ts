@@ -13,6 +13,7 @@ import { syncTemplatesFromMeta, testWhatsAppConnection } from "@/lib/marketing/w
 import { getOrCreateAutomation } from "@/lib/after-visit-whatsapp/service";
 import { DEFAULT_AUTOMATION } from "@/lib/after-visit-whatsapp/types";
 import { isMetaOAuthReady, resolveMetaCredentials } from "@/lib/platform/meta-config";
+import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
 
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 
@@ -162,10 +163,13 @@ export async function finalizeWizardConnection(restaurantId: string, userId?: st
 
 export async function verifyWizardWebhook(restaurantId: string) {
   const connection = await prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } });
-  if (!connection?.accessTokenEnc || !connection.wabaId) {
+  if (!connection?.wabaId) {
     throw new Error("Connection not saved");
   }
-  const accessToken = decryptToken(connection.accessTokenEnc);
+  const accessToken = await resolveWhatsAppAccessToken();
+  if (!accessToken) {
+    throw new Error("WhatsApp Access Token is required");
+  }
   const subscribed = await subscribeWabaWebhook(connection.wabaId, accessToken);
   const active = subscribed || (await checkWabaSubscription(connection.wabaId, accessToken));
 
@@ -228,25 +232,29 @@ export async function runWhatsAppHealthCheck(restaurantId: string) {
   const issues: string[] = [];
   let ok = true;
 
-  if (!connection?.isActive || !connection.accessTokenEnc) {
+  if (!connection?.isActive || !connection.phoneNumberId) {
     issues.push("WhatsApp غير متصل");
     ok = false;
   } else {
+    const platformToken = await resolveWhatsAppAccessToken();
+    if (!platformToken) {
+      issues.push("WhatsApp Access Token is required");
+      ok = false;
+    }
     const test = await testWhatsAppConnection(restaurantId);
     if (!test.ok) {
       issues.push(`Cloud API: ${test.error}`);
       ok = false;
     }
-    if (connection.wabaId) {
+    if (connection.wabaId && platformToken) {
       try {
-        const token = decryptToken(connection.accessTokenEnc);
-        const sub = await checkWabaSubscription(connection.wabaId, token);
+        const sub = await checkWabaSubscription(connection.wabaId, platformToken);
         if (!sub) {
           issues.push("Webhook غير مشترك");
           ok = false;
         }
       } catch {
-        issues.push("Token decryption failed");
+        issues.push("Platform token invalid");
         ok = false;
       }
     }

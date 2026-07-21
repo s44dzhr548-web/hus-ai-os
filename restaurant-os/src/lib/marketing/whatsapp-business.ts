@@ -1,6 +1,7 @@
 import type { WhatsAppDeliveryStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
+import { canEncryptTokens } from "@/lib/marketing/encryption";
+import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
 import {
   getOrCreateAutomation,
   automationFromRow,
@@ -117,7 +118,8 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
     (restaurant ? `${baseUrl}/r/${restaurant.slug}/rate` : baseUrl);
 
   let templates: WhatsAppTemplateRow[] = [];
-  if (connection?.wabaId && connection.accessTokenEnc && canEncryptTokens()) {
+  const platformToken = await resolveWhatsAppAccessToken();
+  if (connection?.wabaId && platformToken) {
     try {
       templates = await syncTemplatesFromMeta(restaurantId);
     } catch {
@@ -148,7 +150,7 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
     (d) => d.sentAt && d.sentAt.toISOString().slice(0, 10) === today
   ).length;
 
-  const health = buildHealthChecks(connection, templates.length, profile);
+  const health = buildHealthChecks(connection, templates.length, profile, Boolean(platformToken));
 
   return {
     automation: automationFromRow(automation),
@@ -162,8 +164,8 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
           templateLanguage: connection.templateLanguage,
           isActive: connection.isActive,
           connectedAt: connection.connectedAt,
-          hasToken: Boolean(connection.accessTokenEnc),
-          connected: Boolean(connection.isActive && connection.accessTokenEnc),
+          hasToken: Boolean(platformToken),
+          connected: Boolean(connection.isActive && connection.phoneNumberId && platformToken),
         }
       : null,
     deliveries,
@@ -199,7 +201,10 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
       : null,
     notifications,
     dashboardSummary: {
-      connectionStatus: connection?.isActive && connection.accessTokenEnc ? "CONNECTED" : "NOT_CONNECTED",
+      connectionStatus:
+        connection?.isActive && connection.phoneNumberId && platformToken
+          ? "CONNECTED"
+          : "NOT_CONNECTED",
       businessName: profile?.businessName || restaurant?.nameAr || restaurant?.name || "—",
       phoneNumber: connection?.businessPhone || "—",
       templateCount: templates.length,
@@ -219,12 +224,13 @@ function buildHealthChecks(
     wabaId: string | null;
   } | null,
   templateCount: number,
-  profile: { verifyTokenEnc: string | null; webhookVerifiedAt: Date | null } | null
+  profile: { verifyTokenEnc: string | null; webhookVerifiedAt: Date | null } | null,
+  hasPlatformToken: boolean
 ): WhatsAppHealthCheck[] {
   const webhookOk = Boolean(
     process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || profile?.verifyTokenEnc || profile?.webhookVerifiedAt
   );
-  const connected = Boolean(connection?.isActive && connection?.accessTokenEnc);
+  const connected = Boolean(connection?.isActive && connection?.phoneNumberId && hasPlatformToken);
 
   return [
     {
@@ -242,10 +248,10 @@ function buildHealthChecks(
     {
       id: "token",
       labelAr: "Token Expiration",
-      ok: Boolean(connection?.accessTokenEnc),
-      detail: connection?.accessTokenEnc
-        ? "Token stored (encrypted)"
-        : "No access token",
+      ok: hasPlatformToken,
+      detail: hasPlatformToken
+        ? "Platform WhatsApp token configured"
+        : "WhatsApp Access Token is required",
     },
     {
       id: "phone",
@@ -274,12 +280,12 @@ export async function syncTemplatesFromMeta(restaurantId: string): Promise<Whats
   const connection = await prisma.whatsAppBusinessConnection.findUnique({
     where: { restaurantId },
   });
-  if (!connection?.wabaId || !connection.accessTokenEnc || !canEncryptTokens()) {
+  const accessToken = await resolveWhatsAppAccessToken();
+  if (!connection?.wabaId || !accessToken) {
     return [];
   }
 
-  const accessToken = decryptToken(connection.accessTokenEnc);
-  const url = `https://graph.facebook.com/v21.0/${connection.wabaId}/message_templates?limit=50`;
+  const url = `https://graph.facebook.com/v23.0/${connection.wabaId}/message_templates?limit=50`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -311,15 +317,16 @@ export async function testWhatsAppConnection(restaurantId: string) {
   const connection = await prisma.whatsAppBusinessConnection.findUnique({
     where: { restaurantId },
   });
-  if (!connection?.accessTokenEnc || !connection.phoneNumberId) {
+  if (!connection?.phoneNumberId) {
     return { ok: false, error: "Connection not configured" };
   }
-  if (!canEncryptTokens()) {
-    return { ok: false, error: "Encryption not configured" };
+
+  const accessToken = await resolveWhatsAppAccessToken();
+  if (!accessToken) {
+    return { ok: false, error: "WhatsApp Access Token is required" };
   }
 
-  const accessToken = decryptToken(connection.accessTokenEnc);
-  const url = `https://graph.facebook.com/v21.0/${connection.phoneNumberId}?fields=display_phone_number,verified_name`;
+  const url = `https://graph.facebook.com/v23.0/${connection.phoneNumberId}?fields=display_phone_number,verified_name`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
