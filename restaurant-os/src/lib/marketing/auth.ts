@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRestaurantRole } from "@/lib/api-auth";
 import { assertFeature } from "@/lib/permissions-engine";
+import { isPlatformAdminUser } from "@/lib/permissions";
 export const MARKETING_ROLES = ["OWNER", "ADMIN", "MARKETING"] as const;
 
 /** Read-only access to ad platform cards */
@@ -52,23 +53,29 @@ export async function requireWhatsAppBusinessReadAccess() {
   if (featureErr) return { error: featureErr, restaurantId: null, session: null, canEdit: false };
 
   const role = session?.user?.role;
-  const canEdit = role === "OWNER";
+  const platformAdmin = isPlatformAdminUser(session!.user);
+  const canEdit = role === "OWNER" || platformAdmin;
   return { error: null, restaurantId: restaurantId!, session, canEdit };
 }
 
 export async function requireWhatsAppBusinessOwnerAccess() {
   const result = await requireWhatsAppBusinessReadAccess();
   if (result.error) return result;
-  if (!result.canEdit) {
+
+  const platformAdmin = Boolean(result.session && isPlatformAdminUser(result.session.user));
+  const canEdit = result.canEdit || platformAdmin;
+
+  if (!canEdit) {
     return {
       ...result,
+      canEdit: false,
       error: NextResponse.json(
         { error: "صلاحية المالك فقط — Connect / Disconnect / Tokens / Automation" },
         { status: 403 }
       ),
     };
   }
-  return result;
+  return { ...result, canEdit: true };
 }
 
 export const MARKETING_ROUTE_PREFIX = "/dashboard/marketing";
