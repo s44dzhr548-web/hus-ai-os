@@ -1,8 +1,7 @@
-import crypto from "crypto";
-import { encryptToken, decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
+import { sanitizeAccessToken, graphGet, graphPost } from "@/lib/marketing/whatsapp-graph-api";
 import { resolveMetaCredentials, getMetaOAuthRedirectUri, isMetaOAuthReady } from "@/lib/platform/meta-config";
-
-const GRAPH = "https://graph.facebook.com/v21.0";
+import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
+import crypto from "crypto";
 
 export const WHATSAPP_OAUTH_SCOPES = [
   "business_management",
@@ -11,11 +10,19 @@ export const WHATSAPP_OAUTH_SCOPES = [
 ].join(",");
 
 export async function whatsAppOAuthConfigured(): Promise<boolean> {
-  return isMetaOAuthReady();
+  const [oauthReady, platformToken] = await Promise.all([
+    isMetaOAuthReady(),
+    resolveWhatsAppAccessToken(),
+  ]);
+  return oauthReady && Boolean(platformToken);
 }
 
 export function getWhatsAppOAuthRedirectUri(): string {
   return getMetaOAuthRedirectUri();
+}
+
+export function getEmbeddedSignupConfigId(): string | null {
+  return process.env.META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID?.trim() || null;
 }
 
 export function buildWhatsAppOAuthState(restaurantId: string, returnStep = 2): string {
@@ -42,14 +49,14 @@ export async function getWhatsAppOAuthStartUrl(restaurantId: string): Promise<st
     state: buildWhatsAppOAuthState(restaurantId),
     response_type: "code",
   });
-  return `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
+  return `https://www.facebook.com/${"v23.0"}/dialog/oauth?${params.toString()}`;
 }
 
 export async function exchangeOAuthCode(code: string): Promise<{ accessToken: string; expiresIn?: number }> {
   const { clientId, clientSecret } = await resolveMetaCredentials();
   if (!clientId || !clientSecret) throw new Error("خدمة الربط مع Meta غير مفعّلة بعد");
 
-  const tokenRes = await fetch(`${GRAPH}/oauth/access_token`, {
+  const tokenRes = await fetch(`https://graph.facebook.com/v23.0/oauth/access_token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -66,7 +73,7 @@ export async function exchangeOAuthCode(code: string): Promise<{ accessToken: st
   }
 
   const longRes = await fetch(
-    `${GRAPH}/oauth/access_token?${new URLSearchParams({
+    `https://graph.facebook.com/v23.0/oauth/access_token?${new URLSearchParams({
       grant_type: "fb_exchange_token",
       client_id: clientId,
       client_secret: clientSecret,
@@ -75,7 +82,7 @@ export async function exchangeOAuthCode(code: string): Promise<{ accessToken: st
   );
   const long = (await longRes.json()) as { access_token?: string; expires_in?: number };
   return {
-    accessToken: long.access_token || short.access_token,
+    accessToken: sanitizeAccessToken(long.access_token || short.access_token)!,
     expiresIn: long.expires_in,
   };
 }
@@ -94,50 +101,71 @@ export type DiscoveredAccounts = {
   phones: DiscoveredPhone[];
 };
 
-async function graphGet<T>(path: string, accessToken: string): Promise<T> {
-  const res = await fetch(`${GRAPH}${path}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as { error?: { message?: string } }).error?.message || `Graph ${res.status}`);
+async function listWabasForBusiness(businessId: string, accessToken: string) {
+  const wabas: Array<{ id: string; name?: string }> = [];
+  try {
+    const owned = await graphGet<{ data?: Array<{ id: string; name?: string }> }>(
+      `/${businessId}/owned_whatsapp_business_accounts`,
+      accessToken,
+      { fields: "id,name", limit: "25" }
+    );
+    wabas.push(...(owned.data || []));
+  } catch {
+    /* try client accounts */
   }
-  return data as T;
+  if (!wabas.length) {
+    try {
+      const client = await graphGet<{ data?: Array<{ id: string; name?: string }> }>(
+        `/${businessId}/client_whatsapp_business_accounts`,
+        accessToken,
+        { fields: "id,name", limit: "25" }
+      );
+      wabas.push(...(client.data || []));
+    } catch {
+      /* skip */
+    }
+  }
+  return wabas;
 }
 
-export async function discoverWhatsAppAccounts(accessToken: string): Promise<DiscoveredAccounts> {
+export async function discoverWhatsAppAccounts(
+  accessToken: string,
+  opts?: { nameHint?: string }
+): Promise<DiscoveredAccounts> {
+  const token = sanitizeAccessToken(accessToken);
+  if (!token) return { phones: [] };
+
   const phones: DiscoveredPhone[] = [];
+  const businessIds: Array<{ id: string; name: string }> = [];
 
-  const businesses = await graphGet<{ data?: Array<{ id: string; name: string }> }>(
-    `/me/businesses?fields=id,name&limit=25`,
-    accessToken
-  );
-
-  for (const biz of businesses.data || []) {
-    let wabas: Array<{ id: string; name?: string }> = [];
-    try {
-      const owned = await graphGet<{ data?: Array<{ id: string; name?: string }> }>(
-        `/${biz.id}/owned_whatsapp_business_accounts?fields=id,name&limit=25`,
-        accessToken
-      );
-      wabas = owned.data || [];
-    } catch {
-      try {
-        const client = await graphGet<{ data?: Array<{ id: string; name?: string }> }>(
-          `/${biz.id}/client_whatsapp_business_accounts?fields=id,name&limit=25`,
-          accessToken
-        );
-        wabas = client.data || [];
-      } catch {
-        /* skip business */
-      }
+  try {
+    const businesses = await graphGet<{ data?: Array<{ id: string; name: string }> }>(
+      "/me/businesses",
+      token,
+      { fields: "id,name", limit: "25" }
+    );
+    for (const biz of businesses.data || []) {
+      businessIds.push({ id: biz.id, name: biz.name });
     }
+  } catch {
+    /* system user may not have /me/businesses */
+  }
 
+  const envBusinessId = process.env.META_BUSINESS_ID?.trim();
+  if (!businessIds.length && envBusinessId) {
+    businessIds.push({ id: envBusinessId, name: "Meta Business" });
+  }
+
+  for (const biz of businessIds) {
+    const wabas = await listWabasForBusiness(biz.id, token);
     for (const waba of wabas) {
       try {
         const nums = await graphGet<{
           data?: Array<{ id: string; display_phone_number?: string; verified_name?: string }>;
-        }>(`/${waba.id}/phone_numbers?fields=id,display_phone_number,verified_name&limit=25`, accessToken);
+        }>(`/${waba.id}/phone_numbers`, token, {
+          fields: "id,display_phone_number,verified_name",
+          limit: "25",
+        });
         for (const n of nums.data || []) {
           phones.push({
             id: n.id,
@@ -155,7 +183,22 @@ export async function discoverWhatsAppAccounts(accessToken: string): Promise<Dis
     }
   }
 
+  if (opts?.nameHint) {
+    const hint = opts.nameHint.toLowerCase();
+    const matched = phones.filter((p) =>
+      [p.verifiedName, p.wabaName, p.businessName].some((s) => s?.toLowerCase().includes(hint))
+    );
+    if (matched.length) return { phones: matched };
+  }
+
   return { phones };
+}
+
+/** Discover WABAs using platform System User token (production path). */
+export async function discoverWhatsAppAccountsFromPlatform(nameHint?: string): Promise<DiscoveredAccounts> {
+  const token = await resolveWhatsAppAccessToken();
+  if (!token) throw new Error("WhatsApp Access Token is required");
+  return discoverWhatsAppAccounts(token, { nameHint });
 }
 
 export function generateVerifyToken(): string {
@@ -163,16 +206,16 @@ export function generateVerifyToken(): string {
 }
 
 export async function subscribeWabaWebhook(wabaId: string, accessToken: string): Promise<boolean> {
-  const res = await fetch(`${GRAPH}/${wabaId}/subscribed_apps`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({}),
-  });
-  const data = await res.json().catch(() => ({}));
-  return res.ok && (data as { success?: boolean }).success !== false;
+  try {
+    const data = await graphPost<{ success?: boolean }>(
+      `/${wabaId}/subscribed_apps`,
+      accessToken,
+      {}
+    );
+    return data.success !== false;
+  } catch {
+    return false;
+  }
 }
 
 export async function checkWabaSubscription(wabaId: string, accessToken: string): Promise<boolean> {
@@ -184,4 +227,25 @@ export async function checkWabaSubscription(wabaId: string, accessToken: string)
   }
 }
 
-export { GRAPH, encryptToken, decryptToken, canEncryptTokens, resolveMetaCredentials };
+export async function fetchWabaPhoneNumbers(wabaId: string, accessToken: string) {
+  return graphGet<{
+    data?: Array<{ id: string; display_phone_number?: string; verified_name?: string }>;
+  }>(`/${wabaId}/phone_numbers`, accessToken, {
+    fields: "id,display_phone_number,verified_name",
+    limit: "25",
+  });
+}
+
+export async function fetchWabaMessageTemplates(wabaId: string, accessToken: string) {
+  return graphGet<{
+    data?: Array<{
+      name: string;
+      language: string;
+      status: string;
+      category: string;
+      last_updated_time?: string;
+    }>;
+  }>(`/${wabaId}/message_templates`, accessToken, { limit: "50" });
+}
+
+export { resolveMetaCredentials, sanitizeAccessToken };

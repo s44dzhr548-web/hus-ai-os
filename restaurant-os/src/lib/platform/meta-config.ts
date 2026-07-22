@@ -4,6 +4,7 @@ import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
 import { whatsAppWebhookUrl } from "@/lib/marketing/whatsapp-business";
 import { fetchWithTimeout, isAbortError } from "@/lib/fetch-with-timeout";
 import { testWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
+import { sanitizeAccessToken } from "@/lib/marketing/whatsapp-graph-api";
 
 const CONFIG_ID = "default";
 
@@ -36,7 +37,7 @@ function envWebhookVerifyToken(): string | null {
 }
 
 function envWhatsAppAccessToken(): string | null {
-  return process.env.WHATSAPP_ACCESS_TOKEN?.trim() || null;
+  return sanitizeAccessToken(process.env.WHATSAPP_ACCESS_TOKEN);
 }
 
 export function getMetaOAuthRedirectUri(): string {
@@ -83,7 +84,7 @@ export async function resolveMetaCredentials(): Promise<MetaCredentials> {
 
   if (row?.whatsappAccessTokenEnc && canEncryptTokens()) {
     try {
-      whatsappAccessToken = decryptToken(row.whatsappAccessTokenEnc);
+      whatsappAccessToken = sanitizeAccessToken(decryptToken(row.whatsappAccessTokenEnc));
       if (source === "none") source = "database";
     } catch {
       whatsappAccessToken = null;

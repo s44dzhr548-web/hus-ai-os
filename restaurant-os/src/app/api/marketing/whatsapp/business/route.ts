@@ -4,7 +4,6 @@ import {
   requireWhatsAppBusinessReadAccess,
   requireWhatsAppBusinessOwnerAccess,
 } from "@/lib/marketing/auth";
-import { encryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
 import {
   fetchWhatsAppHubData,
   syncTemplatesFromMeta,
@@ -13,8 +12,9 @@ import {
   getOrCreateAutomation,
   automationFromRow,
   sendTestWhatsAppMessage,
-  DEFAULT_AUTOMATION,
 } from "@/lib/marketing/whatsapp-business";
+import { saveRestaurantWhatsAppConnection, connectRestaurantFromPlatformDiscovery, verifyRestaurantWhatsAppLink } from "@/lib/marketing/whatsapp-connection-service";
+import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
 
 export const dynamic = "force-dynamic";
 
@@ -65,59 +65,52 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const action = body.action as string;
 
+  if (action === "discover_platform") {
+    await connectRestaurantFromPlatformDiscovery(restaurantId!, {
+      connectedByUserId: session?.user?.id,
+    });
+    await verifyRestaurantWhatsAppLink(restaurantId!).catch(() => null);
+    return NextResponse.json({ success: true });
+  }
+
   if (action === "save_connection") {
-    if (!canEncryptTokens()) {
+    const phoneNumberId = String(body.phoneNumberId || "").trim();
+    const wabaId = String(body.wabaId || "").trim();
+    if (!phoneNumberId || !wabaId) {
+      return NextResponse.json({ error: "WABA ID و Phone Number ID مطلوبان" }, { status: 400 });
+    }
+
+    const platformToken = await resolveWhatsAppAccessToken();
+    if (!platformToken) {
       return NextResponse.json(
-        { error: "MARKETING_TOKEN_SECRET غير مضبوط للتشفير" },
+        { error: "WhatsApp Access Token غير مضبوط على مستوى المنصة" },
         { status: 503 }
       );
     }
-    const phoneNumberId = String(body.phoneNumberId || "").trim();
-    const accessToken = String(body.accessToken || "").trim();
-    if (!phoneNumberId) {
-      return NextResponse.json({ error: "Phone Number ID مطلوب" }, { status: 400 });
-    }
 
-    const existing = await prisma.whatsAppBusinessConnection.findUnique({
-      where: { restaurantId: restaurantId! },
+    await saveRestaurantWhatsAppConnection({
+      restaurantId: restaurantId!,
+      metaBusinessId: String(body.metaBusinessId || wabaId),
+      wabaId,
+      phoneNumberId,
+      displayPhoneNumber: String(body.businessPhone || body.displayPhoneNumber || ""),
+      businessName: body.businessName ? String(body.businessName) : undefined,
+      connectedByUserId: session?.user?.id,
     });
 
-    if (!accessToken && !existing?.accessTokenEnc) {
-      return NextResponse.json({ error: "Access Token مطلوب" }, { status: 400 });
-    }
-
-    const tokenEnc = accessToken ? encryptToken(accessToken) : existing!.accessTokenEnc;
-
-    const connection = await prisma.whatsAppBusinessConnection.upsert({
+    const connection = await prisma.whatsAppBusinessConnection.findUnique({
       where: { restaurantId: restaurantId! },
-      create: {
-        restaurantId: restaurantId!,
-        phoneNumberId,
-        wabaId: body.wabaId || null,
-        businessPhone: body.businessPhone || null,
-        accessTokenEnc: tokenEnc,
-        templateName: body.templateName || DEFAULT_AUTOMATION.templateName,
-        templateLanguage: body.templateLanguage || "ar",
-        isActive: true,
-        connectedByUserId: session?.user?.id,
-      },
-      update: {
-        phoneNumberId,
-        wabaId: body.wabaId || null,
-        businessPhone: body.businessPhone || null,
-        accessTokenEnc: tokenEnc,
-        templateName: body.templateName || undefined,
-        templateLanguage: body.templateLanguage || undefined,
-        isActive: true,
-      },
     });
 
     return NextResponse.json({
       connection: {
-        id: connection.id,
-        phoneNumberId: connection.phoneNumberId,
-        isActive: connection.isActive,
-        connected: true,
+        id: connection!.id,
+        phoneNumberId: connection!.phoneNumberId,
+        wabaId: connection!.wabaId,
+        businessPhone: connection!.businessPhone,
+        connectionStatus: connection!.connectionStatus,
+        isActive: connection!.isActive,
+        connected: connection!.connectionStatus === "CONNECTED",
       },
     });
   }

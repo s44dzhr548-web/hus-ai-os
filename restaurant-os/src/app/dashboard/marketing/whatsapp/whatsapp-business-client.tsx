@@ -67,12 +67,13 @@ export default function WhatsAppBusinessPage() {
     testPhone: "",
   });
   const [connection, setConnection] = useState({
+    metaBusinessId: "",
     wabaId: "",
     phoneNumberId: "",
     businessPhone: "",
-    accessToken: "",
     templateLanguage: "ar",
-    hasToken: false,
+    hasPlatformToken: false,
+    connectionStatus: "NOT_CONNECTED",
     connected: false,
   });
   const [deliveries, setDeliveries] = useState<DeliveryRow[]>([]);
@@ -133,12 +134,13 @@ export default function WhatsAppBusinessPage() {
       });
       if (data.connection) {
         setConnection({
+          metaBusinessId: data.connection.metaBusinessId || "",
           wabaId: data.connection.wabaId || "",
           phoneNumberId: data.connection.phoneNumberId || "",
-          businessPhone: data.connection.businessPhone || "",
-          accessToken: "",
+          businessPhone: data.connection.businessPhone || data.connection.displayPhoneNumber || "",
           templateLanguage: data.connection.templateLanguage || "ar",
-          hasToken: data.connection.hasToken,
+          hasPlatformToken: data.connection.hasPlatformToken ?? data.platformReady ?? false,
+          connectionStatus: data.connection.connectionStatus || "NOT_CONNECTED",
           connected: data.connection.connected,
         });
       }
@@ -234,6 +236,7 @@ export default function WhatsAppBusinessPage() {
       <MkPageHeader
         title="واتساب الأعمال"
         desc="مركز إعداد WhatsApp Business Cloud API — الاتصال، القوالب، الأتمتة، والتسليم"
+        production
       />
 
       {canEdit && (
@@ -321,9 +324,18 @@ export default function WhatsAppBusinessPage() {
               </p>
             </div>
           </div>
-          {!encryptionReady && (
-            <p className="text-xs text-amber-300">MARKETING_TOKEN_SECRET مطلوب لتشفير Access Token</p>
+          {!connection.hasPlatformToken && (
+            <p className="text-xs text-amber-300">
+              توكن WhatsApp على مستوى المنصة غير مضبوط — راجع Super Admin → Meta
+            </p>
           )}
+          <Field label="Meta Business ID" dir="ltr">
+            <input
+              value={connection.metaBusinessId}
+              disabled
+              className={inputCls}
+            />
+          </Field>
           <Field label="Business Account ID (WABA)" dir="ltr">
             <input
               value={connection.wabaId}
@@ -340,16 +352,24 @@ export default function WhatsAppBusinessPage() {
               className={inputCls}
             />
           </Field>
-          <Field label="Access Token (encrypted at rest)" dir="ltr">
+          <Field label="Display Phone" dir="ltr">
             <input
-              type="password"
-              value={connection.accessToken}
-              disabled={!canEdit}
-              onChange={(e) => setConnection({ ...connection, accessToken: e.target.value })}
-              placeholder={connection.hasToken ? "•••••••• (leave blank to keep)" : "EAA..."}
+              value={connection.businessPhone}
+              disabled
+              placeholder="—"
               className={inputCls}
             />
           </Field>
+          <Field label="Connection Status" dir="ltr">
+            <input
+              readOnly
+              value={connection.connectionStatus}
+              className={inputCls}
+            />
+          </Field>
+          <p className="text-xs text-gray-500">
+            يستخدم النظام توكن WhatsApp المشفّر على مستوى المنصة — لا يُخزَّن توكن لكل مطعم.
+          </p>
           <Field label="Webhook URL (read-only)" dir="ltr">
             <input readOnly value={webhookUrl} className={inputCls} />
           </Field>
@@ -367,7 +387,20 @@ export default function WhatsAppBusinessPage() {
           {canEdit && (
             <div className="flex flex-wrap gap-2">
               <Button onClick={saveConnection} loading={busy}>
-                Connect WhatsApp / Save
+                Save IDs
+              </Button>
+              <Button
+                variant="outline"
+                loading={busy}
+                onClick={async () => {
+                  const data = await postAction("discover_platform");
+                  if (data) {
+                    setMessage("تم ربط WhatsApp من إعدادات المنصة");
+                    load();
+                  }
+                }}
+              >
+                Link from Platform
               </Button>
               <Button
                 variant="outline"

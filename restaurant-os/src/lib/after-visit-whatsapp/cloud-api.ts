@@ -1,4 +1,5 @@
 import { buildTemplateVariables } from "./template";
+import { sanitizeAccessToken } from "@/lib/marketing/whatsapp-graph-api";
 
 export type WhatsAppSendResult =
   | { ok: true; messageId: string }
@@ -57,11 +58,16 @@ export async function sendWhatsAppTemplateMessage(params: {
     },
   };
 
+  const token = sanitizeAccessToken(params.accessToken);
+  if (!token) {
+    return { ok: false, error: "WhatsApp Access Token is required", retryable: false };
+  }
+
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${params.accessToken}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),

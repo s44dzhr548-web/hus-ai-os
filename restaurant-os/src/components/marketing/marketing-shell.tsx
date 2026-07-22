@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +13,8 @@ export function useMarketingTheme() {
 
 export function MarketingShell({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("dark");
+  const pathname = usePathname();
+  const isWhatsApp = pathname?.includes("/marketing/whatsapp");
   useEffect(() => {
     const s = localStorage.getItem("mk-theme") as Theme | null;
     if (s) setTheme(s);
@@ -38,7 +41,9 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-widest text-amber-500/90">التسويق الذكي</p>
             <p className={cn("text-xs", dark ? "text-stone-400" : "text-stone-500")}>
-              محاكاة · غير مربوط · Staging/Local فقط
+              {isWhatsApp
+                ? "WhatsApp Business Cloud API — بيانات فعلية من Meta"
+                : "محاكاة · غير مربوط · Staging/Local فقط"}
             </p>
           </div>
           <button
@@ -102,12 +107,24 @@ export function MkMetric({
   );
 }
 
-export function MkPageHeader({ title, desc }: { title: string; desc?: string }) {
+export function MkPageHeader({
+  title,
+  desc,
+  production,
+}: {
+  title: string;
+  desc?: string;
+  production?: boolean;
+}) {
   return (
     <header className="mb-6">
       <h1 className="text-xl font-bold sm:text-2xl">{title}</h1>
       {desc && <p className="mt-1 text-sm opacity-70">{desc}</p>}
-      <p className="mt-2 text-xs text-amber-500/90">محاكاة تقديرية — ليست نتيجة فعلية · غير مربوط بالمنصات</p>
+      {!production && (
+        <p className="mt-2 text-xs text-amber-500/90">
+          محاكاة تقديرية — ليست نتيجة فعلية · غير مربوط بالمنصات
+        </p>
+      )}
     </header>
   );
 }

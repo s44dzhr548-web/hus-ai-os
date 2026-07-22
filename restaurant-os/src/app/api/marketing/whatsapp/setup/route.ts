@@ -11,10 +11,19 @@ import {
   verifyWizardWebhook,
   completeWizard,
   getOrCreateWizardSession,
+  storePlatformDiscovery,
+  completeEmbeddedSignup,
+  connectRestaurantFromPlatformDiscovery,
 } from "@/lib/marketing/whatsapp-setup";
 import { syncTemplatesFromMeta } from "@/lib/marketing/whatsapp-business";
 import { sendTestWhatsAppMessage } from "@/lib/after-visit-whatsapp/service";
-import { isMetaOAuthReady, notifyPlatformAdminMetaSetup } from "@/lib/platform/meta-config";
+import {
+  isMetaOAuthReady,
+  notifyPlatformAdminMetaSetup,
+  resolveMetaCredentials,
+} from "@/lib/platform/meta-config";
+import { getEmbeddedSignupConfigId } from "@/lib/marketing/whatsapp-oauth";
+import { verifyRestaurantWhatsAppLink } from "@/lib/marketing/whatsapp-connection-service";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +31,7 @@ export async function GET() {
   const { error, restaurantId, canEdit } = await requireWhatsAppBusinessReadAccess();
   if (error) return error;
 
-  const [state, notifications, oauthReady] = await Promise.all([
+  const [state, notifications, oauthReady, creds] = await Promise.all([
     fetchWizardState(restaurantId!),
     prisma.whatsAppOwnerNotification.findMany({
       where: { restaurantId: restaurantId!, isRead: false },
@@ -30,14 +39,21 @@ export async function GET() {
       take: 10,
     }),
     isMetaOAuthReady(),
+    resolveMetaCredentials(),
   ]);
 
   return NextResponse.json({
     ...state,
-    oauthReady,
+    oauthReady: state.oauthReady,
+    metaAppId: creds.clientId,
+    embeddedSignupConfigId: getEmbeddedSignupConfigId(),
     metaOAuth: {
-      ready: oauthReady,
-      status: state.connection?.connected ? "CONNECTED" : oauthReady ? "READY" : "PENDING",
+      ready: oauthReady && state.platformTokenReady,
+      status: state.connection?.connected
+        ? "CONNECTED"
+        : oauthReady && state.platformTokenReady
+          ? "READY"
+          : "PENDING",
     },
     notifications,
     permissions: { canEdit },
@@ -67,7 +83,7 @@ export async function POST(req: NextRequest) {
 
   if (action === "save_connection") {
     const result = await finalizeWizardConnection(restaurantId!, session?.user?.id);
-    return NextResponse.json({ ok: true, ...result, state: await fetchWizardState(restaurantId!) });
+    return NextResponse.json({ ...result, state: await fetchWizardState(restaurantId!) });
   }
 
   if (action === "verify_webhook") {
@@ -131,8 +147,58 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "recheck_oauth") {
-    const ready = await isMetaOAuthReady();
-    return NextResponse.json({ oauthReady: ready });
+    const state = await fetchWizardState(restaurantId!);
+    return NextResponse.json({ oauthReady: state.oauthReady, platformTokenReady: state.platformTokenReady });
+  }
+
+  if (action === "discover_platform") {
+    const discovered = await storePlatformDiscovery(restaurantId!);
+    return NextResponse.json({
+      ok: true,
+      discovered,
+      state: await fetchWizardState(restaurantId!),
+    });
+  }
+
+  if (action === "connect_from_platform") {
+    await connectRestaurantFromPlatformDiscovery(restaurantId!, {
+      connectedByUserId: session?.user?.id,
+    });
+    await verifyRestaurantWhatsAppLink(restaurantId!).catch(() => null);
+    return NextResponse.json({ ok: true, state: await fetchWizardState(restaurantId!) });
+  }
+
+  if (action === "embedded_signup_complete") {
+    const wabaId = String(body.wabaId || "").trim();
+    const phoneNumberId = String(body.phoneNumberId || "").trim();
+    if (!wabaId || !phoneNumberId) {
+      return NextResponse.json({ error: "WABA ID و Phone Number ID مطلوبان" }, { status: 400 });
+    }
+    const result = await completeEmbeddedSignup(
+      restaurantId!,
+      {
+        wabaId,
+        phoneNumberId,
+        metaBusinessId: body.metaBusinessId ? String(body.metaBusinessId) : undefined,
+        displayPhoneNumber: body.displayPhoneNumber ? String(body.displayPhoneNumber) : undefined,
+        businessName: body.businessName ? String(body.businessName) : undefined,
+      },
+      session?.user?.id
+    );
+    await prisma.whatsAppWizardSession.update({
+      where: { restaurantId: restaurantId! },
+      data: {
+        step: 4,
+        selectedWabaId: wabaId,
+        selectedPhoneNumberId: phoneNumberId,
+        selectedDisplayPhone: body.displayPhoneNumber ? String(body.displayPhoneNumber) : undefined,
+      },
+    });
+    return NextResponse.json({
+      ok: true,
+      ...result,
+      state: await fetchWizardState(restaurantId!),
+    });
   }
 
   if (action === "sync_all") {

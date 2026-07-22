@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canEncryptTokens } from "@/lib/marketing/encryption";
 import {
-  exchangeOAuthCode,
   parseWhatsAppOAuthState,
   whatsAppOAuthConfigured,
 } from "@/lib/marketing/whatsapp-oauth";
-import { storeOAuthDiscovery } from "@/lib/marketing/whatsapp-setup";
+import { storePlatformDiscovery } from "@/lib/marketing/whatsapp-setup";
 import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +31,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { accessToken } = await exchangeOAuthCode(code);
-    const discovered = await storeOAuthDiscovery(parsed.restaurantId, accessToken);
+    const discovered = await storePlatformDiscovery(parsed.restaurantId);
     const step = discovered.phones.length === 0 ? 2 : discovered.phones.length === 1 ? 4 : 3;
     return NextResponse.redirect(`${setupUrl}?step=${step}&oauth=success`);
   } catch (e) {

@@ -1,19 +1,22 @@
-import crypto from "crypto";
 import prisma from "@/lib/prisma";
-import { encryptToken, decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
+import { resolveMetaCredentials, isMetaOAuthReady } from "@/lib/platform/meta-config";
+import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
 import {
-  discoverWhatsAppAccounts,
+  discoverWhatsAppAccountsFromPlatform,
   subscribeWabaWebhook,
   checkWabaSubscription,
-  generateVerifyToken,
+  getEmbeddedSignupConfigId,
   type DiscoveredAccounts,
   type DiscoveredPhone,
 } from "@/lib/marketing/whatsapp-oauth";
 import { syncTemplatesFromMeta, testWhatsAppConnection } from "@/lib/marketing/whatsapp-business";
 import { getOrCreateAutomation } from "@/lib/after-visit-whatsapp/service";
 import { DEFAULT_AUTOMATION } from "@/lib/after-visit-whatsapp/types";
-import { isMetaOAuthReady, resolveMetaCredentials } from "@/lib/platform/meta-config";
-import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
+import {
+  connectRestaurantFromPlatformDiscovery,
+  completeEmbeddedSignup,
+  saveRestaurantWhatsAppConnection,
+} from "@/lib/marketing/whatsapp-connection-service";
 
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 
@@ -47,12 +50,15 @@ export async function fetchWizardState(restaurantId: string) {
   ]);
 
   const discovered = (session.discoveredJson as DiscoveredAccounts | null) || { phones: [] };
-  const oauthReady = await isMetaOAuthReady();
-  const hasOAuthSession = Boolean(session.accessTokenEnc);
+  const [oauthReady, platformToken] = await Promise.all([isMetaOAuthReady(), resolveWhatsAppAccessToken()]);
+  const platformReady = oauthReady && Boolean(platformToken);
+  const hasOAuthSession = Boolean(session.accessTokenEnc || discovered.phones.length);
 
   return {
     step: session.step,
-    oauthReady,
+    oauthReady: platformReady,
+    platformTokenReady: Boolean(platformToken),
+    embeddedSignupConfigId: getEmbeddedSignupConfigId(),
     hasOAuthSession,
     discovered,
     selected: {
@@ -63,10 +69,17 @@ export async function fetchWizardState(restaurantId: string) {
     },
     connection: connection
       ? {
-          connected: Boolean(connection.isActive && connection.accessTokenEnc),
+          connected: Boolean(
+            connection.isActive &&
+              connection.phoneNumberId &&
+              connection.connectionStatus === "CONNECTED" &&
+              platformToken
+          ),
           wabaId: connection.wabaId,
           phoneNumberId: connection.phoneNumberId,
           businessPhone: connection.businessPhone,
+          metaBusinessId: connection.metaBusinessId,
+          connectionStatus: connection.connectionStatus,
         }
       : null,
     webhookReady: Boolean(profile.webhookVerifiedAt),
@@ -107,50 +120,22 @@ export async function saveWizardSelection(
 }
 
 export async function finalizeWizardConnection(restaurantId: string, userId?: string) {
-  if (!canEncryptTokens()) throw new Error("MARKETING_TOKEN_SECRET not configured");
-
   const session = await prisma.whatsAppWizardSession.findUnique({ where: { restaurantId } });
-  if (!session?.accessTokenEnc || !session.selectedPhoneNumberId || !session.selectedWabaId) {
-    throw new Error("Complete Meta login and phone selection first");
+  if (!session?.selectedPhoneNumberId || !session.selectedWabaId) {
+    throw new Error("Complete phone selection first");
   }
 
-  const verifyToken = generateVerifyToken();
-  const verifyTokenEnc = encryptToken(verifyToken);
+  const discovered = (session.discoveredJson as DiscoveredAccounts | null) || { phones: [] };
+  const phone = discovered.phones.find((p) => p.id === session.selectedPhoneNumberId);
 
-  await prisma.whatsAppBusinessConnection.upsert({
-    where: { restaurantId },
-    create: {
-      restaurantId,
-      phoneNumberId: session.selectedPhoneNumberId,
-      wabaId: session.selectedWabaId,
-      businessPhone: session.selectedDisplayPhone,
-      accessTokenEnc: session.accessTokenEnc,
-      templateName: DEFAULT_AUTOMATION.templateName,
-      isActive: true,
-      connectedByUserId: userId,
-    },
-    update: {
-      phoneNumberId: session.selectedPhoneNumberId,
-      wabaId: session.selectedWabaId,
-      businessPhone: session.selectedDisplayPhone,
-      accessTokenEnc: session.accessTokenEnc,
-      isActive: true,
-    },
-  });
-
-  await prisma.whatsAppBusinessProfile.upsert({
-    where: { restaurantId },
-    create: {
-      restaurantId,
-      businessName: session.selectedBusinessName,
-      verifyTokenEnc,
-      oauthConnectedAt: new Date(),
-    },
-    update: {
-      businessName: session.selectedBusinessName,
-      verifyTokenEnc,
-      oauthConnectedAt: new Date(),
-    },
+  await saveRestaurantWhatsAppConnection({
+    restaurantId,
+    metaBusinessId: phone?.businessId || session.selectedWabaId,
+    wabaId: session.selectedWabaId,
+    phoneNumberId: session.selectedPhoneNumberId,
+    displayPhoneNumber: session.selectedDisplayPhone || phone?.displayPhone || "",
+    businessName: session.selectedBusinessName || phone?.verifiedName,
+    connectedByUserId: userId,
   });
 
   await prisma.whatsAppWizardSession.update({
@@ -158,7 +143,7 @@ export async function finalizeWizardConnection(restaurantId: string, userId?: st
     data: { step: 5 },
   });
 
-  return { verifyToken };
+  return { ok: true };
 }
 
 export async function verifyWizardWebhook(restaurantId: string) {
@@ -315,16 +300,20 @@ export async function runWhatsAppHealthCheck(restaurantId: string) {
   return { ok, issues };
 }
 
-export async function storeOAuthDiscovery(restaurantId: string, accessToken: string) {
-  const tokenEnc = encryptToken(accessToken);
-  const discovered = await discoverWhatsAppAccounts(accessToken);
+export async function storeOAuthDiscovery(restaurantId: string, _accessToken?: string) {
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: restaurantId },
+    select: { name: true, nameAr: true },
+  });
+  const hint = restaurant?.nameAr || restaurant?.name;
+  const discovered = await discoverWhatsAppAccountsFromPlatform(hint);
 
   await getOrCreateWizardSession(restaurantId);
   await prisma.whatsAppWizardSession.update({
     where: { restaurantId },
     data: {
       step: discovered.phones.length === 1 ? 4 : 3,
-      accessTokenEnc: tokenEnc,
+      accessTokenEnc: null,
       discoveredJson: discovered as object,
       ...(discovered.phones.length === 1
         ? {
@@ -339,5 +328,11 @@ export async function storeOAuthDiscovery(restaurantId: string, accessToken: str
 
   return discovered;
 }
+
+export async function storePlatformDiscovery(restaurantId: string) {
+  return storeOAuthDiscovery(restaurantId);
+}
+
+export { connectRestaurantFromPlatformDiscovery, completeEmbeddedSignup };
 
 export type { DiscoveredPhone, DiscoveredAccounts };

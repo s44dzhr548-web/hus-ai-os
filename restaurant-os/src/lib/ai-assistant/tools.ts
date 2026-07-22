@@ -506,7 +506,7 @@ export async function executeAiTool(
         data: {
           connected,
           isActive: conn?.isActive ?? false,
-          hasToken: conn?.hasToken ?? false,
+          hasPlatformToken: conn?.hasPlatformToken ?? false,
           phoneNumberId: conn?.phoneNumberId ? "configured" : null,
           templateCount: hub.templates?.length ?? 0,
           messagesSent: hub.stats?.sent ?? 0,

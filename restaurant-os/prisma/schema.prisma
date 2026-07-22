@@ -2222,19 +2222,21 @@ enum WhatsAppDeliveryStatus {
 }
 
 model WhatsAppBusinessConnection {
-  id              String   @id @default(cuid())
-  restaurantId    String   @unique @map("restaurant_id")
-  phoneNumberId   String   @map("phone_number_id")
-  wabaId          String?  @map("waba_id")
-  businessPhone   String?  @map("business_phone")
-  accessTokenEnc  String   @map("access_token_enc")
-  templateName    String   @default("after_visit_thank_you") @map("template_name")
-  templateLanguage String  @default("ar") @map("template_language")
-  isActive        Boolean  @default(true) @map("is_active")
-  connectedAt     DateTime @default(now()) @map("connected_at")
+  id               String   @id @default(cuid())
+  restaurantId     String   @unique @map("restaurant_id")
+  metaBusinessId   String?  @map("meta_business_id")
+  phoneNumberId    String   @map("phone_number_id")
+  wabaId           String?  @map("waba_id")
+  businessPhone    String?  @map("business_phone")
+  accessTokenEnc   String?  @map("access_token_enc")
+  connectionStatus String   @default("NOT_CONNECTED") @map("connection_status")
+  templateName     String   @default("after_visit_thank_you") @map("template_name")
+  templateLanguage String   @default("ar") @map("template_language")
+  isActive         Boolean  @default(true) @map("is_active")
+  connectedAt      DateTime @default(now()) @map("connected_at")
   connectedByUserId String? @map("connected_by_user_id")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 

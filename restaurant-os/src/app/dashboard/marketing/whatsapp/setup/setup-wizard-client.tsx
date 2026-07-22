@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { MkCard, MkLoading, MkPageHeader } from "@/components/marketing/marketing-shell";
+import { WhatsAppEmbeddedSignup } from "@/components/marketing/whatsapp-embedded-signup";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -16,14 +17,30 @@ const PROGRESS = [
   { n: 6, title: "اكتمل" },
 ];
 
-const LEARN_MORE_URL = "https://developers.facebook.com/docs/whatsapp/cloud-api/get-started";
+const LEARN_MORE_URL = "https://developers.facebook.com/docs/whatsapp/embedded-signup";
 
 type WizardState = {
   step: number;
   oauthReady: boolean;
+  platformTokenReady?: boolean;
   hasOAuthSession: boolean;
-  discovered: { phones: Array<{ id: string; displayPhone: string; verifiedName: string; wabaId: string; businessName: string }> };
-  selected: { wabaId?: string; phoneNumberId?: string; businessName?: string; displayPhone?: string };
+  metaAppId?: string | null;
+  embeddedSignupConfigId?: string | null;
+  discovered: {
+    phones: Array<{
+      id: string;
+      displayPhone: string;
+      verifiedName: string;
+      wabaId: string;
+      businessName: string;
+    }>;
+  };
+  selected: {
+    wabaId?: string;
+    phoneNumberId?: string;
+    businessName?: string;
+    displayPhone?: string;
+  };
   connection: { connected: boolean } | null;
   webhookReady: boolean;
   features: Record<string, boolean>;
@@ -50,7 +67,6 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export default function SetupWizardClient() {
   const searchParams = useSearchParams();
-  const autoRedirected = useRef(false);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -88,30 +104,13 @@ export default function SetupWizardClient() {
     if (s >= 1 && s <= 8) setStep(s);
     const err = searchParams.get("error");
     if (err) {
-      setError(ERROR_MESSAGES[err] || "حدث خطأ — حاول مرة أخرى");
+      setError(ERROR_MESSAGES[err] || decodeURIComponent(err));
     }
     if (searchParams.get("oauth") === "success") {
-      setMessage("تم تسجيل الدخول إلى Meta بنجاح");
+      setMessage("تم اكتشاف حسابات WhatsApp من المنصة");
+      load();
     }
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (!state || loading || autoRedirected.current) return;
-    const oauthSuccess = searchParams.get("oauth") === "success";
-    const hasError = Boolean(searchParams.get("error"));
-    const shouldAutoLogin =
-      state.oauthReady &&
-      !state.connection?.connected &&
-      !state.hasOAuthSession &&
-      step <= 2 &&
-      !oauthSuccess &&
-      !hasError;
-
-    if (shouldAutoLogin) {
-      autoRedirected.current = true;
-      window.location.href = "/api/marketing/whatsapp/oauth/start";
-    }
-  }, [state, loading, step, searchParams]);
+  }, [searchParams, load]);
 
   async function post(action: string, extra: Record<string, unknown> = {}) {
     setBusy(true);
@@ -128,11 +127,14 @@ export default function SetupWizardClient() {
       return null;
     }
     if (data.state) {
-      setState((prev) => ({ ...prev!, ...data.state, oauthReady: data.oauthReady ?? prev!.oauthReady }));
+      setState((prev) => ({
+        ...prev!,
+        ...data.state,
+        oauthReady: data.oauthReady ?? prev!.oauthReady,
+        metaAppId: data.metaAppId ?? prev!.metaAppId,
+        embeddedSignupConfigId: data.embeddedSignupConfigId ?? prev!.embeddedSignupConfigId,
+      }));
       setStep(data.state.step || step);
-    }
-    if (data.oauthReady !== undefined) {
-      setState((prev) => (prev ? { ...prev, oauthReady: data.oauthReady } : prev));
     }
     if (data.message) setMessage(data.message);
     return data;
@@ -156,14 +158,17 @@ export default function SetupWizardClient() {
     Boolean(state.connection?.connected || state.wizardCompleted)
   );
 
-  const showPendingSetup = !state.oauthReady && step <= 2 && !state.hasOAuthSession;
-  const showReadyConnect = state.oauthReady && !state.hasOAuthSession && !state.connection?.connected && step <= 2;
+  const platformReady = state.oauthReady && state.platformTokenReady !== false;
+  const embeddedReady = Boolean(state.metaAppId && state.embeddedSignupConfigId);
+  const showPendingSetup = !platformReady && step <= 2 && !state.hasOAuthSession;
+  const showReadyConnect = platformReady && !state.connection?.connected && step <= 4;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-16">
       <MkPageHeader
         title="ربط واتساب الأعمال"
-        desc="اربط حسابك في Meta في خطوات بسيطة — بدون إعدادات تقنية"
+        desc="Meta Embedded Signup — ربط رقم WhatsApp Business الحالي (Coexistence) بدون نقل الرقم"
+        production
       />
       <Link href="/dashboard/marketing/whatsapp" className="text-sm text-emerald-400 hover:underline">
         ← واتساب الأعمال
@@ -175,11 +180,14 @@ export default function SetupWizardClient() {
             key={s.n}
             className={cn(
               "rounded-full px-3 py-1.5 text-xs font-medium",
-              progress === s.n ? "bg-emerald-600 text-white" : progress > s.n ? "bg-emerald-950 text-emerald-300" : "bg-stone-800 text-stone-400"
+              progress === s.n
+                ? "bg-emerald-600 text-white"
+                : progress > s.n
+                  ? "bg-emerald-950 text-emerald-300"
+                  : "bg-stone-800 text-stone-400"
             )}
           >
-            {s.n === 1 ? "1️⃣" : s.n === 2 ? "2️⃣" : s.n === 3 ? "3️⃣" : s.n === 4 ? "4️⃣" : s.n === 5 ? "5️⃣" : "6️⃣"}{" "}
-            {s.title}
+            {s.n}. {s.title}
           </span>
         ))}
       </div>
@@ -192,31 +200,15 @@ export default function SetupWizardClient() {
           <div>
             <h2 className="text-xl font-semibold text-white">إعداد خدمة واتساب</h2>
             <p className="mt-2 text-sm text-gray-300">
-              يحتاج النظام إلى تفعيل خدمة الربط مع Meta مرة واحدة فقط بواسطة مسؤول المنصة.
+              يحتاج النظام إلى تفعيل App ID/Secret وWhatsApp Access Token بواسطة مسؤول المنصة.
             </p>
           </div>
           <p className="text-lg">🟡 بانتظار التفعيل</p>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              loading={busy}
-              onClick={async () => {
-                const data = await post("recheck_oauth");
-                if (data?.oauthReady) {
-                  setMessage("🟢 جاهز للربط — جاري فتح تسجيل Meta...");
-                  window.location.href = "/api/marketing/whatsapp/oauth/start";
-                } else {
-                  setMessage("لا يزال بانتظار تفعيل مسؤول المنصة");
-                }
-              }}
-            >
+            <Button variant="outline" loading={busy} onClick={() => post("recheck_oauth")}>
               إعادة التحقق
             </Button>
-            <Button
-              variant="outline"
-              loading={busy}
-              onClick={() => post("notify_platform_admin")}
-            >
+            <Button variant="outline" loading={busy} onClick={() => post("notify_platform_admin")}>
               إشعار مسؤول المنصة
             </Button>
             <a href={LEARN_MORE_URL} target="_blank" rel="noopener noreferrer">
@@ -228,11 +220,57 @@ export default function SetupWizardClient() {
 
       {showReadyConnect && (
         <MkCard className="space-y-5 text-center">
-          <p className="text-lg">🟢 جاهز للربط</p>
-          <p className="text-sm text-gray-400">اضغط للمتابعة — سيتم فتح تسجيل الدخول إلى Meta</p>
-          <a href="/api/marketing/whatsapp/oauth/start">
-            <Button size="lg">ربط حساب Meta</Button>
-          </a>
+          <p className="text-lg">🟢 جاهز للربط على Production</p>
+          <p className="text-sm text-gray-400">
+            استخدم Embedded Signup لربط رقم WhatsApp Business الحالي (Coexistence) — أو الاكتشاف التلقائي من
+            توكن المنصة
+          </p>
+          {embeddedReady ? (
+            <WhatsAppEmbeddedSignup
+              appId={state.metaAppId!}
+              configId={state.embeddedSignupConfigId!}
+              disabled={busy}
+              onComplete={async (payload) => {
+                const data = await post("embedded_signup_complete", payload);
+                if (data) {
+                  setStep(4);
+                  setMessage("تم ربط WhatsApp Business بنجاح");
+                  await post("sync_all");
+                }
+              }}
+              onError={(msg) => setError(msg)}
+            />
+          ) : (
+            <p className="text-sm text-amber-300">
+              META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID غير مضبوط — استخدم الاكتشاف من المنصة
+            </p>
+          )}
+          <Button
+            variant="outline"
+            loading={busy}
+            onClick={async () => {
+              const data = await post("connect_from_platform");
+              if (data) {
+                setStep(4);
+                setMessage("تم الربط من إعدادات المنصة");
+              }
+            }}
+          >
+            ربط تلقائي من Platform Token (Fabrika / WABA)
+          </Button>
+          <Button
+            variant="outline"
+            loading={busy}
+            onClick={async () => {
+              const data = await post("discover_platform");
+              if (data?.discovered?.phones?.length) {
+                setStep(data.state?.step || 3);
+                setMessage(`تم اكتشاف ${data.discovered.phones.length} رقم`);
+              }
+            }}
+          >
+            اكتشاف حسابات WABA
+          </Button>
         </MkCard>
       )}
 
@@ -266,9 +304,13 @@ export default function SetupWizardClient() {
           {(step === 4 || (step === 3 && state.selected.phoneNumberId)) && (
             <MkCard className="space-y-4">
               <h2 className="text-xl font-semibold text-white">تأكيد الرقم</h2>
-              <div className="rounded bg-stone-900 p-3 text-sm text-gray-300 space-y-1">
-                <p><strong>الاسم:</strong> {state.selected.businessName}</p>
-                <p dir="ltr"><strong>الرقم:</strong> {state.selected.displayPhone}</p>
+              <div className="space-y-1 rounded bg-stone-900 p-3 text-sm text-gray-300">
+                <p>
+                  <strong>الاسم:</strong> {state.selected.businessName}
+                </p>
+                <p dir="ltr">
+                  <strong>الرقم:</strong> {state.selected.displayPhone}
+                </p>
               </div>
               <Button
                 loading={busy}
