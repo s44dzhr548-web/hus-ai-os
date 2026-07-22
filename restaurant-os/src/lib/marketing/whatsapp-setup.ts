@@ -9,7 +9,7 @@ import {
   type DiscoveredAccounts,
   type DiscoveredPhone,
 } from "@/lib/marketing/whatsapp-oauth";
-import { syncTemplatesFromMeta, testWhatsAppConnection } from "@/lib/marketing/whatsapp-business";
+import { syncTemplatesFromMeta, probeRestaurantWhatsAppHealth } from "@/lib/marketing/whatsapp-business";
 import { getOrCreateAutomation } from "@/lib/after-visit-whatsapp/service";
 import { DEFAULT_AUTOMATION } from "@/lib/after-visit-whatsapp/types";
 import {
@@ -128,9 +128,10 @@ export async function finalizeWizardConnection(restaurantId: string, userId?: st
   const discovered = (session.discoveredJson as DiscoveredAccounts | null) || { phones: [] };
   const phone = discovered.phones.find((p) => p.id === session.selectedPhoneNumberId);
 
+  const creds = await resolveMetaCredentials();
   await saveRestaurantWhatsAppConnection({
     restaurantId,
-    metaBusinessId: phone?.businessId || session.selectedWabaId,
+    metaBusinessId: phone?.businessId || creds.metaBusinessId || "",
     wabaId: session.selectedWabaId,
     phoneNumberId: session.selectedPhoneNumberId,
     displayPhoneNumber: session.selectedDisplayPhone || phone?.displayPhone || "",
@@ -209,74 +210,24 @@ export async function completeWizard(
 }
 
 export async function runWhatsAppHealthCheck(restaurantId: string) {
-  const [connection, profile] = await Promise.all([
-    prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } }),
-    prisma.whatsAppBusinessProfile.findUnique({ where: { restaurantId } }),
-  ]);
-
-  const issues: string[] = [];
-  let ok = true;
-
-  if (!connection?.isActive || !connection.phoneNumberId) {
-    issues.push("WhatsApp غير متصل");
-    ok = false;
-  } else {
-    const platformToken = await resolveWhatsAppAccessToken();
-    if (!platformToken) {
-      issues.push("WhatsApp Access Token is required");
-      ok = false;
-    }
-    const test = await testWhatsAppConnection(restaurantId);
-    if (!test.ok) {
-      issues.push(`Cloud API: ${test.error}`);
-      ok = false;
-    }
-    if (connection.wabaId && platformToken) {
-      try {
-        const sub = await checkWabaSubscription(connection.wabaId, platformToken);
-        if (!sub) {
-          issues.push("Webhook غير مشترك");
-          ok = false;
-        }
-      } catch {
-        issues.push("Platform token invalid");
-        ok = false;
-      }
-    }
-    try {
-      const templates = await syncTemplatesFromMeta(restaurantId);
-      if (!templates.length) {
-        issues.push("لا توجد قوالب معتمدة");
-        ok = false;
-      }
-    } catch {
-      issues.push("فشل مزامنة القوالب");
-      ok = false;
-    }
-  }
-
-  const creds = await resolveMetaCredentials();
-  if (!creds.webhookVerifyToken && !profile?.verifyTokenEnc) {
-    issues.push("Verify Token غير مضبوط");
-    ok = false;
-  }
+  const probe = await probeRestaurantWhatsAppHealth(restaurantId);
 
   await prisma.whatsAppBusinessProfile.upsert({
     where: { restaurantId },
     create: {
       restaurantId,
       lastHealthCheckAt: new Date(),
-      lastHealthOk: ok,
-      healthIssues: issues,
+      lastHealthOk: probe.ok,
+      healthIssues: probe.issues,
     },
     update: {
       lastHealthCheckAt: new Date(),
-      lastHealthOk: ok,
-      healthIssues: issues,
+      lastHealthOk: probe.ok,
+      healthIssues: probe.issues,
     },
   });
 
-  if (!ok) {
+  if (!probe.ok) {
     const existing = await prisma.whatsAppOwnerNotification.findFirst({
       where: {
         restaurantId,
@@ -291,13 +242,13 @@ export async function runWhatsAppHealthCheck(restaurantId: string) {
           restaurantId,
           kind: "HEALTH_ALERT",
           titleAr: "تنبيه واتساب الأعمال",
-          messageAr: issues.join(" · "),
+          messageAr: probe.issues.join(" · "),
         },
       });
     }
   }
 
-  return { ok, issues };
+  return { ok: probe.ok, issues: probe.issues };
 }
 
 export async function storeOAuthDiscovery(restaurantId: string, _accessToken?: string) {

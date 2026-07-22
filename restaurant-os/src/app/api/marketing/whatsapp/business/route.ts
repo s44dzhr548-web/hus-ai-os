@@ -13,8 +13,9 @@ import {
   automationFromRow,
   sendTestWhatsAppMessage,
 } from "@/lib/marketing/whatsapp-business";
-import { saveRestaurantWhatsAppConnection, connectRestaurantFromPlatformDiscovery, verifyRestaurantWhatsAppLink } from "@/lib/marketing/whatsapp-connection-service";
+import { saveRestaurantWhatsAppConnection, connectRestaurantFromPlatformDiscovery, verifyRestaurantWhatsAppLink, refreshRestaurantWhatsAppConnection } from "@/lib/marketing/whatsapp-connection-service";
 import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
+import { resolveMetaCredentials } from "@/lib/platform/meta-config";
 
 export const dynamic = "force-dynamic";
 
@@ -88,15 +89,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await saveRestaurantWhatsAppConnection({
-      restaurantId: restaurantId!,
-      metaBusinessId: String(body.metaBusinessId || wabaId),
-      wabaId,
-      phoneNumberId,
-      displayPhoneNumber: String(body.businessPhone || body.displayPhoneNumber || ""),
-      businessName: body.businessName ? String(body.businessName) : undefined,
-      connectedByUserId: session?.user?.id,
+    const creds = await resolveMetaCredentials();
+    await prisma.whatsAppBusinessConnection.upsert({
+      where: { restaurantId: restaurantId! },
+      create: {
+        restaurantId: restaurantId!,
+        metaBusinessId: String(body.metaBusinessId || creds.metaBusinessId || ""),
+        wabaId,
+        phoneNumberId,
+        businessPhone: String(body.businessPhone || body.displayPhoneNumber || ""),
+        accessTokenEnc: null,
+        connectionStatus: "NOT_CONNECTED",
+        isActive: true,
+      },
+      update: {
+        metaBusinessId: String(body.metaBusinessId || creds.metaBusinessId || ""),
+        wabaId,
+        phoneNumberId,
+        isActive: true,
+      },
     });
+
+    const refresh = await refreshRestaurantWhatsAppConnection(restaurantId!);
+    if (!refresh.ok) {
+      return NextResponse.json({ error: refresh.error || "Graph API verification failed" }, { status: 400 });
+    }
 
     const connection = await prisma.whatsAppBusinessConnection.findUnique({
       where: { restaurantId: restaurantId! },

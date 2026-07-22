@@ -12,7 +12,12 @@ import {
 } from "@/lib/after-visit-whatsapp/service";
 import { DEFAULT_AUTOMATION, DEFAULT_MESSAGE_BODY, DELAY_OPTIONS } from "@/lib/after-visit-whatsapp/types";
 import { resolveAppBaseUrl } from "@/lib/after-visit-whatsapp/review-url";
-import { runWhatsAppHealthCheck } from "@/lib/marketing/whatsapp-setup";
+import {
+  fetchWabaPhoneNumbers,
+  fetchWabaMessageTemplates,
+  checkWabaSubscription,
+} from "@/lib/marketing/whatsapp-oauth";
+import { refreshRestaurantWhatsAppConnection } from "@/lib/marketing/whatsapp-connection-service";
 
 export type WhatsAppTemplateRow = {
   name: string;
@@ -44,10 +49,9 @@ export function whatsAppWebhookUrl(): string {
 export async function fetchWhatsAppHubData(restaurantId: string) {
   void processWhatsAppQueue(20).catch(console.error);
 
-  const [automation, connection, deliveries, branches, restaurant, statusCounts, profile, notifications] =
+  const [automation, deliveries, branches, restaurant, statusCounts, profile, notifications, platformToken, creds] =
     await Promise.all([
       getOrCreateAutomation(restaurantId),
-      prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } }),
       prisma.whatsAppMessageDelivery.findMany({
         where: { restaurantId },
         orderBy: { createdAt: "desc" },
@@ -75,9 +79,16 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
         orderBy: { createdAt: "desc" },
         take: 5,
       }),
+      resolveWhatsAppAccessToken(),
+      resolveMetaCredentials(),
     ]);
 
-  void runWhatsAppHealthCheck(restaurantId).catch(console.error);
+  let connection = await prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } });
+
+  if (connection?.wabaId && connection.phoneNumberId && platformToken) {
+    await refreshRestaurantWhatsAppConnection(restaurantId).catch(() => null);
+    connection = await prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } });
+  }
 
   const countMap = Object.fromEntries(
     statusCounts.map((r) => [r.status, r._count.status])
@@ -120,22 +131,23 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
     (restaurant ? `${baseUrl}/r/${restaurant.slug}/rate` : baseUrl);
 
   let templates: WhatsAppTemplateRow[] = [];
-  const platformToken = await resolveWhatsAppAccessToken();
   if (connection?.wabaId && platformToken) {
     try {
       templates = await syncTemplatesFromMeta(restaurantId);
     } catch {
-      templates = [
-        {
-          name: connection.templateName,
-          language: connection.templateLanguage,
-          status: "CONFIGURED",
-          category: "UTILITY",
-          lastUpdated: connection.updatedAt.toISOString(),
-        },
-      ];
+      if (connection.templateName) {
+        templates = [
+          {
+            name: connection.templateName,
+            language: connection.templateLanguage,
+            status: "CONFIGURED",
+            category: "UTILITY",
+            lastUpdated: connection.updatedAt.toISOString(),
+          },
+        ];
+      }
     }
-  } else if (connection) {
+  } else if (connection?.templateName) {
     templates = [
       {
         name: connection.templateName,
@@ -152,13 +164,16 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
     (d) => d.sentAt && d.sentAt.toISOString().slice(0, 10) === today
   ).length;
 
-  const health = buildHealthChecks(
+  const probe = await probeRestaurantWhatsAppHealth(restaurantId, {
     connection,
-    templates.length,
-    profile,
-    Boolean(platformToken),
-    Boolean((await resolveMetaCredentials()).webhookVerifyToken)
-  );
+    platformToken,
+    creds,
+    templateCount: templates.length,
+  });
+  await persistHealthProfile(restaurantId, probe.ok, probe.issues);
+
+  const health = probe.health;
+  const graphConnected = probe.graphOk;
 
   return {
     automation: automationFromRow(automation),
@@ -180,7 +195,7 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
             connection.isActive &&
               connection.phoneNumberId &&
               connection.connectionStatus === "CONNECTED" &&
-              platformToken
+              graphConnected
           ),
         }
       : null,
@@ -191,7 +206,8 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
     reviewLinkExample,
     encryptionReady: canEncryptTokens(),
     webhookUrl: whatsAppWebhookUrl(),
-    webhookVerifyToken: Boolean(process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN),
+    webhookVerifyToken: Boolean(creds.webhookVerifyToken),
+    platformWebhookConfigured: Boolean(creds.webhookVerifyToken),
     platformReady: Boolean(platformToken),
     stats,
     charts: {
@@ -222,7 +238,7 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
         connection?.connectionStatus === "CONNECTED" &&
         connection?.isActive &&
         connection.phoneNumberId &&
-        platformToken
+        graphConnected
           ? "CONNECTED"
           : "NOT_CONNECTED",
       businessName: profile?.businessName || restaurant?.nameAr || restaurant?.name || "—",
@@ -231,73 +247,187 @@ export async function fetchWhatsAppHubData(restaurantId: string) {
       deliveryPercent: rates.deliveryRate,
       messagesToday,
       failures: stats.failed,
-      healthOk: profile?.lastHealthOk ?? null,
+      healthOk: probe.ok,
     },
   };
 }
 
-function buildHealthChecks(
-  connection: {
-    isActive: boolean;
-    phoneNumberId: string;
-    wabaId: string | null;
-    connectionStatus: string;
-  } | null,
-  templateCount: number,
-  profile: { verifyTokenEnc: string | null; webhookVerifiedAt: Date | null } | null,
-  hasPlatformToken: boolean,
-  platformWebhookToken: boolean
-): WhatsAppHealthCheck[] {
-  const webhookOk = Boolean(platformWebhookToken || profile?.webhookVerifiedAt);
-  const connected = Boolean(
-    connection?.isActive &&
-      connection?.phoneNumberId &&
-      connection.connectionStatus === "CONNECTED" &&
-      hasPlatformToken
-  );
+async function persistHealthProfile(restaurantId: string, ok: boolean, issues: string[]) {
+  await prisma.whatsAppBusinessProfile.upsert({
+    where: { restaurantId },
+    create: {
+      restaurantId,
+      lastHealthCheckAt: new Date(),
+      lastHealthOk: ok,
+      healthIssues: issues,
+    },
+    update: {
+      lastHealthCheckAt: new Date(),
+      lastHealthOk: ok,
+      healthIssues: issues,
+    },
+  });
+}
 
-  return [
-    {
-      id: "webhook",
-      labelAr: "Webhook",
-      ok: webhookOk,
-      detail: webhookOk ? "Verify token configured" : "WHATSAPP_WEBHOOK_VERIFY_TOKEN missing",
-    },
-    {
-      id: "cloud_api",
-      labelAr: "Cloud API",
-      ok: connected,
-      detail: connected ? "Connection active" : "Not connected",
-    },
-    {
+export async function probeRestaurantWhatsAppHealth(
+  restaurantId: string,
+  cached?: {
+    connection: {
+      wabaId: string | null;
+      phoneNumberId: string;
+      businessPhone: string | null;
+      connectionStatus: string;
+      isActive: boolean;
+    } | null;
+    platformToken: string | null;
+    creds: Awaited<ReturnType<typeof resolveMetaCredentials>>;
+    templateCount: number;
+  }
+): Promise<{ health: WhatsAppHealthCheck[]; ok: boolean; graphOk: boolean; issues: string[] }> {
+  const [connection, platformToken, creds] = cached
+    ? [cached.connection, cached.platformToken, cached.creds]
+    : await Promise.all([
+        prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } }),
+        resolveWhatsAppAccessToken(),
+        resolveMetaCredentials(),
+      ]);
+
+  const issues: string[] = [];
+  const health: WhatsAppHealthCheck[] = [];
+  const webhookConfigured = Boolean(creds.webhookVerifyToken);
+
+  health.push({
+    id: "webhook",
+    labelAr: "Webhook",
+    ok: webhookConfigured,
+    detail: webhookConfigured
+      ? "Verify token configured (platform)"
+      : "Platform webhook verify token missing — set in Super Admin → Meta",
+  });
+  if (!webhookConfigured) issues.push("Verify Token غير مضبوط على المنصة");
+
+  if (!platformToken) {
+    health.push({
       id: "token",
       labelAr: "Token Expiration",
-      ok: hasPlatformToken,
-      detail: hasPlatformToken
-        ? "Platform WhatsApp token configured"
-        : "WhatsApp Access Token is required",
-    },
-    {
-      id: "phone",
-      labelAr: "Phone Number Status",
-      ok: Boolean(connection?.phoneNumberId),
-      detail: connection?.phoneNumberId || "Phone Number ID missing",
-    },
-    {
-      id: "business",
-      labelAr: "Business Verification",
-      ok: Boolean(connection?.wabaId),
-      detail: connection?.wabaId
-        ? "WABA ID configured"
-        : "Add Business Account ID in Meta",
-    },
-    {
+      ok: false,
+      detail: "WhatsApp Access Token is required",
+    });
+    health.push({ id: "cloud_api", labelAr: "Cloud API", ok: false, detail: "Not connected" });
+    health.push({ id: "phone", labelAr: "Phone Number Status", ok: false, detail: "Phone Number ID missing" });
+    health.push({ id: "business", labelAr: "Business Verification", ok: false, detail: "WABA unreachable" });
+    health.push({
       id: "templates",
       labelAr: "Template Sync",
-      ok: templateCount > 0,
-      detail: templateCount ? `${templateCount} template(s)` : "Sync templates from Meta",
-    },
-  ];
+      ok: false,
+      detail: "Sync templates from Meta",
+    });
+    issues.push("WhatsApp Access Token is required");
+    return { health, ok: false, graphOk: false, issues };
+  }
+
+  health.push({
+    id: "token",
+    labelAr: "Token Expiration",
+    ok: true,
+    detail: "Platform WhatsApp token configured",
+  });
+
+  if (!connection?.wabaId || !connection.phoneNumberId) {
+    health.push({ id: "cloud_api", labelAr: "Cloud API", ok: false, detail: "Not connected" });
+    health.push({ id: "phone", labelAr: "Phone Number Status", ok: false, detail: "Phone Number ID missing" });
+    health.push({ id: "business", labelAr: "Business Verification", ok: false, detail: "WABA ID missing" });
+    health.push({
+      id: "templates",
+      labelAr: "Template Sync",
+      ok: false,
+      detail: "Sync templates from Meta",
+    });
+    issues.push("WhatsApp غير متصل");
+    return { health, ok: false, graphOk: false, issues };
+  }
+
+  let wabaOk = false;
+  let phoneOk = false;
+  let phoneDetail = connection.businessPhone || "—";
+  let templateCount = cached?.templateCount ?? 0;
+  let templateOk = templateCount > 0;
+
+  try {
+    const nums = await fetchWabaPhoneNumbers(connection.wabaId, platformToken);
+    const match = nums.data?.find((n) => n.id === connection.phoneNumberId);
+    wabaOk = Boolean(match);
+    if (match?.display_phone_number) phoneDetail = match.display_phone_number;
+    if (!wabaOk) issues.push("Phone not listed on WABA");
+  } catch (e) {
+    issues.push(e instanceof Error ? e.message : "WABA phone_numbers failed");
+  }
+
+  try {
+    const phone = await graphGet<{
+      display_phone_number?: string;
+      verified_name?: string;
+      quality_rating?: string;
+      status?: string;
+    }>(`/${connection.phoneNumberId}`, platformToken, {
+      fields: "display_phone_number,verified_name,quality_rating,status",
+    });
+    phoneOk = Boolean(phone.display_phone_number);
+    if (phone.display_phone_number) phoneDetail = phone.display_phone_number;
+    if (phone.status) phoneDetail = `${phoneDetail} (${phone.status})`;
+    if (!phoneOk) issues.push("Phone lookup failed");
+  } catch (e) {
+    issues.push(`Cloud API: ${e instanceof Error ? e.message : "Phone lookup failed"}`);
+  }
+
+  if (!templateOk) {
+    try {
+      const templates = await fetchWabaMessageTemplates(connection.wabaId, platformToken);
+      templateCount = templates.data?.length ?? 0;
+      templateOk = templateCount > 0;
+    } catch (e) {
+      issues.push(e instanceof Error ? e.message : "Template sync failed");
+    }
+  }
+
+  let webhookSubscribed = false;
+  if (webhookConfigured) {
+    try {
+      webhookSubscribed = await checkWabaSubscription(connection.wabaId, platformToken);
+      if (!webhookSubscribed) issues.push("Webhook غير مشترك");
+    } catch {
+      issues.push("Webhook subscription check failed");
+    }
+  }
+
+  const graphOk = wabaOk && phoneOk;
+  health.push({
+    id: "cloud_api",
+    labelAr: "Cloud API",
+    ok: graphOk,
+    detail: graphOk ? "Graph API reachable" : issues.find((i) => i.startsWith("Cloud API")) || "Not connected",
+  });
+  health.push({
+    id: "phone",
+    labelAr: "Phone Number Status",
+    ok: phoneOk,
+    detail: phoneOk ? phoneDetail : "Phone lookup failed",
+  });
+  health.push({
+    id: "business",
+    labelAr: "Business Verification",
+    ok: wabaOk,
+    detail: wabaOk ? `WABA ${connection.wabaId}` : "WABA phone_numbers failed",
+  });
+  health.push({
+    id: "templates",
+    labelAr: "Template Sync",
+    ok: templateOk,
+    detail: templateOk ? `${templateCount} template(s)` : "Template sync failed",
+  });
+
+  const ok = graphOk && webhookConfigured;
+  return { health, ok, graphOk, issues };
 }
 
 export async function syncTemplatesFromMeta(restaurantId: string): Promise<WhatsAppTemplateRow[]> {
@@ -329,36 +459,11 @@ export async function syncTemplatesFromMeta(restaurantId: string): Promise<Whats
 }
 
 export async function testWhatsAppConnection(restaurantId: string) {
-  const connection = await prisma.whatsAppBusinessConnection.findUnique({
-    where: { restaurantId },
-  });
-  if (!connection?.phoneNumberId) {
-    return { ok: false, error: "Connection not configured" };
+  const refresh = await refreshRestaurantWhatsAppConnection(restaurantId);
+  if (!refresh.ok) {
+    return { ok: false, error: refresh.error || "Connection test failed" };
   }
-
-  const accessToken = await resolveWhatsAppAccessToken();
-  if (!accessToken) {
-    return { ok: false, error: "WhatsApp Access Token is required" };
-  }
-
-  try {
-    const data = await graphGet<{ display_phone_number?: string; verified_name?: string }>(
-      `/${connection.phoneNumberId}`,
-      accessToken,
-      { fields: "display_phone_number,verified_name" }
-    );
-
-    if (data.display_phone_number) {
-      await prisma.whatsAppBusinessConnection.update({
-        where: { restaurantId },
-        data: { businessPhone: data.display_phone_number, connectionStatus: "CONNECTED" },
-      });
-    }
-
-    return { ok: true, phone: data };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Connection test failed" };
-  }
+  return { ok: true, phone: { display_phone_number: refresh.displayPhone } };
 }
 
 export async function disconnectWhatsAppBusiness(restaurantId: string) {

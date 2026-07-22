@@ -115,31 +115,102 @@ async function phoneFromLegacyToken(
   }
 }
 
+export async function refreshRestaurantWhatsAppConnection(restaurantId: string): Promise<{
+  ok: boolean;
+  displayPhone?: string;
+  wabaId?: string;
+  phoneNumberId?: string;
+  error?: string;
+}> {
+  const connection = await prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } });
+  if (!connection?.wabaId || !connection.phoneNumberId) {
+    return { ok: false, error: "Missing WABA ID or Phone Number ID" };
+  }
+
+  const token = await resolveWhatsAppAccessToken();
+  if (!token) return { ok: false, error: "WhatsApp Access Token is required" };
+
+  let displayPhone = connection.businessPhone || "";
+  let phoneVerified = false;
+
+  try {
+    const nums = await fetchWabaPhoneNumbers(connection.wabaId, token);
+    const match = nums.data?.find((n) => n.id === connection.phoneNumberId);
+    if (match) {
+      phoneVerified = true;
+      displayPhone = match.display_phone_number || displayPhone;
+    }
+  } catch {
+    /* try direct phone lookup */
+  }
+
+  if (!phoneVerified) {
+    try {
+      const phone = await graphGet<{
+        display_phone_number?: string;
+        verified_name?: string;
+        quality_rating?: string;
+        status?: string;
+      }>(`/${connection.phoneNumberId}`, token, {
+        fields: "display_phone_number,verified_name,quality_rating,status",
+      });
+      if (phone.display_phone_number) {
+        phoneVerified = true;
+        displayPhone = phone.display_phone_number;
+      }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Graph API failed" };
+    }
+  }
+
+  if (!phoneVerified) {
+    return { ok: false, error: "Phone number not found on WABA" };
+  }
+
+  await prisma.whatsAppBusinessConnection.update({
+    where: { restaurantId },
+    data: {
+      businessPhone: displayPhone,
+      connectionStatus: "CONNECTED",
+      isActive: true,
+    },
+  });
+
+  return {
+    ok: true,
+    displayPhone,
+    wabaId: connection.wabaId,
+    phoneNumberId: connection.phoneNumberId,
+  };
+}
+
 export async function saveRestaurantWhatsAppConnection(input: RestaurantWhatsAppLinkInput) {
   const platformToken = await resolveWhatsAppAccessToken();
   if (!platformToken) throw new Error("WhatsApp Access Token is required");
+
+  const creds = await resolveMetaCredentials();
+  const metaBusinessId = input.metaBusinessId || creds.metaBusinessId || null;
 
   await prisma.whatsAppBusinessConnection.upsert({
     where: { restaurantId: input.restaurantId },
     create: {
       restaurantId: input.restaurantId,
-      metaBusinessId: input.metaBusinessId,
+      metaBusinessId,
       wabaId: input.wabaId,
       phoneNumberId: input.phoneNumberId,
       businessPhone: input.displayPhoneNumber,
       accessTokenEnc: null,
-      connectionStatus: "CONNECTED",
+      connectionStatus: "NOT_CONNECTED",
       templateName: DEFAULT_AUTOMATION.templateName,
       isActive: true,
       connectedByUserId: input.connectedByUserId,
     },
     update: {
-      metaBusinessId: input.metaBusinessId,
+      metaBusinessId,
       wabaId: input.wabaId,
       phoneNumberId: input.phoneNumberId,
-      businessPhone: input.displayPhoneNumber,
+      businessPhone: input.displayPhoneNumber || undefined,
       accessTokenEnc: null,
-      connectionStatus: "CONNECTED",
       isActive: true,
     },
   });
@@ -159,10 +230,19 @@ export async function saveRestaurantWhatsAppConnection(input: RestaurantWhatsApp
     });
   }
 
+  const refresh = await refreshRestaurantWhatsAppConnection(input.restaurantId);
+  if (!refresh.ok) {
+    await prisma.whatsAppBusinessConnection.update({
+      where: { restaurantId: input.restaurantId },
+      data: { connectionStatus: "NOT_CONNECTED" },
+    });
+    throw new Error(refresh.error || "Could not verify WhatsApp phone on Graph API");
+  }
+
   await subscribeWabaWebhook(input.wabaId, platformToken);
   await syncTemplatesFromMeta(input.restaurantId).catch(() => []);
 
-  return { connectionStatus: "CONNECTED" as const };
+  return { connectionStatus: "CONNECTED" as const, displayPhoneNumber: refresh.displayPhone };
 }
 
 export async function connectRestaurantFromPlatformDiscovery(
@@ -265,7 +345,7 @@ export async function connectRestaurantFromPlatformDiscovery(
 
   return saveRestaurantWhatsAppConnection({
     restaurantId,
-    metaBusinessId: phone.businessId,
+    metaBusinessId: (await resolveMetaCredentials()).metaBusinessId || phone.businessId || "",
     wabaId: phone.wabaId,
     phoneNumberId: phone.id,
     displayPhoneNumber: phone.displayPhone,
