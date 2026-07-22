@@ -8,6 +8,7 @@ import {
   fetchWabaMessageTemplates,
   type DiscoveredPhone,
 } from "@/lib/marketing/whatsapp-oauth";
+import { graphGet } from "@/lib/marketing/whatsapp-graph-api";
 import { syncTemplatesFromMeta } from "@/lib/marketing/whatsapp-business";
 import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
 import { resolveMetaCredentials } from "@/lib/platform/meta-config";
@@ -95,7 +96,12 @@ export async function connectRestaurantFromPlatformDiscovery(
   if (!restaurant) throw new Error("Restaurant not found");
 
   const hint = opts?.nameHint || restaurant.nameAr || restaurant.name;
-  const discovered = await discoverWhatsAppAccountsFromPlatform(hint);
+  let discovered: { phones: DiscoveredPhone[] } = { phones: [] };
+  try {
+    discovered = await discoverWhatsAppAccountsFromPlatform(hint);
+  } catch {
+    /* discovery may fail — fall back to stored WABA/phone IDs */
+  }
   let phone = pickBestPhone(discovered.phones, hint);
 
   if (!phone) {
@@ -104,18 +110,43 @@ export async function connectRestaurantFromPlatformDiscovery(
     });
     const platformToken = await resolveWhatsAppAccessToken();
     if (existing?.wabaId && existing.phoneNumberId && platformToken) {
-      const nums = await fetchWabaPhoneNumbers(existing.wabaId, platformToken);
-      const match = nums.data?.find((n) => n.id === existing.phoneNumberId);
-      if (match) {
-        phone = {
-          id: existing.phoneNumberId,
-          displayPhone: match.display_phone_number || existing.businessPhone || "",
-          verifiedName: match.verified_name || hint,
-          wabaId: existing.wabaId,
-          wabaName: match.verified_name || hint,
-          businessId: existing.metaBusinessId || existing.wabaId,
-          businessName: hint,
-        };
+      try {
+        const nums = await fetchWabaPhoneNumbers(existing.wabaId, platformToken);
+        const match = nums.data?.find((n) => n.id === existing.phoneNumberId);
+        if (match) {
+          phone = {
+            id: existing.phoneNumberId,
+            displayPhone: match.display_phone_number || existing.businessPhone || "",
+            verifiedName: match.verified_name || hint,
+            wabaId: existing.wabaId,
+            wabaName: match.verified_name || hint,
+            businessId: existing.metaBusinessId || existing.wabaId,
+            businessName: hint,
+          };
+        }
+      } catch {
+        /* try direct phone lookup */
+      }
+      if (!phone) {
+        try {
+          const direct = await graphGet<{
+            display_phone_number?: string;
+            verified_name?: string;
+          }>(`/${existing.phoneNumberId}`, platformToken, {
+            fields: "display_phone_number,verified_name",
+          });
+          phone = {
+            id: existing.phoneNumberId,
+            displayPhone: direct.display_phone_number || existing.businessPhone || "",
+            verifiedName: direct.verified_name || hint,
+            wabaId: existing.wabaId,
+            wabaName: direct.verified_name || hint,
+            businessId: existing.metaBusinessId || existing.wabaId,
+            businessName: hint,
+          };
+        } catch {
+          /* fall through */
+        }
       }
     }
   }

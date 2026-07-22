@@ -161,11 +161,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "connect_from_platform") {
-    await connectRestaurantFromPlatformDiscovery(restaurantId!, {
-      connectedByUserId: session?.user?.id,
-    });
-    await verifyRestaurantWhatsAppLink(restaurantId!).catch(() => null);
-    return NextResponse.json({ ok: true, state: await fetchWizardState(restaurantId!) });
+    try {
+      await connectRestaurantFromPlatformDiscovery(restaurantId!, {
+        connectedByUserId: session?.user?.id,
+      });
+      await verifyRestaurantWhatsAppLink(restaurantId!).catch(() => null);
+      return NextResponse.json({ ok: true, state: await fetchWizardState(restaurantId!) });
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Connect failed" },
+        { status: 400 }
+      );
+    }
   }
 
   if (action === "embedded_signup_complete") {
