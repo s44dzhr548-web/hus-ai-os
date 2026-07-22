@@ -98,13 +98,6 @@ export async function resolveMetaBusinessIds(accessToken?: string): Promise<Arra
   if (!token) return [...ids.entries()].map(([id, name]) => ({ id, name }));
 
   try {
-    const me = await graphGet<{ id?: string; name?: string }>("/me", token, { fields: "id,name" });
-    if (me.id) add(me.id, me.name || "System user");
-  } catch {
-    /* skip */
-  }
-
-  try {
     const businesses = await graphGet<{ data?: Array<{ id: string; name: string }> }>(
       "/me/businesses",
       token,
@@ -157,7 +150,7 @@ export async function probeWhatsAppPlatformAccess(opts?: {
     ok: businessIds.length > 0,
     detail: businessIds.length
       ? businessIds.map((b) => `${b.name} (${b.id})`).join(" · ")
-      : "Set Meta Business ID in platform settings",
+      : "Set Meta Business Portfolio ID in platform settings (not the System User ID)",
   });
 
   const assignedWabas = await resolveAssignedWabaIds(token, opts?.wabaId);

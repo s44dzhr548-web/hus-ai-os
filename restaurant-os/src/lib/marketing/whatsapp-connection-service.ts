@@ -13,6 +13,7 @@ import { graphGet, sanitizeAccessToken } from "@/lib/marketing/whatsapp-graph-ap
 import { syncTemplatesFromMeta } from "@/lib/marketing/whatsapp-business";
 import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
 import { resolveMetaCredentials } from "@/lib/platform/meta-config";
+import { resolveMetaBusinessIds } from "@/lib/marketing/whatsapp-platform-probe";
 
 export type RestaurantWhatsAppLinkInput = {
   restaurantId: string;
@@ -248,7 +249,18 @@ export async function connectRestaurantFromPlatformDiscovery(
   }
 
   if (!phone) {
-    throw new Error("No WhatsApp Business phone numbers found for this account");
+    const hints: string[] = [];
+    const hasLegacy = Boolean(existing?.accessTokenEnc);
+    if (hasLegacy) hints.push("legacy token present but cannot reach WABA");
+    const businessIds = await resolveMetaBusinessIds();
+    if (!businessIds.length) {
+      hints.push("set Meta Business Portfolio ID in /dashboard/platform/meta");
+    }
+    hints.push("assign System User to Fabrika WABA in Meta Business Manager");
+    hints.push("or complete Embedded Signup from /dashboard/marketing/whatsapp/setup");
+    throw new Error(
+      `No WhatsApp Business phone numbers found for this account. ${hints.join("; ")}.`
+    );
   }
 
   return saveRestaurantWhatsAppConnection({
