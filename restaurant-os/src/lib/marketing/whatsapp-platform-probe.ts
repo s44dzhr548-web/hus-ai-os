@@ -16,26 +16,69 @@ async function wabaIdsFromDebugToken(
 ): Promise<string[]> {
   const appToken = `${clientId}|${clientSecret}`;
   const data = await graphGet<{
-    data?: { granular_scopes?: Array<{ scope?: string; target_ids?: string[] }> };
+    data?: {
+      type?: string;
+      scopes?: string[];
+      granular_scopes?: Array<{ scope?: string; target_ids?: string[] }>;
+    };
   }>("/debug_token", appToken, { input_token: userToken });
+
   const wabaIds: string[] = [];
   for (const scope of data.data?.granular_scopes || []) {
     if (scope.scope?.includes("whatsapp") && scope.target_ids?.length) {
       wabaIds.push(...scope.target_ids);
     }
   }
+
+  // User tokens expose scopes, not always granular_scopes — try business discovery next.
   return [...new Set(wabaIds)];
 }
 
-export async function resolveAssignedWabaIds(accessToken?: string): Promise<string[]> {
+/** Try resolving WABA IDs using app credentials (no user token on the query). */
+async function wabaIdsFromAppCredentials(
+  clientId: string,
+  clientSecret: string,
+  knownWabaId?: string
+): Promise<string[]> {
+  const appToken = `${clientId}|${clientSecret}`;
+  const ids = new Set<string>();
+  if (knownWabaId) ids.add(knownWabaId);
+
+  try {
+    const data = await graphGet<{ id?: string }>(`/${knownWabaId}`, appToken, {
+      fields: "id,name",
+    });
+    if (data.id) ids.add(data.id);
+  } catch {
+    /* app token may not read WABA */
+  }
+
+  return [...ids];
+}
+
+export async function resolveAssignedWabaIds(accessToken?: string, knownWabaId?: string): Promise<string[]> {
   const token = accessToken || (await resolveWhatsAppAccessToken());
   const creds = await resolveMetaCredentials();
-  if (!token || !creds.clientId || !creds.clientSecret) return [];
-  try {
-    return await wabaIdsFromDebugToken(token, creds.clientId, creds.clientSecret);
-  } catch {
-    return [];
+  if (!creds.clientId || !creds.clientSecret) return knownWabaId ? [knownWabaId] : [];
+
+  const ids = new Set<string>();
+  if (knownWabaId) ids.add(knownWabaId);
+
+  if (token) {
+    try {
+      for (const id of await wabaIdsFromDebugToken(token, creds.clientId, creds.clientSecret)) {
+        ids.add(id);
+      }
+    } catch {
+      /* debug_token failed */
+    }
   }
+
+  for (const id of await wabaIdsFromAppCredentials(creds.clientId, creds.clientSecret, knownWabaId)) {
+    ids.add(id);
+  }
+
+  return [...ids];
 }
 
 /** Resolve Meta Business Portfolio IDs from DB, env, and Graph /me. */
@@ -117,7 +160,7 @@ export async function probeWhatsAppPlatformAccess(opts?: {
       : "Set Meta Business ID in platform settings",
   });
 
-  const assignedWabas = await resolveAssignedWabaIds(token);
+  const assignedWabas = await resolveAssignedWabaIds(token, opts?.wabaId);
   steps.push({
     id: "debug_token_wabas",
     ok: assignedWabas.length > 0,

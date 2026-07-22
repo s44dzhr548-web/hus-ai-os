@@ -171,7 +171,7 @@ export async function discoverWhatsAppAccounts(
   const phones: DiscoveredPhone[] = [];
   const businessIds = await resolveMetaBusinessIds(token);
   const wabaHints = new Set((opts?.wabaIds || []).filter(Boolean));
-  for (const wabaId of await resolveAssignedWabaIds(token)) {
+  for (const wabaId of await resolveAssignedWabaIds(token, opts?.wabaIds?.[0])) {
     wabaHints.add(wabaId);
   }
 

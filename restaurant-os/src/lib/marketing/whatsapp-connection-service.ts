@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { DEFAULT_AUTOMATION } from "@/lib/after-visit-whatsapp/types";
+import { decryptToken, encryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
 import {
   discoverWhatsAppAccountsFromPlatform,
   subscribeWabaWebhook,
@@ -8,7 +9,7 @@ import {
   fetchWabaMessageTemplates,
   type DiscoveredPhone,
 } from "@/lib/marketing/whatsapp-oauth";
-import { graphGet } from "@/lib/marketing/whatsapp-graph-api";
+import { graphGet, sanitizeAccessToken } from "@/lib/marketing/whatsapp-graph-api";
 import { syncTemplatesFromMeta } from "@/lib/marketing/whatsapp-business";
 import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
 import { resolveMetaCredentials } from "@/lib/platform/meta-config";
@@ -33,6 +34,84 @@ function pickBestPhone(phones: DiscoveredPhone[], nameHint?: string): Discovered
     if (match) return match;
   }
   return phones[0];
+}
+
+const CONFIG_ID = "default";
+
+async function readLegacyRestaurantToken(restaurantId: string): Promise<string | null> {
+  if (!canEncryptTokens()) return null;
+  const conn = await prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } });
+  if (!conn?.accessTokenEnc) return null;
+  try {
+    return sanitizeAccessToken(decryptToken(conn.accessTokenEnc));
+  } catch {
+    return null;
+  }
+}
+
+/** One-time migration: promote working per-restaurant OAuth token to platform config. */
+async function promoteLegacyTokenToPlatform(restaurantId: string, legacyToken: string) {
+  if (!canEncryptTokens()) return;
+  const clean = sanitizeAccessToken(legacyToken);
+  if (!clean) return;
+
+  await prisma.platformMetaConfig.upsert({
+    where: { id: CONFIG_ID },
+    create: {
+      id: CONFIG_ID,
+      whatsappAccessTokenEnc: encryptToken(clean),
+    },
+    update: {
+      whatsappAccessTokenEnc: encryptToken(clean),
+    },
+  });
+
+  await prisma.whatsAppBusinessConnection.update({
+    where: { restaurantId },
+    data: { accessTokenEnc: null },
+  });
+}
+
+async function phoneFromLegacyToken(
+  legacyToken: string,
+  wabaId: string,
+  phoneNumberId: string,
+  hint: string,
+  metaBusinessId?: string | null
+): Promise<DiscoveredPhone | null> {
+  try {
+    const direct = await graphGet<{ display_phone_number?: string; verified_name?: string }>(
+      `/${phoneNumberId}`,
+      legacyToken,
+      { fields: "display_phone_number,verified_name" }
+    );
+    return {
+      id: phoneNumberId,
+      displayPhone: direct.display_phone_number || "",
+      verifiedName: direct.verified_name || hint,
+      wabaId,
+      wabaName: direct.verified_name || hint,
+      businessId: metaBusinessId || wabaId,
+      businessName: hint,
+    };
+  } catch {
+    try {
+      const nums = await fetchWabaPhoneNumbers(wabaId, legacyToken);
+      const match = nums.data?.find((n) => n.id === phoneNumberId);
+      if (!match) return null;
+      return {
+        id: phoneNumberId,
+        displayPhone: match.display_phone_number || "",
+        verifiedName: match.verified_name || hint,
+        wabaId,
+        wabaName: match.verified_name || hint,
+        businessId: metaBusinessId || wabaId,
+        businessName: hint,
+      };
+    } catch {
+      return null;
+    }
+  }
 }
 
 export async function saveRestaurantWhatsAppConnection(input: RestaurantWhatsAppLinkInput) {
@@ -147,6 +226,23 @@ export async function connectRestaurantFromPlatformDiscovery(
         } catch {
           /* fall through */
         }
+      }
+    }
+  }
+
+  if (!phone && existing?.wabaId && existing.phoneNumberId) {
+    const legacyToken = await readLegacyRestaurantToken(restaurantId);
+    if (legacyToken) {
+      const legacyPhone = await phoneFromLegacyToken(
+        legacyToken,
+        existing.wabaId,
+        existing.phoneNumberId,
+        hint,
+        existing.metaBusinessId
+      );
+      if (legacyPhone) {
+        await promoteLegacyTokenToPlatform(restaurantId, legacyToken);
+        phone = legacyPhone;
       }
     }
   }
