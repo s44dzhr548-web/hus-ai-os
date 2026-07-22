@@ -82,7 +82,11 @@ async function main() {
       body: JSON.stringify({ action: "connect_from_platform" }),
     });
     const connect = await json(connectRes);
-    record("connect_from_platform", connectRes.ok, connect.error || connect.state?.connection?.connectionStatus);
+    record(
+      "connect_from_platform",
+      connectRes.ok,
+      connect.error || connect.state?.connection?.connectionStatus || `HTTP ${connectRes.status}`
+    );
   } else if (DO_CONNECT) {
     record("connect_from_platform", false, "platform token not ready — deploy pending");
   }

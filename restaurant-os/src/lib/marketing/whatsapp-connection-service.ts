@@ -57,6 +57,7 @@ export async function saveRestaurantWhatsAppConnection(input: RestaurantWhatsApp
       wabaId: input.wabaId,
       phoneNumberId: input.phoneNumberId,
       businessPhone: input.displayPhoneNumber,
+      accessTokenEnc: null,
       connectionStatus: "CONNECTED",
       isActive: true,
     },
@@ -95,7 +96,30 @@ export async function connectRestaurantFromPlatformDiscovery(
 
   const hint = opts?.nameHint || restaurant.nameAr || restaurant.name;
   const discovered = await discoverWhatsAppAccountsFromPlatform(hint);
-  const phone = pickBestPhone(discovered.phones, hint);
+  let phone = pickBestPhone(discovered.phones, hint);
+
+  if (!phone) {
+    const existing = await prisma.whatsAppBusinessConnection.findUnique({
+      where: { restaurantId },
+    });
+    const platformToken = await resolveWhatsAppAccessToken();
+    if (existing?.wabaId && existing.phoneNumberId && platformToken) {
+      const nums = await fetchWabaPhoneNumbers(existing.wabaId, platformToken);
+      const match = nums.data?.find((n) => n.id === existing.phoneNumberId);
+      if (match) {
+        phone = {
+          id: existing.phoneNumberId,
+          displayPhone: match.display_phone_number || existing.businessPhone || "",
+          verifiedName: match.verified_name || hint,
+          wabaId: existing.wabaId,
+          wabaName: match.verified_name || hint,
+          businessId: existing.metaBusinessId || existing.wabaId,
+          businessName: hint,
+        };
+      }
+    }
+  }
+
   if (!phone) {
     throw new Error("No WhatsApp Business phone numbers found for this account");
   }
