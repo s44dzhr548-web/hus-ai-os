@@ -13,6 +13,7 @@ export type MetaCredentials = {
   clientSecret: string | null;
   webhookVerifyToken: string | null;
   whatsappAccessToken: string | null;
+  metaBusinessId: string | null;
   source: "database" | "environment" | "none";
   facebookAppName: string | null;
 };
@@ -104,6 +105,7 @@ export async function resolveMetaCredentials(): Promise<MetaCredentials> {
     clientSecret,
     webhookVerifyToken,
     whatsappAccessToken,
+    metaBusinessId: row?.metaBusinessId || process.env.META_BUSINESS_ID?.trim() || null,
     source,
     facebookAppName: row?.facebookAppName || null,
   };
@@ -125,6 +127,7 @@ export async function getPlatformMetaAdminView(opts?: { skipHealth?: boolean }) 
   return {
     facebookAppName: creds.facebookAppName,
     clientId: creds.clientId,
+    metaBusinessId: creds.metaBusinessId,
     hasClientSecret: Boolean(creds.clientSecret),
     hasWhatsAppAccessToken: Boolean(creds.whatsappAccessToken),
     redirectUri: getMetaOAuthRedirectUri(),
@@ -144,6 +147,7 @@ export async function savePlatformMetaConfig(input: {
   clientSecret?: string;
   webhookVerifyToken?: string;
   whatsappAccessToken?: string;
+  metaBusinessId?: string;
   userId?: string;
 }) {
   if (!canEncryptTokens()) {
@@ -159,6 +163,7 @@ export async function savePlatformMetaConfig(input: {
     clientSecretEnc?: string;
     webhookVerifyTokenEnc?: string;
     whatsappAccessTokenEnc?: string;
+    metaBusinessId?: string | null;
     updatedByUserId?: string;
   } = { updatedByUserId: input.userId };
 
@@ -175,7 +180,10 @@ export async function savePlatformMetaConfig(input: {
     data.webhookVerifyTokenEnc = encryptToken(input.webhookVerifyToken.trim());
   }
   if (input.whatsappAccessToken?.trim()) {
-    data.whatsappAccessTokenEnc = encryptToken(input.whatsappAccessToken.trim());
+    data.whatsappAccessTokenEnc = encryptToken(sanitizeAccessToken(input.whatsappAccessToken.trim())!);
+  }
+  if (input.metaBusinessId !== undefined) {
+    data.metaBusinessId = input.metaBusinessId.trim() || null;
   }
 
   if (!existing && !data.clientId && !envClientId()) {
@@ -191,6 +199,7 @@ export async function savePlatformMetaConfig(input: {
       clientSecretEnc: data.clientSecretEnc ?? null,
       webhookVerifyTokenEnc: data.webhookVerifyTokenEnc ?? null,
       whatsappAccessTokenEnc: data.whatsappAccessTokenEnc ?? null,
+      metaBusinessId: data.metaBusinessId ?? null,
       updatedByUserId: input.userId,
     },
     update: data,

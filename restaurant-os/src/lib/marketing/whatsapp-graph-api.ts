@@ -2,10 +2,20 @@
 export const WHATSAPP_GRAPH_VERSION = "v23.0";
 export const WHATSAPP_GRAPH = `https://graph.facebook.com/${WHATSAPP_GRAPH_VERSION}`;
 
-/** Strip quotes, Bearer prefix, and whitespace from stored tokens. */
+/** Strip quotes, Bearer prefix, JSON wrappers, and control chars from stored tokens. */
 export function sanitizeAccessToken(raw: string | null | undefined): string | null {
   if (!raw) return null;
   let token = String(raw).trim();
+
+  if (token.startsWith("{") && token.includes("access_token")) {
+    try {
+      const parsed = JSON.parse(token) as { access_token?: string };
+      if (typeof parsed.access_token === "string") token = parsed.access_token.trim();
+    } catch {
+      /* keep raw */
+    }
+  }
+
   if (
     (token.startsWith('"') && token.endsWith('"')) ||
     (token.startsWith("'") && token.endsWith("'"))
@@ -15,6 +25,7 @@ export function sanitizeAccessToken(raw: string | null | undefined): string | nu
   if (/^bearer\s+/i.test(token)) {
     token = token.replace(/^bearer\s+/i, "").trim();
   }
+  token = token.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
   return token || null;
 }
 

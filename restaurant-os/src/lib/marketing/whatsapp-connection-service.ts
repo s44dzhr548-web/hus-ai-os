@@ -96,18 +96,18 @@ export async function connectRestaurantFromPlatformDiscovery(
   if (!restaurant) throw new Error("Restaurant not found");
 
   const hint = opts?.nameHint || restaurant.nameAr || restaurant.name;
+  const existing = await prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } });
+  const wabaHints = existing?.wabaId ? [existing.wabaId] : [];
+
   let discovered: { phones: DiscoveredPhone[] } = { phones: [] };
   try {
-    discovered = await discoverWhatsAppAccountsFromPlatform(hint);
+    discovered = await discoverWhatsAppAccountsFromPlatform(hint, wabaHints);
   } catch {
     /* discovery may fail — fall back to stored WABA/phone IDs */
   }
   let phone = pickBestPhone(discovered.phones, hint);
 
   if (!phone) {
-    const existing = await prisma.whatsAppBusinessConnection.findUnique({
-      where: { restaurantId },
-    });
     const platformToken = await resolveWhatsAppAccessToken();
     if (existing?.wabaId && existing.phoneNumberId && platformToken) {
       try {
@@ -190,7 +190,7 @@ export async function completeEmbeddedSignup(
     businessName = businessName || match?.verified_name || "";
   }
 
-  const metaBusinessId = payload.metaBusinessId || process.env.META_BUSINESS_ID?.trim() || "";
+  const metaBusinessId = payload.metaBusinessId || (await resolveMetaCredentials()).metaBusinessId || "";
 
   const result = await saveRestaurantWhatsAppConnection({
     restaurantId,

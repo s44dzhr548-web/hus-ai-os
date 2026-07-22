@@ -1,6 +1,7 @@
 import { sanitizeAccessToken, graphGet, graphPost } from "@/lib/marketing/whatsapp-graph-api";
 import { resolveMetaCredentials, getMetaOAuthRedirectUri, isMetaOAuthReady } from "@/lib/platform/meta-config";
 import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
+import { resolveMetaBusinessIds, resolveAssignedWabaIds } from "@/lib/marketing/whatsapp-platform-probe";
 import crypto from "crypto";
 
 export const WHATSAPP_OAUTH_SCOPES = [
@@ -103,90 +104,106 @@ export type DiscoveredAccounts = {
 
 async function listWabasForBusiness(businessId: string, accessToken: string) {
   const wabas: Array<{ id: string; name?: string }> = [];
+  const seen = new Set<string>();
+  const add = (items: Array<{ id: string; name?: string }> | undefined) => {
+    for (const item of items || []) {
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        wabas.push(item);
+      }
+    }
+  };
+
   try {
     const owned = await graphGet<{ data?: Array<{ id: string; name?: string }> }>(
       `/${businessId}/owned_whatsapp_business_accounts`,
       accessToken,
       { fields: "id,name", limit: "25" }
     );
-    wabas.push(...(owned.data || []));
+    add(owned.data);
   } catch {
     /* try client accounts */
   }
-  if (!wabas.length) {
-    try {
-      const client = await graphGet<{ data?: Array<{ id: string; name?: string }> }>(
-        `/${businessId}/client_whatsapp_business_accounts`,
-        accessToken,
-        { fields: "id,name", limit: "25" }
-      );
-      wabas.push(...(client.data || []));
-    } catch {
-      /* skip */
-    }
+  try {
+    const client = await graphGet<{ data?: Array<{ id: string; name?: string }> }>(
+      `/${businessId}/client_whatsapp_business_accounts`,
+      accessToken,
+      { fields: "id,name", limit: "25" }
+    );
+    add(client.data);
+  } catch {
+    /* skip */
   }
   return wabas;
 }
 
+async function phonesFromWaba(
+  wabaId: string,
+  wabaName: string,
+  businessId: string,
+  businessName: string,
+  accessToken: string
+): Promise<DiscoveredPhone[]> {
+  const nums = await graphGet<{
+    data?: Array<{ id: string; display_phone_number?: string; verified_name?: string }>;
+  }>(`/${wabaId}/phone_numbers`, accessToken, {
+    fields: "id,display_phone_number,verified_name",
+    limit: "25",
+  });
+  return (nums.data || []).map((n) => ({
+    id: n.id,
+    displayPhone: n.display_phone_number || "",
+    verifiedName: n.verified_name || wabaName || businessName,
+    wabaId,
+    wabaName,
+    businessId,
+    businessName,
+  }));
+}
+
 export async function discoverWhatsAppAccounts(
   accessToken: string,
-  opts?: { nameHint?: string }
+  opts?: { nameHint?: string; wabaIds?: string[] }
 ): Promise<DiscoveredAccounts> {
   const token = sanitizeAccessToken(accessToken);
   if (!token) return { phones: [] };
 
   const phones: DiscoveredPhone[] = [];
-  const businessIds: Array<{ id: string; name: string }> = [];
-
-  try {
-    const businesses = await graphGet<{ data?: Array<{ id: string; name: string }> }>(
-      "/me/businesses",
-      token,
-      { fields: "id,name", limit: "25" }
-    );
-    for (const biz of businesses.data || []) {
-      businessIds.push({ id: biz.id, name: biz.name });
-    }
-  } catch {
-    /* system user may not have /me/businesses */
-  }
-
-  const envBusinessId = process.env.META_BUSINESS_ID?.trim();
-  if (!businessIds.length && envBusinessId) {
-    businessIds.push({ id: envBusinessId, name: "Meta Business" });
+  const businessIds = await resolveMetaBusinessIds(token);
+  const wabaHints = new Set((opts?.wabaIds || []).filter(Boolean));
+  for (const wabaId of await resolveAssignedWabaIds(token)) {
+    wabaHints.add(wabaId);
   }
 
   for (const biz of businessIds) {
     const wabas = await listWabasForBusiness(biz.id, token);
     for (const waba of wabas) {
+      wabaHints.add(waba.id);
       try {
-        const nums = await graphGet<{
-          data?: Array<{ id: string; display_phone_number?: string; verified_name?: string }>;
-        }>(`/${waba.id}/phone_numbers`, token, {
-          fields: "id,display_phone_number,verified_name",
-          limit: "25",
-        });
-        for (const n of nums.data || []) {
-          phones.push({
-            id: n.id,
-            displayPhone: n.display_phone_number || "",
-            verifiedName: n.verified_name || waba.name || biz.name,
-            wabaId: waba.id,
-            wabaName: waba.name || "",
-            businessId: biz.id,
-            businessName: biz.name,
-          });
-        }
+        phones.push(...(await phonesFromWaba(waba.id, waba.name || "", biz.id, biz.name, token)));
       } catch {
         /* skip waba */
       }
     }
   }
 
+  for (const wabaId of wabaHints) {
+    if (phones.some((p) => p.wabaId === wabaId)) continue;
+    try {
+      phones.push(
+        ...(await phonesFromWaba(wabaId, "", businessIds[0]?.id || wabaId, businessIds[0]?.name || "WABA", token))
+      );
+    } catch {
+      /* direct WABA probe failed */
+    }
+  }
+
   if (opts?.nameHint) {
     const hint = opts.nameHint.toLowerCase();
     const matched = phones.filter((p) =>
-      [p.verifiedName, p.wabaName, p.businessName].some((s) => s?.toLowerCase().includes(hint))
+      [p.verifiedName, p.wabaName, p.businessName, p.displayPhone].some((s) =>
+        s?.toLowerCase().includes(hint)
+      )
     );
     if (matched.length) return { phones: matched };
   }
@@ -195,10 +212,13 @@ export async function discoverWhatsAppAccounts(
 }
 
 /** Discover WABAs using platform System User token (production path). */
-export async function discoverWhatsAppAccountsFromPlatform(nameHint?: string): Promise<DiscoveredAccounts> {
+export async function discoverWhatsAppAccountsFromPlatform(
+  nameHint?: string,
+  wabaIds?: string[]
+): Promise<DiscoveredAccounts> {
   const token = await resolveWhatsAppAccessToken();
   if (!token) throw new Error("WhatsApp Access Token is required");
-  return discoverWhatsAppAccounts(token, { nameHint });
+  return discoverWhatsAppAccounts(token, { nameHint, wabaIds });
 }
 
 export function generateVerifyToken(): string {

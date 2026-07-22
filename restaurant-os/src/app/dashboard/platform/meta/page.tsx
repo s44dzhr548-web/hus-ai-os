@@ -13,6 +13,7 @@ type Alert = { id: string; title: string; message: string; createdAt: string };
 type MetaView = {
   facebookAppName: string | null;
   clientId: string | null;
+  metaBusinessId: string | null;
   hasClientSecret: boolean;
   hasWhatsAppAccessToken: boolean;
   redirectUri: string;
@@ -65,6 +66,7 @@ export default function PlatformMetaPage() {
   const [form, setForm] = useState({
     facebookAppName: "",
     clientId: "",
+    metaBusinessId: "",
     clientSecret: "",
     webhookVerifyToken: "",
     whatsappAccessToken: "",
@@ -80,6 +82,7 @@ export default function PlatformMetaPage() {
         setForm({
           facebookAppName: d.facebookAppName || "",
           clientId: d.clientId || "",
+          metaBusinessId: d.metaBusinessId || "",
           clientSecret: "",
           webhookVerifyToken: "",
           whatsappAccessToken: "",
@@ -243,6 +246,16 @@ export default function PlatformMetaPage() {
           <Input
             value={form.clientId}
             onChange={(e) => setForm({ ...form, clientId: e.target.value })}
+            className="mt-1 font-mono text-sm"
+            dir="ltr"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="text-gray-600">Meta Business Portfolio ID (للاكتشاف التلقائي لـ WABA)</span>
+          <Input
+            value={form.metaBusinessId}
+            onChange={(e) => setForm({ ...form, metaBusinessId: e.target.value })}
+            placeholder={view?.metaBusinessId || "Business Manager → Business Settings → Business Info"}
             className="mt-1 font-mono text-sm"
             dir="ltr"
           />

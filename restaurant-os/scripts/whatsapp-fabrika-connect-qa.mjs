@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
  * Fabrika WhatsApp connect + verify on production (upserts connection metadata only).
- * Usage: node scripts/whatsapp-fabrika-connect-qa.mjs [baseUrl]
  */
 const BASE = process.argv[2] || "https://restaurant-os-nine.vercel.app";
 const ADMIN_EMAIL = process.env.QA_ADMIN_EMAIL || "admin@menuos.sa";
@@ -53,11 +52,10 @@ async function switchFabrika(cookie) {
     headers: { Cookie: cookie, "Content-Type": "application/json" },
     body: JSON.stringify({ restaurantId: fab.id }),
   });
-  const next = [
+  return [
     ...cookie.split("; ").filter(Boolean),
     ...(sw.headers.getSetCookie?.() || []).map((c) => c.split(";")[0]),
   ].join("; ");
-  return next;
 }
 
 async function main() {
@@ -65,31 +63,39 @@ async function main() {
 
   let cookie = await login();
   record("Authentication", !!cookie);
-  cookie = await switchFabrika(cookie);
-  record("Switched to Fabrika", true, FABRIKA_SLUG);
 
-  const setupBefore = await json(
-    await fetch(`${BASE}/api/marketing/whatsapp/setup`, { headers: { Cookie: cookie } })
-  );
-  record("Setup API", true, `platformTokenReady=${setupBefore.platformTokenReady}`);
-  record("New deploy fields", setupBefore.platformTokenReady !== undefined, "platformTokenReady present");
-  record("No token in API payload", !JSON.stringify(setupBefore).match(/EAA[A-Za-z0-9]/), "owner-safe");
-
-  if (DO_CONNECT && setupBefore.platformTokenReady) {
-    const connectRes = await fetch(`${BASE}/api/marketing/whatsapp/setup`, {
+  if (DO_CONNECT) {
+    const probeRes = await fetch(`${BASE}/api/platform/meta`, {
       method: "POST",
       headers: { Cookie: cookie, "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "connect_from_platform" }),
+      body: JSON.stringify({ action: "probe_whatsapp", restaurantSlug: FABRIKA_SLUG }),
     });
-    const connect = await json(connectRes);
+    const probe = await json(probeRes);
+    if (probeRes.ok) {
+      const debugStep = probe.steps?.find((s) => s.id === "debug_token_wabas");
+      record("Platform WABA probe", Boolean(debugStep?.ok), debugStep?.detail || "probe ok");
+    } else {
+      record("Platform WABA probe", false, probe.error || `HTTP ${probeRes.status}`);
+    }
+
+    const linkRes = await fetch(`${BASE}/api/platform/meta`, {
+      method: "POST",
+      headers: { Cookie: cookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "link_restaurant_whatsapp", restaurantSlug: FABRIKA_SLUG }),
+    });
+    const link = await json(linkRes);
     record(
-      "connect_from_platform",
-      connectRes.ok,
-      connect.error || connect.state?.connection?.connectionStatus || `HTTP ${connectRes.status}`
+      "Platform link Fabrika",
+      linkRes.ok,
+      link.connection?.displayPhoneNumber ||
+        link.connection?.connectionStatus ||
+        link.error ||
+        `HTTP ${linkRes.status}`
     );
-  } else if (DO_CONNECT) {
-    record("connect_from_platform", false, "platform token not ready — deploy pending");
   }
+
+  cookie = await switchFabrika(cookie);
+  record("Switched to Fabrika", true, FABRIKA_SLUG);
 
   const biz = await json(
     await fetch(`${BASE}/api/marketing/whatsapp/business`, { headers: { Cookie: cookie } })
@@ -111,6 +117,7 @@ async function main() {
     biz.health?.find((h) => h.id === "token")?.detail
   );
   record("Templates", (biz.templates?.length ?? 0) > 0, `${biz.templates?.length ?? 0} templates`);
+  record("No token in API payload", !JSON.stringify(biz).match(/EAA[A-Za-z0-9]/), "owner-safe");
 
   const page = await fetch(`${BASE}/dashboard/marketing/whatsapp`, {
     headers: { Cookie: cookie },

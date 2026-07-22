@@ -306,7 +306,11 @@ export async function storeOAuthDiscovery(restaurantId: string, _accessToken?: s
     select: { name: true, nameAr: true },
   });
   const hint = restaurant?.nameAr || restaurant?.name;
-  const discovered = await discoverWhatsAppAccountsFromPlatform(hint);
+  const existing = await prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId } });
+  const discovered = await discoverWhatsAppAccountsFromPlatform(
+    hint,
+    existing?.wabaId ? [existing.wabaId] : undefined
+  );
 
   await getOrCreateWizardSession(restaurantId);
   await prisma.whatsAppWizardSession.update({

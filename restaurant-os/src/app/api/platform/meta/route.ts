@@ -6,6 +6,8 @@ import {
   testPlatformMetaConnection,
   runPlatformMetaHealthCheck,
 } from "@/lib/platform/meta-config";
+import { probeWhatsAppPlatformAccess } from "@/lib/marketing/whatsapp-platform-probe";
+import { connectRestaurantFromPlatformDiscovery } from "@/lib/marketing/whatsapp-connection-service";
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +40,7 @@ export async function PATCH(req: NextRequest) {
       clientSecret: body.clientSecret,
       webhookVerifyToken: body.webhookVerifyToken,
       whatsappAccessToken: body.whatsappAccessToken,
+      metaBusinessId: body.metaBusinessId,
       userId: session!.user.id,
     });
 
@@ -51,7 +54,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { error } = await requirePlatformAdmin();
+  const { session, error } = await requirePlatformAdmin();
   if (error) return error;
 
   try {
@@ -77,6 +80,60 @@ export async function POST(req: NextRequest) {
     if (action === "refresh_health") {
       const health = await runPlatformMetaHealthCheck();
       return NextResponse.json({ health });
+    }
+
+    if (action === "probe_whatsapp") {
+      const restaurantSlug = String(body.restaurantSlug || "fabrika-mqkat9dw");
+      const restaurant = await prisma.restaurant.findFirst({
+        where: { slug: restaurantSlug },
+        select: { id: true },
+      });
+      const connection = restaurant
+        ? await prisma.whatsAppBusinessConnection.findUnique({ where: { restaurantId: restaurant.id } })
+        : null;
+      const probe = await probeWhatsAppPlatformAccess({
+        wabaId: connection?.wabaId || undefined,
+        phoneNumberId: connection?.phoneNumberId || undefined,
+      });
+      return NextResponse.json(probe);
+    }
+
+    if (action === "link_restaurant_whatsapp") {
+      const restaurantSlug = String(body.restaurantSlug || "fabrika-mqkat9dw");
+      const restaurant = await prisma.restaurant.findFirst({
+        where: { slug: restaurantSlug },
+        select: { id: true, name: true, nameAr: true },
+      });
+      if (!restaurant) {
+        return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
+      }
+      try {
+        const result = await connectRestaurantFromPlatformDiscovery(restaurant.id, {
+          nameHint: restaurant.nameAr || restaurant.name,
+          connectedByUserId: session!.user.id,
+        });
+        const connection = await prisma.whatsAppBusinessConnection.findUnique({
+          where: { restaurantId: restaurant.id },
+        });
+        return NextResponse.json({
+          ok: true,
+          result,
+          connection: connection
+            ? {
+                metaBusinessId: connection.metaBusinessId,
+                wabaId: connection.wabaId,
+                phoneNumberId: connection.phoneNumberId,
+                displayPhoneNumber: connection.businessPhone,
+                connectionStatus: connection.connectionStatus,
+              }
+            : null,
+        });
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Link failed" },
+          { status: 400 }
+        );
+      }
     }
 
     return NextResponse.json({ error: "إجراء غير مدعوم" }, { status: 400 });
