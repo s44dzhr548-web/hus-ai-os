@@ -35,6 +35,7 @@
     "test:marketing": "tsx scripts/marketing-ai-test.ts",
     "test:marketing-center": "tsx scripts/marketing-center-test.ts",
     "test:fabrika-regression": "node scripts/fabrika-regression-test.mjs",
+    "test:whatsapp-inbox-qa": "node scripts/whatsapp-inbox-qa.mjs",
     "test:customer-nav-qa": "node scripts/customer-nav-qa.mjs",
     "test:gifts-qa": "node scripts/gifts-health-qa.mjs",
     "test:wishes-qa": "node scripts/wishes-qa.mjs",

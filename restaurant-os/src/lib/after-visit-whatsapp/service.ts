@@ -2,6 +2,7 @@ import type { WhatsAppDeliveryStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { canEncryptTokens } from "@/lib/marketing/encryption";
 import { resolveWhatsAppAccessToken } from "@/lib/platform/whatsapp-access-token";
+import { recordAfterVisitOutboundMessage } from "@/lib/whatsapp-inbox/service";
 import { sendWhatsAppTemplateMessage } from "./cloud-api";
 import { normalizeWhatsAppPhone, isValidCustomerPhone } from "./phone";
 import { buildReviewUrl, resolveAppBaseUrl } from "./review-url";
@@ -324,6 +325,16 @@ export async function processWhatsAppDeliveryById(deliveryId: string) {
   });
 
   if (result.ok) {
+    void recordAfterVisitOutboundMessage({
+      restaurantId: delivery.restaurantId,
+      waId: delivery.phone.replace(/\D/g, ""),
+      phoneNumberId: connection.phoneNumberId,
+      wabaId: connection.wabaId,
+      templateName: delivery.templateName,
+      providerMessageId: result.messageId,
+      previewText: `after_visit:${delivery.templateName}`,
+    }).catch(() => null);
+
     return prisma.whatsAppMessageDelivery.update({
       where: { id: deliveryId },
       data: {

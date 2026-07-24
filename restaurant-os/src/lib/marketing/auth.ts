@@ -78,6 +78,28 @@ export async function requireWhatsAppBusinessOwnerAccess() {
   return { ...result, canEdit: true };
 }
 
+/** Inbox read/write — restaurant-scoped WhatsApp conversations */
+export const WHATSAPP_INBOX_ROLES = ["OWNER", "ADMIN", "MANAGER", "MARKETING", "RECEPTION"] as const;
+
+export async function requireWhatsAppInboxAccess() {
+  const { restaurantId, session, error } = await requireRestaurantRole([...WHATSAPP_INBOX_ROLES]);
+  if (error) return { error, restaurantId: null, session: null, canSend: false };
+
+  const featureErr = await assertFeature(restaurantId!, "marketing");
+  if (featureErr) return { error: featureErr, restaurantId: null, session: null, canSend: false };
+
+  const role = session?.user?.role;
+  const canSend =
+    role === "OWNER" ||
+    role === "ADMIN" ||
+    role === "MANAGER" ||
+    role === "RECEPTION" ||
+    role === "MARKETING" ||
+    isPlatformAdminUser(session!.user);
+
+  return { error: null, restaurantId: restaurantId!, session, canSend };
+}
+
 export const MARKETING_ROUTE_PREFIX = "/dashboard/marketing";
 
 export async function requireAdsPlatformReadAccess() {

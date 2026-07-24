@@ -25,6 +25,7 @@ import {
   Sparkles,
   Music,
   Bot,
+  MessageCircle,
 } from "lucide-react";
 import {
   PLATFORM_ADMIN_ROLE,
@@ -45,6 +46,7 @@ export interface NavItem {
 /** Routes marketing staff may access */
 export const MARKETING_STAFF_ROUTES = [
   "/dashboard/marketing",
+  "/dashboard/whatsapp/inbox",
 ];
 
 /** Routes reception staff may access */
@@ -57,6 +59,7 @@ export const RECEPTION_STAFF_ROUTES = [
   "/dashboard/wishes",
   "/dashboard/song-requests",
   "/dashboard/ai-assistant",
+  "/dashboard/whatsapp/inbox",
   "/dashboard/staff/activity",
   "/dashboard/staff/login-history",
 ];
@@ -93,6 +96,7 @@ export const restaurantNavItems: NavItem[] = [
   { href: "/dashboard/branding", label: "Landing Page Builder", icon: Palette, roles: ["OWNER", "ADMIN"] },
   { href: "/dashboard/media", label: "مركز الوسائط", icon: Images, roles: ["OWNER", "ADMIN", "MANAGER"] },
   { href: "/dashboard/marketing", label: "التسويق الذكي", icon: Megaphone, roles: ["OWNER", "ADMIN", "MARKETING", "MANAGER"] },
+  { href: "/dashboard/whatsapp/inbox", label: "WhatsApp Inbox", icon: MessageCircle, roles: ["OWNER", "ADMIN", "MARKETING", "MANAGER", "RECEPTION"] },
   { href: "/dashboard/menu/options", label: "الخيارات والإضافات", icon: ListTree, roles: ["OWNER", "ADMIN", "MANAGER"] },
   { href: "/dashboard/orders", label: "الطلبات", icon: ClipboardList, roles: ["OWNER", "ADMIN", "MANAGER", "CASHIER", "KITCHEN", "WAITER"] },
   { href: "/dashboard/kitchen", label: "المطبخ", icon: ChefHat, roles: ["OWNER", "ADMIN", "MANAGER", "KITCHEN"] },
@@ -109,6 +113,7 @@ export const MANAGER_WHATSAPP_MARKETING_ROUTES = [
   "/dashboard/marketing/whatsapp",
   "/dashboard/marketing/automations",
   "/dashboard/marketing/campaigns",
+  "/dashboard/whatsapp/inbox",
 ];
 
 function managerWhatsAppMarketingAllowed(pathname: string): boolean {
