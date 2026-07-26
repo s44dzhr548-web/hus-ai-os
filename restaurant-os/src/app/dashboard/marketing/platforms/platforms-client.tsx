@@ -173,8 +173,8 @@ export default function PlatformsClient({
     if (searchParams.get("connected") === "google" && searchParams.get("success") === "1") {
       setMessage(
         searchParams.get("google_campaigns") === "pending_dev_token"
-          ? "✓ تم ربط Google Ads — قراءة الحملات تنتظر إضافة GOOGLE_ADS_DEVELOPER_TOKEN على الخادم"
-          : "✓ تم ربط Google Ads بنجاح"
+          ? "تم ربط حساب Google، وتنتظر قراءة الحملات إضافة Google Ads Developer Token"
+          : "تم ربط Google Ads بنجاح"
       );
       void load();
     } else if (searchParams.get("success") === "1" && searchParams.get("connected") !== "google") {
@@ -289,34 +289,75 @@ export default function PlatformsClient({
   }
 
   function startGoogleOAuth() {
-    window.location.href = GOOGLE_CONNECT_HREF;
+    void runGoogleOAuthConnect();
+  }
+
+  async function runGoogleOAuthConnect() {
+    if (busy) return;
+    setBusy("GOOGLE-oauth");
+    setMessage("");
+    try {
+      const res = await fetch(GOOGLE_CONNECT_HREF, {
+        redirect: "manual",
+        credentials: "include",
+      });
+      const loc = res.headers.get("location") || "";
+
+      if (loc.includes("ads.google.com/aw/accountaccess")) {
+        setMessage("مسار الربط غير صحيح — يجب استخدام OAuth عبر /api/integrations/google/connect");
+        return;
+      }
+
+      if (
+        (res.status === 307 || res.status === 302) &&
+        loc.includes("accounts.google.com/o/oauth2")
+      ) {
+        window.location.assign(loc);
+        return;
+      }
+
+      let data: { error?: string; missingEnv?: string[] } = {};
+      try {
+        data = await res.json();
+      } catch {
+        /* not json */
+      }
+
+      if (res.status === 503 && data.missingEnv?.length) {
+        setMessage(`إعداد ناقص: ${data.missingEnv.join("، ")}`);
+        return;
+      }
+      if (res.status === 401 || res.status === 403) {
+        setMessage(data.error || "صلاحية المالك أو مدير المطعم مطلوبة لربط Google Ads");
+        return;
+      }
+      if (data.error) {
+        setMessage(data.error);
+        return;
+      }
+
+      window.location.assign(GOOGLE_CONNECT_HREF);
+    } finally {
+      setBusy("");
+    }
   }
 
   function renderGoogleActions(p: PlatformCard) {
     const connected = p.status === "CONNECTED";
     const canAct = canConnect || canEdit;
+    const googleBusy = busy === "GOOGLE-oauth";
 
-    const recheckBtn = canConnect ? (
+    const recheckBtn = (
       <Button
         key="recheck"
         size="sm"
         variant="outline"
         type="button"
-        loading={busy === `${p.key}-recheck`}
+        loading={googleBusy}
+        disabled={googleBusy}
         onClick={() => startGoogleOAuth()}
       >
         إعادة التحقق / الربط
-      </Button>
-    ) : (
-      <Button
-        key="recheck"
-        size="sm"
-        variant="outline"
-        type="button"
-        loading={busy === `${p.key}-recheck`}
-        onClick={() => action(p.key, "recheck")}
-      >
-        إعادة التحقق
       </Button>
     );
 
@@ -333,19 +374,14 @@ export default function PlatformsClient({
       </Button>
     );
 
-    const connectBtn = canConnect ? (
-      <Button key="connect" size="sm" type="button" onClick={() => startGoogleOAuth()}>
-        Connect Account
-      </Button>
-    ) : (
+    const connectBtn = (
       <Button
-        key="connect-info"
+        key="connect"
         size="sm"
         type="button"
-        variant="outline"
-        onClick={() =>
-          setMessage("صلاحية المالك أو مدير المطعم مطلوبة لربط حساب Google Ads")
-        }
+        loading={googleBusy}
+        disabled={googleBusy}
+        onClick={() => startGoogleOAuth()}
       >
         Connect Account
       </Button>
@@ -363,7 +399,14 @@ export default function PlatformsClient({
           >
             Sync Now
           </Button>
-          <Button size="sm" variant="outline" type="button" onClick={() => startGoogleOAuth()}>
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            loading={googleBusy}
+            disabled={googleBusy}
+            onClick={() => startGoogleOAuth()}
+          >
             Reconnect
           </Button>
           <Button

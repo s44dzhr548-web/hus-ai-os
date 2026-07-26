@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdsPlatformConnectAccess } from "@/lib/marketing/auth";
 import {
   buildGoogleOAuthAuthorizeUrl,
-  isGoogleOAuthReady,
+  listMissingGoogleOAuthEnv,
   resolveGoogleOAuthCredentials,
 } from "@/lib/marketing/google-ads-oauth-service";
 
@@ -18,24 +18,33 @@ function jsonUtf8(body: object, status: number) {
 
 /** Google Ads OAuth — server-side authorize redirect (not ads.google.com console URLs). */
 export async function GET() {
-  const { error, restaurantId } = await requireAdsPlatformConnectAccess();
+  const { error, restaurantId, session } = await requireAdsPlatformConnectAccess();
   if (error) return error;
 
-  if (!isGoogleOAuthReady()) {
-    const creds = resolveGoogleOAuthCredentials();
+  const missingEnv = listMissingGoogleOAuthEnv();
+  if (missingEnv.length > 0) {
     return jsonUtf8(
       {
-        error: "Google OAuth غير مهيأ — أضف GOOGLE_CLIENT_ID وGOOGLE_CLIENT_SECRET وGOOGLE_REDIRECT_URI",
+        error: `إعداد Google OAuth ناقص — أضف: ${missingEnv.join("، ")}`,
         ready: false,
-        hasClientId: Boolean(creds?.clientId),
+        missingEnv,
       },
       503
     );
   }
 
-  const url = buildGoogleOAuthAuthorizeUrl(restaurantId!);
-  if (!url) {
+  const userId = session?.user?.id;
+  if (!userId) {
+    return jsonUtf8({ error: "جلسة غير صالحة" }, 401);
+  }
+
+  const url = buildGoogleOAuthAuthorizeUrl(restaurantId!, userId);
+  if (!url || !resolveGoogleOAuthCredentials()) {
     return jsonUtf8({ error: "تعذّر إنشاء رابط Google OAuth" }, 503);
+  }
+
+  if (url.includes("ads.google.com")) {
+    return jsonUtf8({ error: "مسار OAuth غير صالح" }, 500);
   }
 
   return NextResponse.redirect(url, 307);

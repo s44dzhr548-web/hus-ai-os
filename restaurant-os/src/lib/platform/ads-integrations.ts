@@ -5,7 +5,7 @@ import {
   getMetaAdsOAuthRedirectUri,
   isValidMetaAppId,
 } from "@/lib/platform/meta-ads-env";
-import { getCanonicalGoogleRedirectUri } from "@/lib/marketing/google-ads-oauth-service";
+import { getCanonicalGoogleRedirectUri, sanitizeGoogleRedirectOverride } from "@/lib/marketing/google-ads-oauth-service";
 import { fetchWithTimeout, isAbortError } from "@/lib/fetch-with-timeout";
 
 export const ADS_INTEGRATION_KEYS = [
@@ -210,7 +210,7 @@ export async function resolveAdsIntegration(platformKey: AdsIntegrationKey): Pro
     platformKey === "META"
       ? getMetaAdsOAuthRedirectUri()
       : platformKey === "GOOGLE"
-        ? row?.redirectUriOverride ||
+        ? sanitizeGoogleRedirectOverride(row?.redirectUriOverride) ||
           getCanonicalGoogleRedirectUri()
         : row?.redirectUriOverride || getAdsOAuthRedirectUri(platformKey);
 
