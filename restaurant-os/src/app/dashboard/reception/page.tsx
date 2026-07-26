@@ -148,6 +148,7 @@ function WalkInTableInput({
   availableTables,
   showPicker,
   onTogglePicker,
+  allowManualEntry = true,
 }: {
   tableNumber: string;
   onTableNumberChange: (v: string) => void;
@@ -156,9 +157,11 @@ function WalkInTableInput({
   availableTables: TableCard[];
   showPicker: boolean;
   onTogglePicker: () => void;
+  allowManualEntry?: boolean;
 }) {
   return (
     <div className="space-y-2" data-testid="walkin-table-input">
+      {allowManualEntry && (
       <label className="block text-sm font-medium text-gray-700">
         رقم الطاولة *
         <input
@@ -176,6 +179,7 @@ function WalkInTableInput({
           data-testid="manual-table-number"
         />
       </label>
+      )}
       <button
         type="button"
         onClick={onTogglePicker}
@@ -184,7 +188,7 @@ function WalkInTableInput({
       >
         {showPicker ? "إخفاء قائمة الطاولات" : "اختيار من الطاولات"}
       </button>
-      {showPicker && (
+      {(showPicker || !allowManualEntry) && (
         <label className="block text-sm font-medium text-gray-700">
           الطاولة من القائمة
           <select
@@ -219,10 +223,12 @@ function TableModeToggle({
   mode,
   onChange,
   idPrefix,
+  allowManual = true,
 }: {
   mode: TableMode;
   onChange: (m: TableMode) => void;
   idPrefix: string;
+  allowManual?: boolean;
 }) {
   return (
     <fieldset className="space-y-2" data-testid={`${idPrefix}-table-mode-toggle`}>
@@ -244,6 +250,7 @@ function TableModeToggle({
           />
           اختيار طاولة موجودة
         </label>
+        {allowManual && (
         <label
           className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-3 text-sm ${
             mode === "manual"
@@ -262,6 +269,7 @@ function TableModeToggle({
           />
           إدخال يدوي
         </label>
+        )}
       </div>
     </fieldset>
   );
@@ -363,9 +371,10 @@ export default function ReceptionPage() {
   const [sortBy, setSortBy] = useState("sortOrder");
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [canManageTableStructure, setCanManageTableStructure] = useState(true);
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [showTablePicker, setShowTablePicker] = useState(false);
-  const [tableMode, setTableMode] = useState<TableMode>("manual");
+  const [tableMode, setTableMode] = useState<TableMode>("existing");
   const [editTarget, setEditTarget] = useState<{ card: TableCard; mode: EditModal } | null>(null);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
   const [auditLogs, setAuditLogs] = useState<
@@ -423,6 +432,7 @@ export default function ReceptionPage() {
     setCards(data.cards || []);
     setPresentGuests(data.presentGuests || []);
     setBranches(data.branches || []);
+    setCanManageTableStructure(data.permissions?.canManageTableStructure !== false);
     if (!branchId && data.branches?.[0]) setBranchId(data.branches[0].id);
   }, [branchId, sortBy]);
 
@@ -877,6 +887,7 @@ export default function ReceptionPage() {
             availableTables={availableTables}
             showPicker={showTablePicker}
             onTogglePicker={() => setShowTablePicker((v) => !v)}
+            allowManualEntry={canManageTableStructure}
           />
 
           <label className="block text-sm font-medium">
@@ -1009,6 +1020,7 @@ export default function ReceptionPage() {
                   mode={editForm.tableMode}
                   onChange={(m) => setEditForm({ ...editForm, tableMode: m })}
                   idPrefix="move"
+                  allowManual={canManageTableStructure}
                 />
                 {editForm.tableMode === "existing" ? (
                   <select

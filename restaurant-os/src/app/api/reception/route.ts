@@ -20,7 +20,7 @@ import { menuUrlForTable } from "@/lib/table-code";
 import { requestMeta } from "@/lib/request-meta";
 import { onCustomerRegistered } from "@/lib/visit-tracking";
 import { fetchPresentGuests } from "@/lib/present-guests";
-import { assertManualTableAllowed } from "@/lib/reception-permissions";
+import { assertManualTableAllowed, staffCanManageTableStructure } from "@/lib/reception-permissions";
 import type { TableSessionStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 const RECEPTION_ROLES = ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "CASHIER", "WAITER"];
 
 export async function GET(req: NextRequest) {
-  const { restaurantId, error } = await requireRestaurantRole(RECEPTION_ROLES);
+  const { restaurantId, session, error, isPlatformAdmin } = await requireRestaurantRole(RECEPTION_ROLES);
   if (error) return error;
 
   const featureErr = await assertFeature(restaurantId!, "reception");
@@ -95,9 +95,16 @@ export async function GET(req: NextRequest) {
 
   const presentGuests = await fetchPresentGuests(restaurantId!, branchId);
 
+  const canManageTableStructure = await staffCanManageTableStructure(
+    session!.user.id,
+    restaurantId!,
+    isPlatformAdmin
+  );
+
   return NextResponse.json({
     cards,
     presentGuests,
+    permissions: { canManageTableStructure },
     branches: await prisma.branch.findMany({
       where: { restaurantId: restaurantId!, isActive: true },
       select: { id: true, name: true, nameAr: true },
