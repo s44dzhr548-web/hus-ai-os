@@ -14,9 +14,9 @@ export default async function SlugTableHomePage({
 
   const table = await prisma.diningTable.findFirst({
     where: {
-      tableCode,
       isActive: true,
       branch: { restaurant: { slug }, isActive: true },
+      OR: [{ id: tableCode }, { tableCode }],
     },
     include: {
       branch: {

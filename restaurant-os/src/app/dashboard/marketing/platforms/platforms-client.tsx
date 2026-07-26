@@ -34,6 +34,7 @@ type PlatformCard = {
   integrationReady: boolean;
   showConnectButton?: boolean;
   connectUrl?: string | null;
+  setupHint?: string | null;
   businessName: string | null;
   accountName: string | null;
   accountId: string | null;
@@ -133,10 +134,12 @@ type PlatformsClientProps = {
 export default function PlatformsClient({
   initialPlatforms = [],
   initialCanConnect = false,
+  initialCanEdit = false,
 }: PlatformsClientProps) {
   const searchParams = useSearchParams();
   const [platforms, setPlatforms] = useState<PlatformCard[]>(initialPlatforms);
   const [canConnect, setCanConnect] = useState(initialCanConnect);
+  const [canEdit, setCanEdit] = useState(initialCanEdit);
   const [loading, setLoading] = useState(initialPlatforms.length === 0);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
@@ -154,6 +157,7 @@ export default function PlatformsClient({
     if (res.ok) {
       setPlatforms(data.platforms || []);
       setCanConnect(data.permissions?.canConnect ?? false);
+      setCanEdit(data.permissions?.canEdit ?? false);
     }
     setLoading(false);
   }, []);
@@ -278,52 +282,92 @@ export default function PlatformsClient({
     const connected = p.status === "CONNECTED";
     const pending = p.status === "PENDING_SETUP";
     const connectHref = p.connectUrl || `/api/marketing/connections/${p.key.toLowerCase()}/oauth`;
+    const canAct = canConnect || canEdit;
 
-    if (canConnect && !pending && !connected && p.integrationReady) {
-      return (
-        <a href={connectHref}>
-          <Button size="sm">Connect Account</Button>
-        </a>
-      );
-    }
-    if (canConnect && pending) {
+    const recheckBtn = (
+      <Button
+        key="recheck"
+        size="sm"
+        variant="outline"
+        type="button"
+        loading={busy === `${p.key}-recheck`}
+        onClick={() => action(p.key, "recheck")}
+      >
+        إعادة التحقق
+      </Button>
+    );
+
+    const notifyBtn = (
+      <Button
+        key="notify"
+        size="sm"
+        variant="outline"
+        type="button"
+        loading={busy === `${p.key}-notify_admin`}
+        onClick={() => action(p.key, "notify_admin")}
+      >
+        إشعار مسؤول المنصة
+      </Button>
+    );
+
+    const connectBtn = canConnect ? (
+      <a key="connect" href={connectHref} className="inline-flex">
+        <Button size="sm" type="button">
+          Connect Account
+        </Button>
+      </a>
+    ) : (
+      <Button
+        key="connect-info"
+        size="sm"
+        type="button"
+        variant="outline"
+        onClick={() =>
+          setMessage("صلاحية المالك أو مدير المطعم مطلوبة لربط حساب الإعلانات")
+        }
+      >
+        Connect Account
+      </Button>
+    );
+
+    if (connected && canConnect) {
       return (
         <>
-          <Button size="sm" variant="outline" loading={busy === `${p.key}-recheck`} onClick={() => load()}>
-            إعادة التحقق
-          </Button>
           <Button
             size="sm"
             variant="outline"
-            loading={busy === `${p.key}-notify_admin`}
-            onClick={() => action(p.key, "notify_admin")}
+            type="button"
+            loading={busy === `${p.key}-sync`}
+            onClick={() => action(p.key, "sync")}
           >
-            إشعار مسؤول المنصة
-          </Button>
-        </>
-      );
-    }
-    if (canConnect && connected) {
-      return (
-        <>
-          <Button size="sm" variant="outline" loading={busy === `${p.key}-sync`} onClick={() => action(p.key, "sync")}>
             Sync Now
           </Button>
           <a href={connectHref}>
-            <Button size="sm" variant="outline">Reconnect</Button>
+            <Button size="sm" variant="outline" type="button">
+              Reconnect
+            </Button>
           </a>
           <Button
             size="sm"
             variant="outline"
+            type="button"
             loading={busy === `${p.key}-disconnect`}
             onClick={() => action(p.key, "disconnect")}
           >
             Disconnect
           </Button>
+          {recheckBtn}
         </>
       );
     }
-    return null;
+
+    return (
+      <>
+        {recheckBtn}
+        {canAct && notifyBtn}
+        {!connected && connectBtn}
+      </>
+    );
   }
 
   if (loading && platforms.length === 0) return <MkLoading />;
@@ -417,9 +461,10 @@ export default function PlatformsClient({
                 </p>
               ) : !connected ? (
                 <p className="mb-4 text-sm text-stone-400">
-                  {p.integrationReady
-                    ? "اربط حسابك للبدء في إنشاء الحملات."
-                    : "يحتاج مسؤول المنصة لتفعيل الربط."}
+                  {p.setupHint ||
+                    (p.integrationReady
+                      ? "اربط حسابك للبدء في إنشاء الحملات."
+                      : "يحتاج مسؤول المنصة لتفعيل الربط.")}
                 </p>
               ) : null}
 

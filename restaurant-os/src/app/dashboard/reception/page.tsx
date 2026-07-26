@@ -675,7 +675,7 @@ export default function ReceptionPage() {
       {(arrivedGuests.length > 0 || checkedInGuests.length > 0 || seatedGuests.length > 0) && (
         <Card className="space-y-4 p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">الحاضرون اليوم</h2>
+            <h2 className="text-lg font-bold">العملاء الموجودون حالياً</h2>
             <Link href="/dashboard/reservations" className="text-sm text-emerald-700 hover:underline">
               إدارة الحجوزات
             </Link>

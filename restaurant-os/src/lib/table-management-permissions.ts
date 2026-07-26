@@ -89,7 +89,7 @@ export async function requireTableManagement(requestedRestaurantId?: string | nu
       ...result,
       error: NextResponse.json(
         {
-          error: "إدارة الطاولات متاحة لمالك المطعم فقط",
+          error: "ليس لديك صلاحية لإدارة الطاولات",
           code: "TABLE_MANAGEMENT_FORBIDDEN",
         },
         { status: 403 }

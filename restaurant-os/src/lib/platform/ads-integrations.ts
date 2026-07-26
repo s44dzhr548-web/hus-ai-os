@@ -167,7 +167,9 @@ export async function resolveAdsIntegration(platformKey: AdsIntegrationKey): Pro
         envOrNull(def.envClientId);
       if (clientId && !isValidMetaAppId(clientId)) clientId = null;
     } else {
-      clientId = envOrNull(def.envClientId);
+      clientId =
+        envOrNull(def.envClientId) ||
+        (platformKey === "GOOGLE" ? envOrNull("GOOGLE_CLIENT_ID") : null);
     }
     if (clientId) source = "environment";
   }
@@ -187,7 +189,9 @@ export async function resolveAdsIntegration(platformKey: AdsIntegrationKey): Pro
         envOrNull("META_ADS_CLIENT_SECRET") ||
         envOrNull(def.envClientSecret);
     } else {
-      clientSecret = envOrNull(def.envClientSecret);
+      clientSecret =
+        envOrNull(def.envClientSecret) ||
+        (platformKey === "GOOGLE" ? envOrNull("GOOGLE_CLIENT_SECRET") : null);
     }
     if (clientSecret && source === "none") source = "environment";
   }
@@ -204,7 +208,12 @@ export async function resolveAdsIntegration(platformKey: AdsIntegrationKey): Pro
   const redirectUri =
     platformKey === "META"
       ? getMetaAdsOAuthRedirectUri()
-      : row?.redirectUriOverride || getAdsOAuthRedirectUri(platformKey);
+      : platformKey === "GOOGLE"
+        ? row?.redirectUriOverride ||
+          envOrNull("GOOGLE_REDIRECT_URI") ||
+          envOrNull("GOOGLE_ADS_REDIRECT_URI") ||
+          getAdsOAuthRedirectUri(platformKey)
+        : row?.redirectUriOverride || getAdsOAuthRedirectUri(platformKey);
 
   return {
     platformKey,
@@ -222,6 +231,26 @@ export async function resolveAdsIntegration(platformKey: AdsIntegrationKey): Pro
 export async function isAdsIntegrationReady(platformKey: AdsIntegrationKey): Promise<boolean> {
   const creds = await resolveAdsIntegration(platformKey);
   return Boolean(creds.isEnabled && creds.clientId && creds.clientSecret);
+}
+
+/** OAuth may work without developer token; Ads API calls need the token. */
+export function googleAdsDeveloperTokenConfigured(): boolean {
+  return Boolean(
+    envOrNull("GOOGLE_ADS_DEVELOPER_TOKEN") || envOrNull("GOOGLE_DEVELOPER_TOKEN")
+  );
+}
+
+export function googleAdsSetupHint(): string | null {
+  if (!envOrNull("GOOGLE_ADS_CLIENT_ID") && !envOrNull("GOOGLE_CLIENT_ID")) {
+    return "إعداد Google Ads غير مكتمل: Client ID غير مضاف";
+  }
+  if (!envOrNull("GOOGLE_ADS_CLIENT_SECRET") && !envOrNull("GOOGLE_CLIENT_SECRET")) {
+    return "إعداد Google Ads غير مكتمل: Client Secret غير مضاف";
+  }
+  if (!googleAdsDeveloperTokenConfigured()) {
+    return "إعداد Google Ads غير مكتمل: Developer Token غير مضاف";
+  }
+  return null;
 }
 
 export async function getAdsIntegrationsAdminView() {

@@ -20,6 +20,7 @@ import {
   serializeCheckinResponse,
 } from "@/lib/reservation-checkin";
 import { fetchPresentGuests } from "@/lib/present-guests";
+import { staffCanManageTableStructure } from "@/lib/reception-permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -116,11 +117,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const { restaurantId, session, error } = await requireRestaurantRole(RECEPTION_ROLES);
+  const { restaurantId, session, error, isPlatformAdmin } = await requireRestaurantRole(RECEPTION_ROLES);
   if (error) return error;
 
   const featureErr = await assertFeature(restaurantId!, "reception");
   if (featureErr) return featureErr;
+
+  const allowManualTable = await staffCanManageTableStructure(
+    session!.user.id,
+    restaurantId!,
+    isPlatformAdmin
+  );
 
   const reservation = await prisma.reservation.findFirst({
     where: { id, restaurantId: restaurantId! },
@@ -223,7 +230,15 @@ export async function PATCH(
 
   if (action === "assign_table") {
     try {
-      const table = await resolveReservationTable(restaurantId!, reservation, body);
+      if (body.manualTable?.number && !allowManualTable) {
+        return NextResponse.json(
+          { error: "ليس لديك صلاحية لإدارة الطاولات", code: "TABLE_MANAGEMENT_FORBIDDEN" },
+          { status: 403 }
+        );
+      }
+      const table = await resolveReservationTable(restaurantId!, reservation, body, {
+        allowManualTable,
+      });
       if (!table) {
         return NextResponse.json({ error: "الطاولة غير موجودة" }, { status: 400 });
       }
@@ -256,15 +271,12 @@ export async function PATCH(
       if (!["ARRIVED", "CHECKED_IN", "SEATED", "CONVERTED"].includes(reservation.status)) {
         updated = await markReservationArrived(id, restaurantId!);
       }
-      updated = await assignReservationTable(
-        id,
-        restaurantId!,
-        table,
-        staff,
-        minSpend
-      );
+      updated = await assignReservationTable(id, restaurantId!, table, staff, minSpend);
 
-      return NextResponse.json(await withPresentGuests(updated));
+      return NextResponse.json({
+        ...(await withPresentGuests(updated)),
+        message: "✓ تم تأكيد الوصول وتعيين الطاولة",
+      });
     } catch (e) {
       return NextResponse.json(
         { error: e instanceof Error ? e.message : "فشل تعيين الطاولة" },
@@ -293,7 +305,15 @@ export async function PATCH(
 
   if (action === "confirm_arrival" || action === "check_in") {
     try {
-      const table = await resolveReservationTable(restaurantId!, reservation, body);
+      if (body.manualTable?.number && !allowManualTable) {
+        return NextResponse.json(
+          { error: "ليس لديك صلاحية لإدارة الطاولات", code: "TABLE_MANAGEMENT_FORBIDDEN" },
+          { status: 403 }
+        );
+      }
+      const table = await resolveReservationTable(restaurantId!, reservation, body, {
+        allowManualTable,
+      });
       if (!table) {
         return NextResponse.json({ error: "الطاولة مطلوبة لتأكيد الوصول" }, { status: 400 });
       }
@@ -307,9 +327,12 @@ export async function PATCH(
           body.guestCount != null ? parseInt(String(body.guestCount), 10) : undefined,
         req,
       });
-      return NextResponse.json(
-        await withPresentGuests(result.reservation, result.session)
-      );
+      return NextResponse.json({
+        ...(await withPresentGuests(result.reservation, result.session)),
+        message: result.idempotent
+          ? "✓ العميل مسجّل مسبقاً في هذه الطاولة"
+          : "✓ تم تأكيد الوصول — يظهر في العملاء الموجودون حالياً",
+      });
     } catch (e) {
       return NextResponse.json(
         { error: e instanceof Error ? e.message : "فشل تأكيد الوصول" },
@@ -320,7 +343,15 @@ export async function PATCH(
 
   if (action === "convert" || action === "seat") {
     try {
-      const table = await resolveReservationTable(restaurantId!, reservation, body);
+      if (body.manualTable?.number && !allowManualTable) {
+        return NextResponse.json(
+          { error: "ليس لديك صلاحية لإدارة الطاولات", code: "TABLE_MANAGEMENT_FORBIDDEN" },
+          { status: 403 }
+        );
+      }
+      const table = await resolveReservationTable(restaurantId!, reservation, body, {
+        allowManualTable,
+      });
       if (!table) {
         return NextResponse.json(
           { error: "يجب تعيين طاولة قبل التحويل" },

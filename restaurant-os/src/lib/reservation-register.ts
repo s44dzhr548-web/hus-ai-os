@@ -99,8 +99,16 @@ export function buildReservationWhere(q: ReservationQuery): Prisma.ReservationWh
         where.date = { gte: today.start, lte: weekEnd.end };
         break;
       case "upcoming":
-        where.date = { gte: today.start };
-        where.status = { in: ACTIVE_STATUSES };
+        where.AND = [
+          { status: { in: ACTIVE_STATUSES } },
+          {
+            OR: [
+              { date: { gte: today.start } },
+              { checkedInAt: { gte: today.start, lte: today.end } },
+              { arrivedAt: { gte: today.start, lte: today.end } },
+            ],
+          },
+        ];
         break;
       case "arrived":
         where.status = { in: ["ARRIVED", "CHECKED_IN"] };

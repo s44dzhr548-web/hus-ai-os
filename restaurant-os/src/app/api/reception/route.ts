@@ -20,6 +20,7 @@ import { menuUrlForTable } from "@/lib/table-code";
 import { requestMeta } from "@/lib/request-meta";
 import { onCustomerRegistered } from "@/lib/visit-tracking";
 import { fetchPresentGuests } from "@/lib/present-guests";
+import { assertManualTableAllowed } from "@/lib/reception-permissions";
 import type { TableSessionStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -105,7 +106,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { restaurantId, session, error } = await requireRestaurantRole(RECEPTION_ROLES);
+  const { restaurantId, session, error, isPlatformAdmin } = await requireRestaurantRole(RECEPTION_ROLES);
   if (error) return error;
 
   const featureErr = await assertFeature(restaurantId!, "reception");
@@ -131,6 +132,12 @@ export async function POST(req: NextRequest) {
 
   let table;
   if (manualTable?.number) {
+    const forbidden = await assertManualTableAllowed(
+      session!.user.id,
+      restaurantId!,
+      isPlatformAdmin
+    );
+    if (forbidden) return forbidden;
     const targetBranch =
       branchId ||
       manualTable.branchId ||

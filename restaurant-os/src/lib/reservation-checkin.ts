@@ -11,7 +11,6 @@ import { effectiveMinimumSpend } from "@/lib/table-meta";
 import { displayTableNumber } from "@/lib/table-number-normalize";
 import { onCustomerRegistered } from "@/lib/visit-tracking";
 import { requestMeta } from "@/lib/request-meta";
-import { recordReservationStatusChange } from "@/lib/reservation-audit";
 import type { NextRequest } from "next/server";
 
 type StaffCtx = { userId?: string; userName?: string };
@@ -32,9 +31,13 @@ function tableSnapshot(table: DiningTable) {
 export async function resolveReservationTable(
   restaurantId: string,
   reservation: Reservation,
-  body: { tableId?: string; manualTable?: Record<string, unknown> }
+  body: { tableId?: string; manualTable?: Record<string, unknown> },
+  opts?: { allowManualTable?: boolean }
 ): Promise<DiningTable | null> {
   if (body.manualTable?.number) {
+    if (opts?.allowManualTable === false) {
+      throw new Error("ليس لديك صلاحية لإدارة الطاولات");
+    }
     const { upsertManualTable } = await import("@/lib/table-meta");
     const targetBranch =
       reservation.branchId ||
@@ -116,9 +119,10 @@ export async function assignReservationTable(
   restaurantId: string,
   table: DiningTable,
   staff: StaffCtx,
-  minimumSpendAmount?: number | null
+  minimumSpendAmount?: number | null,
+  txClient?: Prisma.TransactionClient
 ) {
-  return prisma.$transaction(async (tx) => {
+  const run = async (tx: Prisma.TransactionClient) => {
     const r = await tx.reservation.findFirst({
       where: { id: reservationId, restaurantId },
     });
@@ -131,12 +135,13 @@ export async function assignReservationTable(
       table.minimumSpendAmount != null ? Number(table.minimumSpendAmount) : null
     );
 
+    const previousStatus = r.status;
     let status: ReservationStatus = r.status;
     if (["CONFIRMED", "APPROVED", "PENDING", "ARRIVED"].includes(r.status)) {
       status = "CHECKED_IN";
     }
 
-    return tx.reservation.update({
+    const updated = await tx.reservation.update({
       where: { id: reservationId },
       data: {
         ...snap,
@@ -148,7 +153,39 @@ export async function assignReservationTable(
         minimumSpendAmount: minSpend,
       },
     });
-  });
+
+    if (previousStatus !== status) {
+      await tx.reservationStatusHistory.create({
+        data: {
+          reservationId,
+          previousStatus,
+          newStatus: status,
+          changedByUserId: staff.userId ?? null,
+          note: `table:${table.number}`,
+        },
+      });
+      await tx.reservationAuditLog.create({
+        data: {
+          restaurantId,
+          reservationId,
+          action: "RESERVATION_CHECK_IN",
+          userId: staff.userId ?? null,
+          userName: staff.userName ?? null,
+          oldValues: { status: previousStatus } as never,
+          newValues: {
+            status,
+            tableId: table.id,
+            tableNumber: table.number,
+          } as never,
+        },
+      });
+    }
+
+    return updated;
+  };
+
+  if (txClient) return run(txClient);
+  return prisma.$transaction(run);
 }
 
 export async function seatReservationFromBooking(
@@ -316,18 +353,83 @@ export async function confirmArrivalWithTable(
     req?: NextRequest;
   }
 ) {
-  await markReservationArrived(
-    reservationId,
-    restaurantId,
-    opts?.actualGuestCount
-  );
-  await assignReservationTable(
-    reservationId,
-    restaurantId,
-    table,
-    staff,
-    opts?.minimumSpendAmount
-  );
+  const existing = await prisma.reservation.findFirst({
+    where: { id: reservationId, restaurantId },
+  });
+  if (!existing) throw new Error("الحجز غير موجود");
+
+  if (
+    ["CHECKED_IN", "SEATED", "CONVERTED"].includes(existing.status) &&
+    existing.tableId === table.id
+  ) {
+    if (opts?.startSession) {
+      return seatReservationFromBooking(
+        reservationId,
+        restaurantId,
+        table,
+        staff,
+        opts.req,
+        opts?.minimumSpendAmount,
+        opts?.actualGuestCount
+      );
+    }
+    const reservation = await prisma.reservation.findUnique({ where: { id: reservationId } });
+    return { reservation: reservation!, session: null, visit: null, idempotent: true };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const r = await tx.reservation.findFirst({ where: { id: reservationId, restaurantId } });
+    if (!r) throw new Error("الحجز غير موجود");
+
+    const now = new Date();
+    const effectiveCount =
+      opts?.actualGuestCount != null && opts.actualGuestCount >= 1
+        ? opts.actualGuestCount
+        : undefined;
+
+    if (!["ARRIVED", "CHECKED_IN", "SEATED", "CONVERTED"].includes(r.status)) {
+      const prev = r.status;
+      await tx.reservation.update({
+        where: { id: reservationId },
+        data: {
+          status: "ARRIVED",
+          arrivedAt: r.arrivedAt ?? now,
+          checkedInAt: r.checkedInAt ?? now,
+          ...(effectiveCount != null ? { actualArrivedGuestCount: effectiveCount } : {}),
+        } as Prisma.ReservationUpdateInput,
+      });
+      if (prev !== "ARRIVED") {
+        await tx.reservationStatusHistory.create({
+          data: {
+            reservationId,
+            previousStatus: prev,
+            newStatus: "ARRIVED",
+            changedByUserId: staff.userId ?? null,
+          },
+        });
+      }
+    } else if (effectiveCount != null) {
+      await tx.reservation.update({
+        where: { id: reservationId },
+        data: { actualArrivedGuestCount: effectiveCount } as Prisma.ReservationUpdateInput,
+      });
+    }
+
+    await assignReservationTable(
+      reservationId,
+      restaurantId,
+      table,
+      staff,
+      opts?.minimumSpendAmount,
+      tx
+    );
+  });
+
+  try {
+    await syncTableOperationalStatus(table.id);
+  } catch {
+    /* optional */
+  }
 
   if (opts?.startSession) {
     return seatReservationFromBooking(

@@ -215,7 +215,7 @@ export async function syncAllRestaurantsAds() {
 
 export async function getOwnerPlatformCards(restaurantId: string) {
   const { OWNER_AD_PLATFORMS } = await import("@/lib/marketing/ads-platforms");
-  const { isAdsIntegrationReady } = await import("@/lib/platform/ads-integrations");
+  const { isAdsIntegrationReady, googleAdsSetupHint } = await import("@/lib/platform/ads-integrations");
   const {
     isMetaAdsConfigured,
     resolveMetaAdsConnectionState,
@@ -239,6 +239,7 @@ export async function getOwnerPlatformCards(restaurantId: string) {
       let connectionStateLabel: string | undefined;
       let connectUrl: string | null = null;
       let showConnectButton = false;
+      let setupHint: string | null = null;
 
       if (p.platform === "META") {
         const metaState = resolveMetaAdsConnectionState(
@@ -258,6 +259,13 @@ export async function getOwnerPlatformCards(restaurantId: string) {
           connectUrl = META_CONNECT_URL;
           showConnectButton = true;
         }
+      } else if (integrationReady) {
+        connectUrl = `/api/marketing/connections/${p.platform.toLowerCase()}/oauth`;
+        showConnectButton = !connected;
+      }
+
+      if (p.platform === "GOOGLE" || p.platform === "YOUTUBE") {
+        setupHint = googleAdsSetupHint();
       }
 
       const legacyStatus = connected
@@ -285,6 +293,7 @@ export async function getOwnerPlatformCards(restaurantId: string) {
         timezone: conn?.timezone ?? null,
         lastSync: conn?.lastSyncAt?.toISOString() ?? null,
         syncStatus: conn?.syncStatus ?? null,
+        setupHint,
       };
     })
   );

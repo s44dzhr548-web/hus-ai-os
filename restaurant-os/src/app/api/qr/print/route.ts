@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRestaurant } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import QRCode from "qrcode";
-import { menuUrlForTable } from "@/lib/table-code";
+import { menuUrlForTable, sortTablesByNumber } from "@/lib/table-code";
+import { displayTableNumber } from "@/lib/table-number-normalize";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,9 @@ export async function GET(req: NextRequest) {
     where: { id: branchId, restaurantId: restaurantId! },
     include: {
       restaurant: { select: { name: true, nameAr: true, logoUrl: true, slug: true } },
-      tables: { orderBy: { number: "asc" } },
+      tables: {
+        where: { isActive: true, isArchived: false },
+      },
     },
   });
 
@@ -27,33 +30,53 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "الفرع غير موجود" }, { status: 404 });
   }
 
+  const tables = sortTablesByNumber(branch.tables);
+  const exportedAt = new Date().toISOString();
+  const restaurantName = branch.restaurant.nameAr || branch.restaurant.name;
+
+  if (req.nextUrl.searchParams.get("preview") === "1") {
+    return NextResponse.json({
+      restaurantName,
+      branchName: branch.nameAr || branch.name,
+      exportedAt,
+      count: tables.length,
+      tables: tables.map((t) => ({
+        id: t.id,
+        number: t.number,
+        displayNumber: displayTableNumber(t.displayNumber || t.label || String(t.number)),
+      })),
+    });
+  }
+
   const cards = await Promise.all(
-    branch.tables.map(async (table) => {
-      const menuUrl =
-        table.qrCode ||
-        menuUrlForTable(table.id, branch.restaurant.slug, table.tableCode);
+    tables.map(async (table) => {
+      const menuUrl = menuUrlForTable(table.id, branch.restaurant.slug);
+      const displayNum = displayTableNumber(
+        table.displayNumber || table.label || String(table.number)
+      );
       const qrDataUrl = await QRCode.toDataURL(menuUrl, {
         width: 280,
         margin: 1,
         color: { dark: "#047857", light: "#ffffff" },
       });
-      return { table, menuUrl, qrDataUrl };
+      return { table, menuUrl, qrDataUrl, displayNum };
     })
   );
 
-  const restaurantName = branch.restaurant.nameAr || branch.restaurant.name;
   const branchName = branch.nameAr || branch.name;
   const logo = branch.restaurant.logoUrl || "";
 
+  const metaLine = `<p class="meta">${restaurantName} — ${branchName} · ${new Date(exportedAt).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })} · ${tables.length} طاولة</p>`;
+
   const cardsHtml = cards
     .map(
-      ({ table, menuUrl, qrDataUrl }) => `
+      ({ table, menuUrl, qrDataUrl, displayNum }) => `
     <div class="card">
       ${logo ? `<img class="logo" src="${logo}" alt="" />` : ""}
       <h1>${restaurantName}</h1>
       <p class="branch">${branchName}</p>
-      <p class="table">طاولة ${table.number}</p>
-      <img class="qr" src="${qrDataUrl}" alt="QR ${table.number}" />
+      <p class="table">طاولة ${displayNum}</p>
+      <img class="qr" src="${qrDataUrl}" alt="QR ${displayNum}" />
       <p class="hint">امسح الرمز لعرض القائمة والطلب</p>
       <p class="url">${menuUrl}</p>
     </div>`
@@ -68,6 +91,7 @@ export async function GET(req: NextRequest) {
   <style>
     * { box-sizing: border-box; }
     body { font-family: Tahoma, Arial, sans-serif; margin: 0; padding: 16px; background: #f3f4f6; }
+    .meta { text-align: center; color: #555; font-size: 13px; margin-bottom: 16px; }
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
     .card { background: white; border: 2px solid #047857; border-radius: 16px; padding: 24px; text-align: center; page-break-inside: avoid; break-inside: avoid; }
     .logo { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px; }
@@ -89,6 +113,7 @@ export async function GET(req: NextRequest) {
 </head>
 <body>
   <div class="no-print" style="text-align:center;margin-bottom:16px;">
+    ${metaLine}
     <button onclick="window.print()" style="padding:12px 24px;background:#047857;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;">
       طباعة / حفظ PDF
     </button>
@@ -100,6 +125,7 @@ export async function GET(req: NextRequest) {
   return new NextResponse(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
     },
   });
 }

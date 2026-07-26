@@ -69,8 +69,13 @@ export async function fetchPresentGuests(restaurantId: string, branchId?: string
     where: {
       restaurantId,
       ...(branchId ? { branchId } : {}),
-      date: { gte: dayStart, lte: dayEnd },
       status: { in: RECEPTION_ACTIVE_STATUSES },
+      OR: [
+        { date: { gte: dayStart, lte: dayEnd } },
+        { arrivedAt: { gte: dayStart, lte: dayEnd } },
+        { checkedInAt: { gte: dayStart, lte: dayEnd } },
+        { seatedAt: { gte: dayStart, lte: dayEnd } },
+      ],
     },
     include: {
       tableSession: true,
@@ -85,10 +90,6 @@ export async function fetchPresentGuests(restaurantId: string, branchId?: string
     const session = r.tableSession;
     const sessionActive = session ? isActiveSession(session) : false;
 
-    if ((r.status === "CONVERTED" || r.status === "SEATED") && !sessionActive) {
-      continue;
-    }
-
     if (r.status === "CONFIRMED" || r.status === "APPROVED") {
       if (!r.arrivedAt && !r.checkedInAt) continue;
     }
@@ -96,7 +97,9 @@ export async function fetchPresentGuests(restaurantId: string, branchId?: string
     const displaySection = sectionForStatus(r.status, sessionActive, r.tableId);
     const statusLabel = sessionActive
       ? "على الطاولة"
-      : RECEPTION_STATUS_LABELS_AR[r.status] || r.status;
+      : r.status === "SEATED" || r.status === "CONVERTED"
+        ? "تم الجلوس (الجلسة منتهية)"
+        : RECEPTION_STATUS_LABELS_AR[r.status] || r.status;
 
     present.push({
       id: r.id,

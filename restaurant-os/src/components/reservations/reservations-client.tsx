@@ -140,7 +140,9 @@ export default function ReservationsClient({ mode = "active" }: Props) {
   const [assignModal, setAssignModal] = useState<RegisterRow | null>(null);
   const [tables, setTables] = useState<{ id: string; number: number; label?: string }[]>([]);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
+  const [patchBusyId, setPatchBusyId] = useState<string | null>(null);
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
@@ -182,9 +184,12 @@ export default function ReservationsClient({ mode = "active" }: Props) {
   }, [load]);
 
   useEffect(() => {
-    fetch("/api/tables")
+    fetch("/api/tables?status=active")
       .then((r) => r.json())
-      .then((t) => setTables(Array.isArray(t) ? t : t.tables || []))
+      .then((t) => {
+        const list = Array.isArray(t) ? t : t.tables || [];
+        setTables(list.filter((x: { isActive?: boolean }) => x.isActive !== false));
+      })
       .catch(() => {});
   }, []);
 
@@ -195,19 +200,29 @@ export default function ReservationsClient({ mode = "active" }: Props) {
   }
 
   async function patch(id: string, body: Record<string, unknown>, confirmMsg?: string) {
+    if (patchBusyId) return;
     if (confirmMsg && !window.confirm(confirmMsg)) return;
+    setPatchBusyId(id);
+    setSuccess("");
     const res = await fetch(`/api/reservations/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    const d = await res.json().catch(() => ({}));
+    setPatchBusyId(null);
     if (!res.ok) {
-      const d = await res.json();
       setError(d.error || "فشل العملية");
+      setSuccess("");
       return;
     }
     setError("");
+    if (d.message) setSuccess(String(d.message));
     if (detailId === id) openDetail(id);
+    if (body.action === "assign_table" || body.action === "confirm_arrival" || body.action === "check_in") {
+      setAssignModal(null);
+      setAssignTableId("");
+    }
     load();
   }
 
@@ -339,6 +354,7 @@ export default function ReservationsClient({ mode = "active" }: Props) {
       )}
 
       {error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+      {success && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">{success}</p>}
 
       <Card className="p-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -534,13 +550,13 @@ export default function ReservationsClient({ mode = "active" }: Props) {
       </Modal>
 
       {assignModal && (
-        <Modal open onClose={() => setAssignModal(null)} title="تعيين طاولة">
+        <Modal open onClose={() => setAssignModal(null)} title="تأكيد الوصول — تعيين طاولة">
           <select
             className="mb-3 w-full rounded-lg border px-3 py-2"
             value={assignTableId}
             onChange={(e) => setAssignTableId(e.target.value)}
           >
-            <option value="">اختر طاولة</option>
+            <option value="">اختر طاولة نشطة</option>
             {tables.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.label || t.number}
@@ -548,13 +564,17 @@ export default function ReservationsClient({ mode = "active" }: Props) {
             ))}
           </select>
           <Button
+            loading={patchBusyId === assignModal.id}
+            disabled={!assignTableId}
             onClick={() => {
               if (!assignTableId) return;
-              patch(assignModal.id, { action: "assign_table", tableId: assignTableId });
-              setAssignModal(null);
+              patch(assignModal.id, {
+                action: "confirm_arrival",
+                tableId: assignTableId,
+              });
             }}
           >
-            تعيين
+            تأكيد الوصول
           </Button>
         </Modal>
       )}
@@ -776,17 +796,8 @@ function getPrimaryAction(
   }
   if (["APPROVED", "CONFIRMED"].includes(row.status)) {
     return {
-      label: "وصل العميل",
-      onClick: () => {
-        const raw = window.prompt(
-          "عدد الأشخاص الذين وصلوا (شامل العميل):",
-          String(row.guestCount)
-        );
-        if (raw == null) return;
-        const guestCount = parseInt(raw, 10);
-        if (!Number.isFinite(guestCount) || guestCount < 1) return;
-        onPatch(row.id, { action: "mark_arrived", guestCount });
-      },
+      label: "تأكيد الوصول",
+      onClick: () => onAssign(row),
     };
   }
   if (["ARRIVED", "CHECKED_IN"].includes(row.status)) {
