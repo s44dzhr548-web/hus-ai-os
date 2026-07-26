@@ -21,6 +21,7 @@ function metaOAuthErrorMessage(code: string | null, detail: string | null): stri
 }
 
 const META_CONNECT_HREF = "/api/integrations/meta/connect";
+const GOOGLE_CONNECT_HREF = "/api/integrations/google/connect";
 
 type PlatformCard = {
   key: string;
@@ -169,7 +170,16 @@ export default function PlatformsClient({
   }, [initialPlatforms.length, load]);
 
   useEffect(() => {
-    if (searchParams.get("success") === "1") setMessage("✓ تم ربط حساب Meta بنجاح");
+    if (searchParams.get("connected") === "google" && searchParams.get("success") === "1") {
+      setMessage(
+        searchParams.get("google_campaigns") === "pending_dev_token"
+          ? "✓ تم ربط Google Ads — قراءة الحملات تنتظر إضافة GOOGLE_ADS_DEVELOPER_TOKEN على الخادم"
+          : "✓ تم ربط Google Ads بنجاح"
+      );
+      void load();
+    } else if (searchParams.get("success") === "1" && searchParams.get("connected") !== "google") {
+      setMessage("✓ تم ربط حساب Meta بنجاح");
+    }
     const err = searchParams.get("error");
     const detail = searchParams.get("detail");
     const errMsg = metaOAuthErrorMessage(err, detail);
@@ -276,6 +286,107 @@ export default function PlatformsClient({
     }
 
     return null;
+  }
+
+  function startGoogleOAuth() {
+    window.location.href = GOOGLE_CONNECT_HREF;
+  }
+
+  function renderGoogleActions(p: PlatformCard) {
+    const connected = p.status === "CONNECTED";
+    const canAct = canConnect || canEdit;
+
+    const recheckBtn = canConnect ? (
+      <Button
+        key="recheck"
+        size="sm"
+        variant="outline"
+        type="button"
+        loading={busy === `${p.key}-recheck`}
+        onClick={() => startGoogleOAuth()}
+      >
+        إعادة التحقق / الربط
+      </Button>
+    ) : (
+      <Button
+        key="recheck"
+        size="sm"
+        variant="outline"
+        type="button"
+        loading={busy === `${p.key}-recheck`}
+        onClick={() => action(p.key, "recheck")}
+      >
+        إعادة التحقق
+      </Button>
+    );
+
+    const notifyBtn = (
+      <Button
+        key="notify"
+        size="sm"
+        variant="outline"
+        type="button"
+        loading={busy === `${p.key}-notify_admin`}
+        onClick={() => action(p.key, "notify_admin")}
+      >
+        إشعار مسؤول المنصة
+      </Button>
+    );
+
+    const connectBtn = canConnect ? (
+      <Button key="connect" size="sm" type="button" onClick={() => startGoogleOAuth()}>
+        Connect Account
+      </Button>
+    ) : (
+      <Button
+        key="connect-info"
+        size="sm"
+        type="button"
+        variant="outline"
+        onClick={() =>
+          setMessage("صلاحية المالك أو مدير المطعم مطلوبة لربط حساب Google Ads")
+        }
+      >
+        Connect Account
+      </Button>
+    );
+
+    if (connected && canConnect) {
+      return (
+        <>
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            loading={busy === `${p.key}-sync`}
+            onClick={() => action(p.key, "sync")}
+          >
+            Sync Now
+          </Button>
+          <Button size="sm" variant="outline" type="button" onClick={() => startGoogleOAuth()}>
+            Reconnect
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            loading={busy === `${p.key}-disconnect`}
+            onClick={() => action(p.key, "disconnect")}
+          >
+            Disconnect
+          </Button>
+          {recheckBtn}
+        </>
+      );
+    }
+
+    return (
+      <>
+        {recheckBtn}
+        {canAct && notifyBtn}
+        {!connected && connectBtn}
+      </>
+    );
   }
 
   function renderGenericActions(p: PlatformCard) {
@@ -469,7 +580,7 @@ export default function PlatformsClient({
               ) : null}
 
               <div className={cn("flex flex-wrap gap-2", showMetaConnect && "w-full")}>
-                {isMeta ? renderMetaActions(p) : renderGenericActions(p)}
+                {isMeta ? renderMetaActions(p) : p.key === "GOOGLE" ? renderGoogleActions(p) : renderGenericActions(p)}
               </div>
             </div>
           );

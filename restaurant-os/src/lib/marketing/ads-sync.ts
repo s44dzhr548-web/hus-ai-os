@@ -259,6 +259,9 @@ export async function getOwnerPlatformCards(restaurantId: string) {
           connectUrl = META_CONNECT_URL;
           showConnectButton = true;
         }
+      } else if (p.platform === "GOOGLE") {
+        connectUrl = "/api/integrations/google/connect";
+        showConnectButton = !connected;
       } else if (integrationReady) {
         connectUrl = `/api/marketing/connections/${p.platform.toLowerCase()}/oauth`;
         showConnectButton = !connected;

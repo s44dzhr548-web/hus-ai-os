@@ -5,6 +5,7 @@ import {
   getMetaAdsOAuthRedirectUri,
   isValidMetaAppId,
 } from "@/lib/platform/meta-ads-env";
+import { getCanonicalGoogleRedirectUri } from "@/lib/marketing/google-ads-oauth-service";
 import { fetchWithTimeout, isAbortError } from "@/lib/fetch-with-timeout";
 
 export const ADS_INTEGRATION_KEYS = [
@@ -210,9 +211,7 @@ export async function resolveAdsIntegration(platformKey: AdsIntegrationKey): Pro
       ? getMetaAdsOAuthRedirectUri()
       : platformKey === "GOOGLE"
         ? row?.redirectUriOverride ||
-          envOrNull("GOOGLE_REDIRECT_URI") ||
-          envOrNull("GOOGLE_ADS_REDIRECT_URI") ||
-          getAdsOAuthRedirectUri(platformKey)
+          getCanonicalGoogleRedirectUri()
         : row?.redirectUriOverride || getAdsOAuthRedirectUri(platformKey);
 
   return {
@@ -248,7 +247,7 @@ export function googleAdsSetupHint(): string | null {
     return "إعداد Google Ads غير مكتمل: Client Secret غير مضاف";
   }
   if (!googleAdsDeveloperTokenConfigured()) {
-    return "إعداد Google Ads غير مكتمل: Developer Token غير مضاف";
+    return "إعداد Google Ads: Developer Token غير مضاف — الربط عبر OAuth متاح، قراءة الحملات بعد إضافته";
   }
   return null;
 }
