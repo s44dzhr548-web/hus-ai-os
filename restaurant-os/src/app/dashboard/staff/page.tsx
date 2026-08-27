@@ -31,6 +31,7 @@ const ROLE_OPTIONS = [
   { id: "MANAGER", label: "مدير" },
   { id: "WAITER", label: "نادل" },
   { id: "KITCHEN", label: "مطبخ" },
+  { id: "CAPTAIN", label: "كابتن الصالة" },
 ];
 
 export default function StaffPage() {

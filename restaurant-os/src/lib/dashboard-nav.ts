@@ -64,6 +64,9 @@ export const RECEPTION_STAFF_ROUTES = [
   "/dashboard/staff/login-history",
 ];
 
+/** Captain (floor) staff — orders only */
+export const CAPTAIN_STAFF_ROUTES = ["/dashboard/captain"];
+
 export const platformNavItems: NavItem[] = [
   { href: "/dashboard/platform", label: "إدارة المنصة", icon: Shield },
   { href: "/dashboard/platform/subscriptions", label: "الاشتراكات", icon: CreditCard },
@@ -99,6 +102,7 @@ export const restaurantNavItems: NavItem[] = [
   { href: "/dashboard/whatsapp/inbox", label: "WhatsApp Inbox", icon: MessageCircle, roles: ["OWNER", "ADMIN", "MARKETING", "MANAGER", "RECEPTION"] },
   { href: "/dashboard/menu/options", label: "الخيارات والإضافات", icon: ListTree, roles: ["OWNER", "ADMIN", "MANAGER"] },
   { href: "/dashboard/orders", label: "الطلبات", icon: ClipboardList, roles: ["OWNER", "ADMIN", "MANAGER", "CASHIER", "KITCHEN", "WAITER"] },
+  { href: "/dashboard/captain", label: "كابتن الصالة", icon: ConciergeBell, roles: ["OWNER", "ADMIN", "MANAGER", "CAPTAIN", "WAITER"] },
   { href: "/dashboard/kitchen", label: "المطبخ", icon: ChefHat, roles: ["OWNER", "ADMIN", "MANAGER", "KITCHEN"] },
   { href: "/dashboard/waiter-calls", label: "طلبات الخدمة", icon: Bell, roles: ["OWNER", "ADMIN", "MANAGER", "WAITER"] },
   { href: "/dashboard/reports", label: "التحليلات", icon: BarChart3, roles: ["OWNER", "ADMIN", "MANAGER", "CASHIER"] },
@@ -146,6 +150,16 @@ function receptionRouteAllowed(pathname: string): boolean {
   );
 }
 
+function isCaptainStaff(role?: DashboardRole) {
+  return role === "CAPTAIN";
+}
+
+function captainRouteAllowed(pathname: string): boolean {
+  return CAPTAIN_STAFF_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
+
 export function getSidebarNavItems(opts: {
   isPlatformAdmin?: boolean;
   role?: DashboardRole;
@@ -159,6 +173,12 @@ export function getSidebarNavItems(opts: {
   if (isReceptionStaff(role)) {
     return restaurantNavItems.filter((item) =>
       roleCanAccessNavItem("RECEPTION", item.roles)
+    );
+  }
+
+  if (isCaptainStaff(role)) {
+    return restaurantNavItems.filter((item) =>
+      roleCanAccessNavItem("CAPTAIN", item.roles)
     );
   }
 
@@ -198,6 +218,11 @@ export function isRouteAllowedForUser(
     );
   }
 
+  if (isCaptainStaff(opts.role)) {
+    if (pathname === "/dashboard") return false;
+    return captainRouteAllowed(pathname);
+  }
+
   if (opts.role === "MANAGER" && pathname.startsWith("/dashboard/marketing")) {
     return managerWhatsAppMarketingAllowed(pathname);
   }
@@ -223,6 +248,7 @@ export function defaultDashboardPath(opts: {
 }): string {
   if (isPlatformAdminUser(opts)) return "/dashboard/platform";
   if (opts.role === "RECEPTION") return "/dashboard/reception";
+  if (opts.role === "CAPTAIN") return "/dashboard/captain";
   if (opts.role === "MARKETING") return "/dashboard/marketing/command-center";
   if (opts.role === "KITCHEN") return "/dashboard/kitchen";
   if (opts.role === "WAITER") return "/dashboard/waiter-calls";

@@ -6,6 +6,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   imageUrl?: string;
+  notes?: string;
 }
 
 export function getCart(tableId: string): CartItem[] {

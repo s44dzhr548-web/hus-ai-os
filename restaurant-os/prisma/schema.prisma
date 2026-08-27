@@ -1,4 +1,4 @@
-// Menu OS — Production SaaS Schema
+﻿// Menu OS ظ¤ Production SaaS Schema
 
 generator client {
   provider = "prisma-client-js"
@@ -19,14 +19,22 @@ enum StaffRole {
   CASHIER
   KITCHEN
   WAITER
+  CAPTAIN
 }
 
 enum OrderStatus {
   NEW
+  ACCEPTED
   PREPARING
   READY
+  SERVED
   COMPLETED
   CANCELLED
+}
+
+enum OrderSource {
+  CHECKOUT
+  CAPTAIN
 }
 
 enum PaymentStatus {
@@ -319,7 +327,7 @@ model Restaurant {
   heroImageUrl  String? @map("hero_image_url")
   welcomeText   String? @map("welcome_text")
   welcomeTextEn String? @map("welcome_text_en")
-  ctaText       String? @default("استكشف المنيو") @map("cta_text")
+  ctaText       String? @default("╪د╪│╪ز┘â╪┤┘ ╪د┘┘à┘┘è┘ê") @map("cta_text")
   ctaTextEn     String? @default("Explore Menu") @map("cta_text_en")
   cardStyle     String? @default("glass") @map("card_style")
   homepageSections Json? @map("homepage_sections")
@@ -620,6 +628,13 @@ model Order {
   totalAmount        Decimal     @default(0) @map("total_amount")
   couponCode         String?     @map("coupon_code")
   notes              String?
+  orderSource        OrderSource @default(CHECKOUT) @map("order_source")
+  idempotencyKey     String?     @unique @map("idempotency_key")
+  acceptedAt         DateTime?   @map("accepted_at")
+  preparingAt        DateTime?   @map("preparing_at")
+  readyAt            DateTime?   @map("ready_at")
+  servedAt           DateTime?   @map("served_at")
+  cancelledAt        DateTime?   @map("cancelled_at")
   createdAt          DateTime    @default(now()) @map("created_at")
   updatedAt          DateTime    @updatedAt @map("updated_at")
   completedAt        DateTime?   @map("completed_at")
@@ -635,6 +650,7 @@ model Order {
 
   @@unique([branchId, orderNumber])
   @@index([branchId, status, createdAt])
+  @@index([branchId, orderSource, status, createdAt])
   @@map("orders")
 }
 
@@ -1362,7 +1378,7 @@ model ReceptionNotification {
   @@map("reception_notifications")
 }
 
-// ─── Marketing AI Module (additive — does not modify existing flows) ───
+// ظ¤ظ¤ظ¤ Marketing AI Module (additive ظ¤ does not modify existing flows) ظ¤ظ¤ظ¤
 
 enum MarketingCampaignStatus {
   DRAFT
@@ -1864,7 +1880,7 @@ model MarketingEvent {
   @@map("marketing_events")
 }
 
-// ─── AI Marketing Center (Phase 1 — architecture only, no integrations) ───
+// ظ¤ظ¤ظ¤ AI Marketing Center (Phase 1 ظ¤ architecture only, no integrations) ظ¤ظ¤ظ¤
 
 enum MarketingGoalType {
   INCREASE_SALES

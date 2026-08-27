@@ -9,6 +9,7 @@ export type AppRole =
   | "CASHIER"
   | "KITCHEN"
   | "WAITER"
+  | "CAPTAIN"
   | "MARKETING"
   | string
   | null;

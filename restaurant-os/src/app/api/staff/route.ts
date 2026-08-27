@@ -13,6 +13,7 @@ const ASSIGNABLE_ROLES: StaffRole[] = [
   "MANAGER",
   "WAITER",
   "KITCHEN",
+  "CAPTAIN",
 ];
 
 function serializeStaff(row: {

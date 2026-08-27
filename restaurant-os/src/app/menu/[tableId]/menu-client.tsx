@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils";
 import {
   getCart,
   saveCart,
+  clearCart,
   cartTotal,
   type CartItem,
 } from "@/lib/cart";
@@ -179,6 +180,7 @@ function guestToken() {
 
 export default function MenuClient() {
   const params = useParams();
+  const router = useRouter();
   const tableId = params.tableId as string;
 
   const [menu, setMenu] = useState<MenuData | null>(null);
@@ -193,6 +195,9 @@ export default function MenuClient() {
   const [filter, setFilter] = useState<"all" | "featured" | "favorites">("all");
   const [favorites, setFavorites] = useState<string[]>([]);
   const [suggested, setSuggested] = useState<MenuItem[]>([]);
+  const [orderNotes, setOrderNotes] = useState("");
+  const [submitState, setSubmitState] = useState<"idle" | "sending" | "error">("idle");
+  const [submitError, setSubmitError] = useState("");
 
   async function callService(type: string) {
     await fetch("/api/table-requests", {
@@ -264,6 +269,54 @@ export default function MenuClient() {
         .map((i) => (i.id === id ? { ...i, quantity: i.quantity + delta } : i))
         .filter((i) => i.quantity > 0)
     );
+  }
+
+  function updateItemNotes(id: string, notes: string) {
+    updateCart(cart.map((i) => (i.id === id ? { ...i, notes } : i)));
+  }
+
+  function removeFromCart(id: string) {
+    updateCart(cart.filter((i) => i.id !== id));
+  }
+
+  async function submitCaptainOrder() {
+    if (!cart.length || submitState === "sending") return;
+    setSubmitState("sending");
+    setSubmitError("");
+    const requestId = `cap_${tableId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      const res = await fetch("/api/public/captain/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": requestId,
+        },
+        body: JSON.stringify({
+          tableId,
+          requestId,
+          notes: orderNotes.trim() || undefined,
+          guestToken: guestToken(),
+          items: cart.map((i) => ({
+            menuItemId: i.id,
+            quantity: i.quantity,
+            notes: i.notes?.trim() || undefined,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "تعذر إرسال الطلب");
+      }
+      clearCart(tableId);
+      setCart([]);
+      setCartOpen(false);
+      setOrderNotes("");
+      setSubmitState("idle");
+      router.push(`/order-status/${data.order.id}?captain=1`);
+    } catch (e) {
+      setSubmitState("error");
+      setSubmitError(e instanceof Error ? e.message : "تعذر إرسال الطلب، حاول مرة أخرى");
+    }
   }
 
   async function toggleFavorite(itemId: string) {
@@ -510,7 +563,7 @@ export default function MenuClient() {
             buttonColor={theme.button}
             featuredLabel={t(locale, "featured")}
             unavailableLabel={t(locale, "unavailable")}
-            addLabel={t(locale, "addToCart")}
+            addLabel={locale === "ar" ? "أضف للطلب" : "Add to order"}
             caloriesLabel={locale === "ar" ? "سعرة" : "cal"}
             onOpen={(item) => {
               trackView(item.id);
@@ -594,38 +647,81 @@ export default function MenuClient() {
               </button>
             </div>
             {cart.map((item) => (
-              <div key={item.id} className="flex items-center justify-between border-b py-3">
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-sm" style={{ color: theme.button }}>
-                    {formatCurrency(item.price)}
-                  </p>
+              <div key={item.id} className="border-b py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-sm" style={{ color: theme.button }}>
+                      {formatCurrency(item.price)} × {item.quantity} ={" "}
+                      {formatCurrency(item.price * item.quantity)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => updateQty(item.id, -1)}
+                      className="rounded-full bg-gray-100 p-1"
+                      aria-label="تقليل"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="font-bold">{item.quantity}</span>
+                    <button
+                      onClick={() => updateQty(item.id, 1)}
+                      className="rounded-full bg-emerald-100 p-1 text-emerald-700"
+                      aria-label="زيادة"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => removeFromCart(item.id)}
+                      className="rounded-full p-1 text-red-500"
+                      aria-label="حذف"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => updateQty(item.id, -1)}
-                    className="rounded-full bg-gray-100 p-1"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <span className="font-bold">{item.quantity}</span>
-                  <button
-                    onClick={() => updateQty(item.id, 1)}
-                    className="rounded-full bg-emerald-100 p-1 text-emerald-700"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
+                <input
+                  value={item.notes || ""}
+                  onChange={(e) => updateItemNotes(item.id, e.target.value)}
+                  placeholder={locale === "ar" ? "ملاحظة على المنتج…" : "Item note…"}
+                  className="mt-2 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs"
+                />
               </div>
             ))}
+            <textarea
+              value={orderNotes}
+              onChange={(e) => setOrderNotes(e.target.value)}
+              placeholder={locale === "ar" ? "ملاحظة عامة على الطلب…" : "Order note…"}
+              className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              rows={2}
+            />
             <div className="mt-4 flex items-center justify-between text-lg font-bold">
               <span>{locale === "ar" ? "الإجمالي" : "Total"}</span>
               <span style={{ color: theme.button }}>{formatCurrency(total)}</span>
             </div>
-            <Link href={`/checkout/${tableId}`} className="mt-4 block">
-              <Button className="w-full" size="lg" onClick={() => setCartOpen(false)}>
-                {t(locale, "checkout")}
-              </Button>
+            {submitState === "sending" && (
+              <p className="mt-3 text-center text-sm text-amber-600">جاري إرسال الطلب…</p>
+            )}
+            {submitError && (
+              <p className="mt-3 text-center text-sm text-red-600">{submitError}</p>
+            )}
+            <Button
+              className="mt-4 w-full"
+              size="lg"
+              disabled={submitState === "sending"}
+              onClick={() => void submitCaptainOrder()}
+            >
+              {submitState === "sending"
+                ? locale === "ar"
+                  ? "جاري الإرسال…"
+                  : "Sending…"
+                : locale === "ar"
+                  ? "إرسال الطلب"
+                  : "Send order"}
+            </Button>
+            <Link href={`/checkout/${tableId}`} className="mt-2 block text-center text-xs text-gray-500 underline">
+              {locale === "ar" ? "الدفع الإلكتروني (اختياري)" : "Online payment (optional)"}
             </Link>
           </div>
         </div>

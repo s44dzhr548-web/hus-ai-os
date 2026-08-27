@@ -23,8 +23,10 @@ export function formatDate(date: Date | string) {
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {
   NEW: "جديد",
-  PREPARING: "قيد التحضير",
+  ACCEPTED: "تم استلام الطلب",
+  PREPARING: "جاري التجهيز",
   READY: "جاهز",
+  SERVED: "تم التقديم",
   COMPLETED: "مكتمل",
   CANCELLED: "ملغي",
 };
@@ -34,8 +36,10 @@ export const ORDER_STATUS_VARIANTS: Record<
   "default" | "success" | "warning" | "danger" | "info"
 > = {
   NEW: "info",
+  ACCEPTED: "info",
   PREPARING: "warning",
   READY: "success",
+  SERVED: "default",
   COMPLETED: "default",
   CANCELLED: "danger",
 };
@@ -47,6 +51,7 @@ export const STAFF_ROLE_LABELS: Record<string, string> = {
   CASHIER: "كاشير",
   KITCHEN: "مطبخ",
   WAITER: "نادل",
+  CAPTAIN: "كابتن الصالة",
 };
 
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {
