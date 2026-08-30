@@ -64,6 +64,24 @@ export function publicUrlForKey(key: string): string {
   return `${r2PublicBase()}/${key}`;
 }
 
+export async function uploadBufferToR2(
+  buffer: Buffer,
+  key: string,
+  contentType: string
+): Promise<string> {
+  const client = getR2Client();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: r2Bucket(),
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+      CacheControl: "public, max-age=31536000, immutable",
+    })
+  );
+  return publicUrlForKey(key);
+}
+
 export async function createPresignedUploadUrl(
   key: string,
   contentType: string,

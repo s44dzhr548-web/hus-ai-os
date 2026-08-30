@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Moon, Sun } from "lucide-react";
+import { isMenuhusProductionHost } from "@/lib/request-public-host";
 import { cn } from "@/lib/utils";
 
 type Theme = "light" | "dark";
@@ -13,11 +14,16 @@ export function useMarketingTheme() {
 
 export function MarketingShell({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("dark");
+  const [onProductionMenuhus, setOnProductionMenuhus] = useState(false);
   const pathname = usePathname();
   const isWhatsApp = pathname?.includes("/marketing/whatsapp");
   useEffect(() => {
     const s = localStorage.getItem("mk-theme") as Theme | null;
     if (s) setTheme(s);
+  }, []);
+  useEffect(() => {
+    const h = window.location.hostname;
+    setOnProductionMenuhus(isMenuhusProductionHost(h));
   }, []);
   const toggle = () =>
     setTheme((t) => {
@@ -43,7 +49,9 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
             <p className={cn("text-xs", dark ? "text-stone-400" : "text-stone-500")}>
               {isWhatsApp
                 ? "WhatsApp Business Cloud API — بيانات فعلية من Meta"
-                : "محاكاة · غير مربوط · Staging/Local فقط"}
+                : onProductionMenuhus
+                  ? "منصات الإعلان — Meta · Google Ads · OAuth على www.menuhus.com"
+                  : "محاكاة · غير مربوط · Staging/Local فقط"}
             </p>
           </div>
           <button

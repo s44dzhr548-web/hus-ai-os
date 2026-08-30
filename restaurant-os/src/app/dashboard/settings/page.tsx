@@ -10,6 +10,7 @@ import {
   LoadingSpinner,
 } from "@/components/ui";
 import { getPlatformDomain } from "@/lib/domains";
+import { GoogleMapsEmbedSection } from "@/components/customer/google-maps-embed-section";
 
 interface SettingsForm {
   nameAr: string;
@@ -20,6 +21,8 @@ interface SettingsForm {
   timezone: string;
   currency: string;
   businessDayStartHour: number;
+  googleMapsEmbedInput: string;
+  googleMapsEmbedSrc: string | null;
 }
 
 export default function OwnerSettingsPage() {
@@ -32,16 +35,19 @@ export default function OwnerSettingsPage() {
     timezone: "Asia/Riyadh",
     currency: "SAR",
     businessDayStartHour: 4,
+    googleMapsEmbedInput: "",
+    googleMapsEmbedSrc: null,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [mapsError, setMapsError] = useState("");
 
   useEffect(() => {
-    fetch("/api/restaurants")
+    fetch("/api/restaurants/current")
       .then((r) => r.json())
-      .then((data) => {
-        const r = Array.isArray(data) ? data[0] : data;
+      .then((r) => {
+        if (r?.error) return;
         if (r) {
           setForm({
             nameAr: r.nameAr || r.name || "",
@@ -52,6 +58,8 @@ export default function OwnerSettingsPage() {
             timezone: r.timezone || "Asia/Riyadh",
             currency: r.currency || "SAR",
             businessDayStartHour: r.businessDayStartHour ?? 4,
+            googleMapsEmbedInput: r.googleMapsEmbedSrc || r.googleMapsEmbedUrl || "",
+            googleMapsEmbedSrc: r.googleMapsEmbedSrc || r.googleMapsEmbedUrl || null,
           });
         }
       })
@@ -62,7 +70,8 @@ export default function OwnerSettingsPage() {
     e.preventDefault();
     setSaving(true);
     setMessage("");
-    const res = await fetch("/api/restaurants", {
+    setMapsError("");
+    const res = await fetch("/api/restaurants/current", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -74,10 +83,33 @@ export default function OwnerSettingsPage() {
         customDomain: form.customDomain || null,
         timezone: form.timezone,
         currency: form.currency,
+        googleMapsEmbedInput: form.googleMapsEmbedInput,
       }),
     });
+    const data = await res.json().catch(() => ({}));
     setSaving(false);
-    setMessage(res.ok ? "تم الحفظ" : "فشل الحفظ");
+    if (res.ok) {
+      const savedSrc = data.googleMapsEmbedSrc ?? data.googleMapsEmbedUrl ?? null;
+      setForm((prev) => ({
+        ...prev,
+        googleMapsEmbedSrc: savedSrc,
+        googleMapsEmbedInput: savedSrc || "",
+      }));
+      if (data.mapsSaved || (form.googleMapsEmbedInput.trim() && savedSrc)) {
+        setMessage("تم حفظ موقع Google Maps بنجاح");
+      } else {
+        setMessage("تم الحفظ");
+      }
+    } else {
+      setMessage("فشل الحفظ");
+      const detail =
+        typeof data.error === "string"
+          ? data.error
+          : data.code
+            ? `(${data.code})`
+            : "";
+      if (detail) setMapsError(detail);
+    }
   }
 
   if (loading) return <LoadingSpinner />;
@@ -145,6 +177,30 @@ export default function OwnerSettingsPage() {
             onChange={(e) => setForm({ ...form, currency: e.target.value })}
             dir="ltr"
           />
+
+          <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+            <label className="block text-sm font-medium text-gray-800">
+              Google Maps Embed Code
+            </label>
+            <p className="text-xs text-gray-500">
+              من Google Maps: مشاركة → تضمين خريطة — الصق كود iframe هنا. نحفظ رابط{" "}
+              <code className="text-[11px]">src</code> فقط (بدون API Key).
+            </p>
+            <textarea
+              className="min-h-[120px] w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-xs"
+              dir="ltr"
+              placeholder='<iframe src="https://www.google.com/maps/embed?pb=..." ...></iframe>'
+              value={form.googleMapsEmbedInput}
+              onChange={(e) => setForm({ ...form, googleMapsEmbedInput: e.target.value })}
+            />
+            {mapsError && <p className="text-sm text-red-600">{mapsError}</p>}
+            {form.googleMapsEmbedSrc && (
+              <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                <p className="mb-2 text-xs font-medium text-gray-600">معاينة</p>
+                <GoogleMapsEmbedSection embedSrc={form.googleMapsEmbedSrc} />
+              </div>
+            )}
+          </div>
 
           <div className="rounded-lg border border-gray-200 p-4">
             <Input

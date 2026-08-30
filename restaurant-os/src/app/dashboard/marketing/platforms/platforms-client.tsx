@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { MkLoading, MkPageHeader } from "@/components/marketing/marketing-shell";
 import { Button } from "@/components/ui";
 import { isMetaOAuthErrorCode, META_OAUTH_ERROR_MESSAGES_AR } from "@/lib/marketing/meta-oauth-errors";
+import { isMenuhusProductionHost } from "@/lib/request-public-host";
 import { cn } from "@/lib/utils";
 
 function metaOAuthErrorMessage(code: string | null, detail: string | null): string | null {
@@ -18,6 +19,35 @@ function metaOAuthErrorMessage(code: string | null, detail: string | null): stri
     return base;
   }
   return `تعذّر إكمال الربط — ${code}`;
+}
+
+const GOOGLE_OAUTH_FAILURE_AR: Record<string, string> = {
+  state_missing: "انتهت جلسة الربط أو لم تُبدأ من www.menuhus.com — أعد المحاولة من المنصة الرسمية",
+  state_mismatch: "تعذّر التحقق من جلسة الربط — أعد الربط من www.menuhus.com",
+  redirect_uri_mismatch:
+    "redirect_uri غير متطابق — يجب أن يكون GOOGLE_REDIRECT_URI وGoogle Cloud مطابقين حرفيًا لـ https://www.menuhus.com/api/integrations/google/callback",
+  invalid_client: "GOOGLE_CLIENT_ID أو GOOGLE_CLIENT_SECRET غير صحيح",
+  token_exchange_failed: "فشل تبادل رمز Google مع الخادم — راجع Vercel logs لرمز خطأ Google",
+  database_save_failed: "تمت الموافقة لكن تعذّر حفظ الاتصال — حاول مرة أخرى أو تواصل مع الدعم",
+};
+
+function googleOAuthErrorMessage(
+  code: string | null,
+  reason: string | null
+): string | null {
+  if (code === "use_menuhus_domain") {
+    return "يجب ربط Google Ads من https://www.menuhus.com وليس من رابط Vercel Preview";
+  }
+  if (code === "oauth_failed" && reason && GOOGLE_OAUTH_FAILURE_AR[reason]) {
+    return GOOGLE_OAUTH_FAILURE_AR[reason];
+  }
+  if (code === "oauth_failed") {
+    return "فشل ربط Google Ads — أعد المحاولة من www.menuhus.com";
+  }
+  if (code === "oauth_denied") {
+    return "تم إلغاء موافقة Google";
+  }
+  return null;
 }
 
 const META_CONNECT_HREF = "/api/integrations/meta/connect";
@@ -43,6 +73,7 @@ type PlatformCard = {
   timezone: string | null;
   lastSync: string | null;
   syncStatus?: string | null;
+  reviewsUrl?: string | null;
 };
 
 const STATE_BADGE_CLASS: Record<string, string> = {
@@ -126,16 +157,47 @@ function MetaAdsConnectLink({
   );
 }
 
+function googleCardSetupHint(
+  p: PlatformCard,
+  developerTokenConfigured: boolean
+): string | null {
+  if (p.key !== "GOOGLE" && p.key !== "YOUTUBE") return p.setupHint ?? null;
+  const hint = p.setupHint?.trim();
+  if (!hint) return null;
+  if (!developerTokenConfigured) return hint;
+  const h = hint.toLowerCase();
+  if (
+    h.includes("developer token") &&
+    (h.includes("غير مضاف") ||
+      h.includes("إضافة google ads developer") ||
+      h.includes("google_ads_developer_token"))
+  ) {
+    return null;
+  }
+  return hint;
+}
+
+function isDevTokenMissingUserMessage(text: string | null | undefined): boolean {
+  if (!text?.trim()) return false;
+  const h = text.toLowerCase();
+  return (
+    h.includes("developer token") &&
+    (h.includes("غير مضاف") || h.includes("إضافة google ads developer"))
+  );
+}
+
 type PlatformsClientProps = {
   initialPlatforms?: PlatformCard[];
   initialCanConnect?: boolean;
   initialCanEdit?: boolean;
+  initialGoogleAdsEnv?: { developerTokenConfigured: boolean };
 };
 
 export default function PlatformsClient({
   initialPlatforms = [],
   initialCanConnect = false,
   initialCanEdit = false,
+  initialGoogleAdsEnv = { developerTokenConfigured: false },
 }: PlatformsClientProps) {
   const searchParams = useSearchParams();
   const [platforms, setPlatforms] = useState<PlatformCard[]>(initialPlatforms);
@@ -150,6 +212,14 @@ export default function PlatformsClient({
     businessName: string | null;
     currency: string | null;
   }>>([]);
+  const [onProductionHost, setOnProductionHost] = useState(false);
+  const [developerTokenConfigured, setDeveloperTokenConfigured] = useState(
+    initialGoogleAdsEnv.developerTokenConfigured
+  );
+
+  useEffect(() => {
+    setOnProductionHost(isMenuhusProductionHost(window.location.hostname));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -159,20 +229,24 @@ export default function PlatformsClient({
       setPlatforms(data.platforms || []);
       setCanConnect(data.permissions?.canConnect ?? false);
       setCanEdit(data.permissions?.canEdit ?? false);
+      if (typeof data.googleAdsEnv?.developerTokenConfigured === "boolean") {
+        setDeveloperTokenConfigured(data.googleAdsEnv.developerTokenConfigured);
+      }
     }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    if (initialPlatforms.length === 0) {
-      void load();
-    }
-  }, [initialPlatforms.length, load]);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     if (searchParams.get("connected") === "google" && searchParams.get("success") === "1") {
+      const pendingDev =
+        searchParams.get("google_campaigns") === "pending_dev_token" &&
+        !developerTokenConfigured;
       setMessage(
-        searchParams.get("google_campaigns") === "pending_dev_token"
+        pendingDev
           ? "تم ربط حساب Google، وتنتظر قراءة الحملات إضافة Google Ads Developer Token"
           : "تم ربط Google Ads بنجاح"
       );
@@ -182,14 +256,24 @@ export default function PlatformsClient({
     }
     const err = searchParams.get("error");
     const detail = searchParams.get("detail");
-    const errMsg = metaOAuthErrorMessage(err, detail);
-    if (errMsg) setMessage(errMsg);
+    const platform = searchParams.get("platform");
+    const reason = searchParams.get("reason");
+    const googleErr =
+      platform === "google" || err === "use_menuhus_domain"
+        ? googleOAuthErrorMessage(err, reason)
+        : null;
+    if (googleErr) {
+      setMessage(googleErr);
+    } else {
+      const errMsg = metaOAuthErrorMessage(err, detail);
+      if (errMsg) setMessage(errMsg);
+    }
     if (searchParams.get("selectAccount") === "meta") {
       void fetch("/api/marketing/connections/meta/select-account")
         .then((r) => r.json())
         .then((d) => setPendingAccounts(d.accounts || []));
     }
-  }, [searchParams]);
+  }, [searchParams, developerTokenConfigured, load]);
 
   async function selectAdAccount(accountId: string) {
     setBusy("select-account");
@@ -218,7 +302,31 @@ export default function PlatformsClient({
     });
     const data = await res.json();
     setBusy("");
-    if (data.message) setMessage(data.message);
+    if (typeof data.googleAdsEnv?.developerTokenConfigured === "boolean") {
+      setDeveloperTokenConfigured(data.googleAdsEnv.developerTokenConfigured);
+    }
+    const devOk =
+      typeof data.googleAdsEnv?.developerTokenConfigured === "boolean"
+        ? data.googleAdsEnv.developerTokenConfigured
+        : developerTokenConfigured;
+    if (data.results?.length) {
+      const row = data.results.find((r: { platform?: string; ok?: boolean; error?: string }) =>
+        String(r.platform).toUpperCase() === platform.toUpperCase()
+      );
+      if (row && !row.ok && row.error) {
+        if (!(devOk && isDevTokenMissingUserMessage(row.error))) {
+          setMessage(row.error);
+        }
+      } else if (data.message) {
+        if (!(devOk && isDevTokenMissingUserMessage(data.message))) {
+          setMessage(data.message);
+        }
+      }
+    } else if (data.message) {
+      if (!(devOk && isDevTokenMissingUserMessage(data.message))) {
+        setMessage(data.message);
+      }
+    }
     if (data.platforms) setPlatforms(data.platforms);
     else await load();
   }
@@ -310,7 +418,8 @@ export default function PlatformsClient({
 
       if (
         (res.status === 307 || res.status === 302) &&
-        loc.includes("accounts.google.com/o/oauth2")
+        (loc.includes("accounts.google.com/o/oauth2") ||
+          loc.includes("www.menuhus.com/dashboard/marketing/platforms"))
       ) {
         window.location.assign(loc);
         return;
@@ -340,6 +449,66 @@ export default function PlatformsClient({
     } finally {
       setBusy("");
     }
+  }
+
+  function renderGbpActions(p: PlatformCard) {
+    const connectHref = p.connectUrl || "/api/integrations/google-business/connect";
+    const reviewsHref = p.reviewsUrl || "/dashboard/google-reviews";
+    const pendingLoc = p.syncStatus === "PENDING_LOCATION" || p.status === "PENDING_SETUP";
+
+    return (
+      <>
+        <a href={connectHref}>
+          <Button size="sm" type="button" disabled={!canConnect}>
+            {p.status === "NOT_CONNECTED" ? "ربط GBP" : "إعادة الربط"}
+          </Button>
+        </a>
+        <Link href={reviewsHref}>
+          <Button size="sm" variant="outline" type="button">
+            {pendingLoc ? "اختر الموقع" : "المراجعات"}
+          </Button>
+        </Link>
+        {canConnect && p.status === "CONNECTED" && (
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            loading={busy === `${p.key}-gbp-sync`}
+            onClick={async () => {
+              setBusy(`${p.key}-gbp-sync`);
+              const res = await fetch("/api/integrations/google-business/reviews", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "sync" }),
+              });
+              const data = await res.json();
+              setBusy("");
+              setMessage(data.message || data.error || (data.ok ? "تمت المزامنة" : "فشلت المزامنة"));
+              void load();
+            }}
+          >
+            Sync Reviews
+          </Button>
+        )}
+        {canConnect && p.status !== "NOT_CONNECTED" && (
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            loading={busy === `${p.key}-gbp-disconnect`}
+            onClick={async () => {
+              setBusy(`${p.key}-gbp-disconnect`);
+              await fetch("/api/integrations/google-business/disconnect", { method: "POST" });
+              setBusy("");
+              setMessage("تم فصل Google Business Profile");
+              void load();
+            }}
+          >
+            Disconnect
+          </Button>
+        )}
+      </>
+    );
   }
 
   function renderGoogleActions(p: PlatformCard) {
@@ -530,7 +699,8 @@ export default function PlatformsClient({
     <div className="space-y-6 pb-16">
       <MkPageHeader
         title="منصات الإعلان"
-        desc="اربط حساباتك الإعلانية — Meta Ads عبر OAuth الرسمي"
+        desc="اربط حساباتك الإعلانية — Meta Ads · Google Ads عبر OAuth الرسمي"
+        production={onProductionHost}
       />
 
       {message && (
@@ -565,6 +735,10 @@ export default function PlatformsClient({
           const isMeta = p.key === "META";
           const connected = p.connectionState === "CONNECTED" || p.status === "CONNECTED";
           const showMetaConnect = isMeta && metaNeedsConnectButton(p);
+          const googleHint =
+            p.key === "GOOGLE" || p.key === "YOUTUBE"
+              ? googleCardSetupHint(p, developerTokenConfigured)
+              : p.setupHint ?? null;
 
           return (
             <div
@@ -604,6 +778,9 @@ export default function PlatformsClient({
                       Last Sync: {new Date(p.lastSync).toLocaleString("ar-SA")}
                     </p>
                   )}
+                  {googleHint && (
+                    <p className="text-sm text-amber-200/90">{googleHint}</p>
+                  )}
                 </div>
               ) : isMeta && metaConnectionState(p) === "NOT_CONFIGURED" ? (
                 <p className="mb-4 text-sm text-stone-400">
@@ -615,7 +792,7 @@ export default function PlatformsClient({
                 </p>
               ) : !connected ? (
                 <p className="mb-4 text-sm text-stone-400">
-                  {p.setupHint ||
+                  {(p.key === "GOOGLE" || p.key === "YOUTUBE" ? googleHint : p.setupHint) ||
                     (p.integrationReady
                       ? "اربط حسابك للبدء في إنشاء الحملات."
                       : "يحتاج مسؤول المنصة لتفعيل الربط.")}
@@ -623,7 +800,13 @@ export default function PlatformsClient({
               ) : null}
 
               <div className={cn("flex flex-wrap gap-2", showMetaConnect && "w-full")}>
-                {isMeta ? renderMetaActions(p) : p.key === "GOOGLE" ? renderGoogleActions(p) : renderGenericActions(p)}
+                {isMeta
+                  ? renderMetaActions(p)
+                  : p.key === "GOOGLE_BUSINESS"
+                    ? renderGbpActions(p)
+                    : p.key === "GOOGLE"
+                      ? renderGoogleActions(p)
+                      : renderGenericActions(p)}
               </div>
             </div>
           );

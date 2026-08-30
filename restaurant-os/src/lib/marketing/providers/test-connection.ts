@@ -1,4 +1,5 @@
-import { encryptToken, decryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
+import { encryptToken, decryptToken, canEncryptTokens, integrationEncryptionEnvHint } from "@/lib/marketing/encryption";
+import { testRunwayApiKey } from "@/lib/marketing/providers/runway-api";
 import {
   clampMaxOutputTokens,
   classifyOpenAiError,
@@ -142,9 +143,16 @@ export async function testProviderConnection(
   endpointUrl?: string
 ): Promise<{ ok: boolean; error?: string }> {
   if (!apiKey?.trim()) return { ok: false, error: "API key required" };
-  if (!canEncryptTokens()) return { ok: false, error: "MARKETING_TOKEN_SECRET غير مُعدّ على الخادم" };
+  if (!canEncryptTokens()) {
+    return {
+      ok: false,
+      error: `مفتاح التشفير غير مضاف على الخادم — ${integrationEncryptionEnvHint()}`,
+    };
+  }
 
   switch (providerKey) {
+    case "RUNWAY":
+      return testRunwayApiKey(apiKey.trim());
     case "OPENAI":
     case "OPENAI_IMAGES":
     case "OPENAI_AUDIO":
@@ -181,12 +189,9 @@ export async function testProviderConnection(
       if (["DEEPSEEK", "GROK", "MISTRAL", "PERPLEXITY", "OPENROUTER"].includes(providerKey)) {
         return { ok: false, error: "استخدم اختبار المزوّد المخصص" };
       }
-      if (process.env[`${providerKey}_API_KEY`] || process.env[`${providerKey.replace(/_/g, "")}_API_KEY`]) {
-        return { ok: true };
-      }
       return {
         ok: false,
-        error: "يتطلب إعداد حساب المطور — أدخل API Key من لوحة الربط",
+        error: "لا يتوفر اختبار اتصال حقيقي لهذا المزود بعد — تواصل مع الدعم",
       };
   }
 }

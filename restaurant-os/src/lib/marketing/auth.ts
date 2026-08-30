@@ -36,10 +36,9 @@ export async function requireMarketingOwnerAccess() {
   const result = await requireMarketingAccess();
   if (result.error) return { ...result, canManageSecrets: false };
   const role = result.session?.user?.role;
-  const canManageSecrets = role === "OWNER" || role === "ADMIN";
-  if (!canManageSecrets && role === "MARKETING") {
-    return { ...result, canManageSecrets: false };
-  }
+  const platformAdmin = Boolean(result.session && isPlatformAdminUser(result.session.user));
+  const canManageSecrets =
+    platformAdmin || role === "OWNER" || role === "ADMIN";
   return { ...result, canManageSecrets };
 }
 

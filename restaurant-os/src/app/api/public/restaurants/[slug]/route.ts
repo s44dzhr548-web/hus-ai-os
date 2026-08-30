@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { BRANDING_SELECT } from "@/lib/restaurant-branding";
+import { validateGoogleMapsEmbedSrc } from "@/lib/google-maps-embed";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export async function GET(
       whatsappNumber: true,
       address: true,
       addressAr: true,
+      googleMapsEmbedSrc: true,
       primaryColor: true,
       isActive: true,
     },
@@ -30,5 +32,15 @@ export async function GET(
     return NextResponse.json({ error: "المطعم غير موجود" }, { status: 404 });
   }
 
-  return NextResponse.json(restaurant);
+  let googleMapsEmbedSrc: string | null = null;
+  if (restaurant.googleMapsEmbedSrc) {
+    const v = validateGoogleMapsEmbedSrc(restaurant.googleMapsEmbedSrc);
+    if (v.ok && v.src) googleMapsEmbedSrc = v.src;
+  }
+
+  return NextResponse.json({
+    ...restaurant,
+    googleMapsEmbedSrc,
+    googleMapsEmbedUrl: googleMapsEmbedSrc,
+  });
 }

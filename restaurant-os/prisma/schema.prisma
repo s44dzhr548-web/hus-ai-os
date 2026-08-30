@@ -1,4 +1,4 @@
-﻿// Menu OS ظ¤ Production SaaS Schema
+// Menu OS - Production SaaS Schema
 
 generator client {
   provider = "prisma-client-js"
@@ -25,6 +25,7 @@ enum StaffRole {
 enum OrderStatus {
   NEW
   ACCEPTED
+  CONFIRMED
   PREPARING
   READY
   SERVED
@@ -344,6 +345,7 @@ model Restaurant {
   email       String?
   address     String?
   addressAr   String?  @map("address_ar")
+  googleMapsEmbedSrc String? @map("google_maps_embed_src")
   workingHours Json?   @map("working_hours")
   taxNumber   String?  @map("tax_number")
   currency    String   @default("SAR")
@@ -414,6 +416,10 @@ model Restaurant {
   marketingProviderRouting MarketingProviderRouting?
   marketingAiCostSettings  MarketingAiCostSettings?
   marketingAiUsageLogs     MarketingAiUsageLog[]
+  marketingVideoJobs       MarketingVideoJob[]
+  marketingVideoBrand      MarketingVideoBrandSettings?
+  marketingVideoMedia      MarketingVideoMediaAsset[]
+  marketingVideoProjects   MarketingVideoStudioProject[]
   marketingAutomationRules MarketingAutomationRule[]
   marketingJourneyMetrics  MarketingJourneyMetric[]
   marketingCommandSnapshots MarketingCommandSnapshot[]
@@ -438,6 +444,9 @@ model Restaurant {
   aiAssistantPendingActions AiAssistantPendingAction[]
   aiAccess                  RestaurantAiAccess?
   aiUsageLogs               RestaurantAiUsageLog[]
+  googleBusinessConnection  GoogleBusinessConnection?
+  googleBusinessLocations   GoogleBusinessLocation[]
+  googleReviews             GoogleReview[]
 
   @@index([ownerId])
   @@map("restaurants")
@@ -629,15 +638,18 @@ model Order {
   couponCode         String?     @map("coupon_code")
   notes              String?
   orderSource        OrderSource @default(CHECKOUT) @map("order_source")
-  idempotencyKey     String?     @unique @map("idempotency_key")
-  acceptedAt         DateTime?   @map("accepted_at")
-  preparingAt        DateTime?   @map("preparing_at")
-  readyAt            DateTime?   @map("ready_at")
-  servedAt           DateTime?   @map("served_at")
-  cancelledAt        DateTime?   @map("cancelled_at")
-  createdAt          DateTime    @default(now()) @map("created_at")
-  updatedAt          DateTime    @updatedAt @map("updated_at")
-  completedAt        DateTime?   @map("completed_at")
+  idempotencyKey      String?     @unique @map("idempotency_key")
+  publicAccessToken   String?     @unique @map("public_access_token")
+  acceptedAt          DateTime?   @map("accepted_at")
+  confirmedAt         DateTime?   @map("confirmed_at")
+  confirmedByUserId   String?     @map("confirmed_by_user_id")
+  preparingAt         DateTime?   @map("preparing_at")
+  readyAt             DateTime?   @map("ready_at")
+  servedAt            DateTime?   @map("served_at")
+  cancelledAt         DateTime?   @map("cancelled_at")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+  completedAt         DateTime?   @map("completed_at")
 
   branch          Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
   table           DiningTable?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
@@ -647,6 +659,7 @@ model Order {
   items           OrderItem[]
   payments        Payment[]
   tableGift       TableGift?
+  statusHistory   OrderStatusHistory[]
 
   @@unique([branchId, orderNumber])
   @@index([branchId, status, createdAt])
@@ -671,6 +684,20 @@ model OrderItem {
 
   @@index([orderId])
   @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id              String       @id @default(cuid())
+  orderId         String       @map("order_id")
+  fromStatus      OrderStatus? @map("from_status")
+  toStatus        OrderStatus  @map("to_status")
+  changedByUserId String?      @map("changed_by_user_id")
+  changedAt       DateTime     @default(now()) @map("changed_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, changedAt])
+  @@map("order_status_history")
 }
 
 model Payment {
@@ -1487,6 +1514,18 @@ model MarketingAdConnection {
   @@map("marketing_ad_connections")
 }
 
+model GoogleAdsOAuthState {
+  id           String   @id @default(cuid())
+  stateKey     String   @unique @map("state_key")
+  userId       String   @map("user_id")
+  restaurantId String   @map("restaurant_id")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("google_ads_oauth_states")
+}
+
 model MarketingCampaign {
   id              String                  @id @default(cuid())
   restaurantId    String                  @map("restaurant_id")
@@ -2160,6 +2199,108 @@ model MarketingAiUsageLog {
   @@map("marketing_ai_usage_logs")
 }
 
+model MarketingVideoJob {
+  id             String   @id @default(cuid())
+  restaurantId   String   @map("restaurant_id")
+  providerKey    String   @map("provider_key")
+  externalTaskId String?  @map("external_task_id")
+  status         String   @default("PENDING")
+  mode           String
+  prompt         String
+  aspectRatio    String   @map("aspect_ratio")
+  durationSec    Int      @map("duration_sec")
+  modelId        String?  @map("model_id")
+  progress       Float?
+  outputUrl      String?  @map("output_url")
+  rawOutputUrl   String?  @map("raw_output_url")
+  finalOutputUrl String?  @map("final_output_url")
+  errorMessage   String?  @map("error_message")
+  creativeId     String?  @map("creative_id")
+  projectId      String?  @map("project_id")
+  estimatedCost  Decimal? @map("estimated_cost") @db.Decimal(10, 2)
+  metadataJson   Json?    @map("metadata_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  project    MarketingVideoStudioProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, createdAt])
+  @@index([externalTaskId])
+  @@index([projectId])
+  @@map("marketing_video_jobs")
+}
+
+model MarketingVideoMediaAsset {
+  id           String   @id @default(cuid())
+  restaurantId String   @map("restaurant_id")
+  category     String
+  name         String?
+  url          String
+  r2Key        String?  @map("r2_key")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  thumbnailUrl String?  @map("thumbnail_url")
+  durationSec  Float?   @map("duration_sec")
+  source       String   @default("device")
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  metadataJson Json?    @map("metadata_json")
+  createdBy    String?  @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, category])
+  @@index([restaurantId, createdAt])
+  @@map("marketing_video_media_assets")
+}
+
+model MarketingVideoStudioProject {
+  id                    String   @id @default(cuid())
+  restaurantId          String   @map("restaurant_id")
+  name                  String   @default("مشروع فيديو")
+  prompt                String   @default("")
+  providerKey           String?  @map("provider_key")
+  mode                  String   @default("text_to_video")
+  aspectRatio           String   @default("9:16") @map("aspect_ratio")
+  durationSec           Int      @default(5) @map("duration_sec")
+  modelId               String?  @map("model_id")
+  primaryAssetId        String?  @map("primary_asset_id")
+  referenceVideoAssetId String?  @map("reference_video_asset_id")
+  brandJson             Json?    @map("brand_json")
+  storyboardJson        Json     @default("[]") @map("storyboard_json")
+  assetIdsJson          Json     @default("[]") @map("asset_ids_json")
+  createdBy             String?  @map("created_by")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  jobs       MarketingVideoJob[]
+
+  @@index([restaurantId, updatedAt])
+  @@map("marketing_video_studio_projects")
+}
+
+model MarketingVideoBrandSettings {
+  id                  String   @id @default(cuid())
+  restaurantId        String   @unique @map("restaurant_id")
+  restaurantName      String?  @map("restaurant_name")
+  logoUrl             String?  @map("logo_url")
+  primaryColor        String?  @map("primary_color")
+  secondaryColor      String?  @map("secondary_color")
+  textColor           String?  @map("text_color")
+  defaultLogoPosition String?  @default("bottom_right") @map("default_logo_position")
+  defaultLogoTiming   String?  @default("end") @map("default_logo_timing")
+  defaultCTA          String?  @map("default_cta")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("marketing_video_brand_settings")
+}
+
 model MarketingAutomationRule {
   id           String   @id @default(cuid())
   restaurantId String   @map("restaurant_id")
@@ -2575,4 +2716,127 @@ model MarketingAdSyncLog {
 
   @@index([restaurantId, createdAt])
   @@map("marketing_ad_sync_logs")
+}
+
+enum GoogleReviewReplyStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  PUBLISHED
+  REJECTED
+  FAILED
+}
+
+model GoogleBusinessConnection {
+  id                String   @id @default(cuid())
+  restaurantId      String   @unique @map("restaurant_id")
+  accountName       String?  @map("account_name")
+  accountId         String?  @map("account_id")
+  accessTokenEnc    String?  @map("access_token_enc")
+  refreshTokenEnc   String?  @map("refresh_token_enc")
+  tokenExpiresAt    DateTime? @map("token_expires_at")
+  scopes            String[] @default([])
+  isActive          Boolean  @default(true) @map("is_active")
+  connectedAt       DateTime? @map("connected_at")
+  connectedByUserId String?  @map("connected_by_user_id")
+  lastSyncAt        DateTime? @map("last_sync_at")
+  lastSyncError     String?  @map("last_sync_error")
+  metadataJson      Json?    @map("metadata_json")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  locations  GoogleBusinessLocation[]
+
+  @@map("google_business_connections")
+}
+
+model GoogleBusinessLocation {
+  id                String   @id @default(cuid())
+  restaurantId      String   @map("restaurant_id")
+  connectionId      String   @map("connection_id")
+  locationName      String   @map("location_name")
+  locationId        String   @map("location_id")
+  displayName       String?  @map("display_name")
+  verificationState String?  @map("verification_state")
+  isSelected        Boolean  @default(false) @map("is_selected")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  connection GoogleBusinessConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  reviews    GoogleReview[]
+
+  @@unique([restaurantId, locationId])
+  @@index([restaurantId, isSelected])
+  @@map("google_business_locations")
+}
+
+model GoogleReview {
+  id                    String                  @id @default(cuid())
+  restaurantId          String                  @map("restaurant_id")
+  locationId            String                  @map("location_id")
+  reviewId              String                  @map("review_id")
+  reviewerName          String?                 @map("reviewer_name")
+  reviewerPhotoUrl      String?                 @map("reviewer_photo_url")
+  starRating            Int?                    @map("star_rating")
+  comment               String?
+  createTime            DateTime?               @map("create_time")
+  updateTime            DateTime?               @map("update_time")
+  reviewReply           String?                 @map("review_reply")
+  googleReplyUpdateTime DateTime?               @map("google_reply_update_time")
+  replyStatus           GoogleReviewReplyStatus @default(DRAFT) @map("reply_status")
+  draftText             String?                 @map("draft_text")
+  draftByUserId         String?                 @map("draft_by_user_id")
+  approvedByUserId      String?                 @map("approved_by_user_id")
+  publishedAt           DateTime?               @map("published_at")
+  publishedByUserId     String?                 @map("published_by_user_id")
+  googleResponseStatus  String?                 @map("google_response_status")
+  lastSyncAt            DateTime?               @map("last_sync_at")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  location   GoogleBusinessLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  drafts     GoogleReviewDraft[]
+  auditLogs  GoogleReviewAuditLog[]
+
+  @@unique([restaurantId, reviewId])
+  @@index([restaurantId, starRating])
+  @@index([restaurantId, replyStatus])
+  @@index([restaurantId, createTime])
+  @@map("google_reviews")
+}
+
+model GoogleReviewDraft {
+  id               String                  @id @default(cuid())
+  restaurantId     String                  @map("restaurant_id")
+  googleReviewDbId String                  @map("google_review_db_id")
+  body             String
+  status           GoogleReviewReplyStatus @default(DRAFT)
+  createdByUserId  String?                 @map("created_by_user_id")
+  updatedByUserId  String?                 @map("updated_by_user_id")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+
+  review GoogleReview @relation(fields: [googleReviewDbId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, googleReviewDbId])
+  @@map("google_review_drafts")
+}
+
+model GoogleReviewAuditLog {
+  id               String   @id @default(cuid())
+  restaurantId     String   @map("restaurant_id")
+  googleReviewDbId String?  @map("google_review_db_id")
+  action           String
+  userId           String?  @map("user_id")
+  detailsJson      Json?    @map("details_json")
+  errorCode        String?  @map("error_code")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  review GoogleReview? @relation(fields: [googleReviewDbId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, createdAt])
+  @@map("google_review_audit_logs")
 }

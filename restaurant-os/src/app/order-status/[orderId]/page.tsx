@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Badge, LoadingSpinner } from "@/components/ui";
 import { formatCurrency, formatDate, ORDER_STATUS_LABELS, ORDER_STATUS_VARIANTS } from "@/lib/utils";
-import { CAPTAIN_CUSTOMER_STATUS_STEPS } from "@/lib/captain/status";
+import { CAPTAIN_CUSTOMER_STATUS_STEPS, captainCustomerStepIndex } from "@/lib/captain/status";
 import { CheckCircle, Clock, RefreshCw } from "lucide-react";
 
 interface OrderData {
@@ -31,13 +31,14 @@ export default function OrderStatusPage() {
   const searchParams = useSearchParams();
   const orderId = params.orderId as string;
   const isCaptain = searchParams.get("captain") === "1";
+  const accessToken = searchParams.get("token")?.trim() || "";
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(() => {
     const url = isCaptain
-      ? `/api/public/captain/orders/${orderId}`
+      ? `/api/public/captain/orders/${orderId}${accessToken ? `?token=${encodeURIComponent(accessToken)}` : ""}`
       : `/api/public/orders/${orderId}`;
     fetch(url)
       .then((r) => {
@@ -47,7 +48,7 @@ export default function OrderStatusPage() {
       .then(setOrder)
       .catch(() => setError("الطلب غير موجود"))
       .finally(() => setLoading(false));
-  }, [orderId, isCaptain]);
+  }, [orderId, isCaptain, accessToken]);
 
   useEffect(() => {
     load();
@@ -66,7 +67,7 @@ export default function OrderStatusPage() {
 
   const isDone = ["SERVED", "COMPLETED", "CANCELLED"].includes(order.status);
   const captainSteps = CAPTAIN_CUSTOMER_STATUS_STEPS;
-  const currentStepIndex = captainSteps.findIndex((s) => s.status === order.status);
+  const currentStepIndex = captainCustomerStepIndex(order.status as "NEW");
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -84,6 +85,11 @@ export default function OrderStatusPage() {
             طلب #{order.orderNumber}
             {order.table && ` · طاولة ${order.table.label || order.table.number}`}
           </p>
+          {(isCaptain || order.orderSource === "CAPTAIN") && order.status === "NEW" && (
+            <p className="mt-3 rounded-lg bg-emerald-900/50 px-3 py-2 text-sm">
+              تم إرسال طلبك إلى كابتن الصالة
+            </p>
+          )}
         </div>
       </header>
 
@@ -113,8 +119,8 @@ export default function OrderStatusPage() {
             <h2 className="mb-3 font-semibold">تتبع الطلب</h2>
             <ol className="space-y-3">
               {captainSteps.map((step, i) => {
-                const done = currentStepIndex >= i && order.status !== "NEW" ? i <= currentStepIndex : i === 0 && order.status === "NEW";
-                const active = step.status === order.status;
+                const done = currentStepIndex > i;
+                const active = currentStepIndex === i;
                 return (
                   <li
                     key={step.status}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireMarketingAccess } from "@/lib/marketing/auth";
+import { canEncryptTokens, integrationEncryptionEnvHint } from "@/lib/marketing/encryption";
 import { canManageProviderSecrets } from "@/lib/marketing/providers/permissions";
 import {
   listProvidersForCategory,
@@ -38,6 +39,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       providers: await listProvidersForCategory(restaurantId!, category),
       canManageSecrets: canManageProviderSecrets(session),
+      encryptionConfigured: canEncryptTokens(),
+      encryptionEnvHint: integrationEncryptionEnvHint(),
     });
   }
 

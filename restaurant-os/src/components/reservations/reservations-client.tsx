@@ -571,6 +571,7 @@ export default function ReservationsClient({ mode = "active" }: Props) {
               patch(assignModal.id, {
                 action: "confirm_arrival",
                 tableId: assignTableId,
+                startSession: true,
               });
             }}
           >

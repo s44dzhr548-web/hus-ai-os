@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, requireRestaurant, requireRestaurantRole } from "@/lib/api-auth";
+import { requireAuth, requireRestaurantRole } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { slugify } from "@/lib/utils";
-import { assertFeature } from "@/lib/permissions-engine";
+import { updateRestaurantFromBody } from "@/lib/restaurant-settings-update";
 
 export async function GET() {
   const { session, error } = await requireAuth();
@@ -56,31 +56,12 @@ export async function PUT(req: NextRequest) {
   const { restaurantId, error } = await requireRestaurantRole(["OWNER", "ADMIN"]);
   if (error) return error;
 
-  const body = await req.json();
-
-  if (body.customDomain !== undefined) {
-    const domainCheck = await assertFeature(restaurantId!, "customDomain");
-    if (domainCheck) return domainCheck;
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "طلب غير صالح", code: "INVALID_JSON" }, { status: 400 });
   }
 
-  const restaurant = await prisma.restaurant.update({
-    where: { id: restaurantId! },
-    data: {
-      name: body.name,
-      nameAr: body.nameAr,
-      description: body.description,
-      phone: body.phone,
-      email: body.email,
-      taxNumber: body.taxNumber,
-      logoUrl: body.logoUrl,
-      address: body.address,
-      addressAr: body.addressAr,
-      workingHours: body.workingHours,
-      customDomain: body.customDomain,
-      timezone: body.timezone,
-      currency: body.currency,
-    },
-  });
-
-  return NextResponse.json(restaurant);
+  return updateRestaurantFromBody(restaurantId!, body);
 }

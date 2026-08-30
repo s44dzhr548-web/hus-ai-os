@@ -1,12 +1,13 @@
 import type { OrderStatus } from "@prisma/client";
 
-/** Valid captain order status transitions (no duplicate actions). */
+/** Valid captain/waiter order status transitions. */
 export const CAPTAIN_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  NEW: ["ACCEPTED", "CANCELLED"],
+  NEW: ["CONFIRMED", "ACCEPTED", "CANCELLED"],
   ACCEPTED: ["PREPARING", "CANCELLED"],
+  CONFIRMED: ["PREPARING", "CANCELLED"],
   PREPARING: ["READY", "CANCELLED"],
   READY: ["SERVED", "CANCELLED"],
-  SERVED: [],
+  SERVED: ["COMPLETED"],
   COMPLETED: [],
   CANCELLED: [],
 };
@@ -14,6 +15,7 @@ export const CAPTAIN_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 export const CAPTAIN_STATUS_LABELS: Record<string, string> = {
   NEW: "طلب جديد",
   ACCEPTED: "تم استلام الطلب",
+  CONFIRMED: "تم التأكيد",
   PREPARING: "جاري التجهيز",
   READY: "جاهز",
   SERVED: "تم التقديم",
@@ -23,11 +25,28 @@ export const CAPTAIN_STATUS_LABELS: Record<string, string> = {
 
 export const CAPTAIN_CUSTOMER_STATUS_STEPS = [
   { status: "NEW", label: "تم إرسال طلبك إلى كابتن الصالة" },
-  { status: "ACCEPTED", label: "تم استلام طلبك" },
+  { status: "CONFIRMED", label: "تم تأكيد طلبك" },
   { status: "PREPARING", label: "جاري التجهيز" },
   { status: "READY", label: "طلبك جاهز" },
   { status: "SERVED", label: "تم تقديم الطلب" },
 ] as const;
+
+/** Legacy orders may still be in ACCEPTED — treat as confirmed step in UI. */
+export function captainCustomerStepIndex(status: OrderStatus): number {
+  if (status === "ACCEPTED") return 1;
+  const idx = CAPTAIN_CUSTOMER_STATUS_STEPS.findIndex((s) => s.status === status);
+  if (idx >= 0) return idx;
+  if (status === "COMPLETED") return CAPTAIN_CUSTOMER_STATUS_STEPS.length;
+  return 0;
+}
+
+export function isCaptainOrderEditable(status: OrderStatus): boolean {
+  return status === "NEW";
+}
+
+export function isCaptainOrderLocked(status: OrderStatus): boolean {
+  return !isCaptainOrderEditable(status);
+}
 
 export function canTransitionCaptainStatus(from: OrderStatus, to: OrderStatus): boolean {
   return CAPTAIN_STATUS_TRANSITIONS[from]?.includes(to) ?? false;
@@ -35,10 +54,20 @@ export function canTransitionCaptainStatus(from: OrderStatus, to: OrderStatus): 
 
 export function captainStatusTimestampField(
   status: OrderStatus
-): "acceptedAt" | "preparingAt" | "readyAt" | "servedAt" | "cancelledAt" | "completedAt" | null {
+):
+  | "acceptedAt"
+  | "confirmedAt"
+  | "preparingAt"
+  | "readyAt"
+  | "servedAt"
+  | "cancelledAt"
+  | "completedAt"
+  | null {
   switch (status) {
     case "ACCEPTED":
       return "acceptedAt";
+    case "CONFIRMED":
+      return "confirmedAt";
     case "PREPARING":
       return "preparingAt";
     case "READY":
@@ -55,30 +84,55 @@ export function captainStatusTimestampField(
 }
 
 export function captainActiveStatuses(): OrderStatus[] {
-  return ["NEW", "ACCEPTED", "PREPARING", "READY"];
+  return ["NEW", "ACCEPTED", "CONFIRMED", "PREPARING", "READY"];
 }
 
 export function captainFilterStatuses(): { key: string; label: string; statuses: OrderStatus[] }[] {
   return [
-    { key: "all", label: "الكل", statuses: ["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED", "CANCELLED"] },
-    { key: "new", label: "جديد", statuses: ["NEW"] },
-    { key: "accepted", label: "تم الاستلام", statuses: ["ACCEPTED"] },
-    { key: "preparing", label: "جاري التجهيز", statuses: ["PREPARING"] },
-    { key: "ready", label: "جاهز", statuses: ["READY"] },
-    { key: "served", label: "تم التقديم", statuses: ["SERVED"] },
+    {
+      key: "new",
+      label: "طلبات جديدة",
+      statuses: ["NEW"],
+    },
+    {
+      key: "confirmed",
+      label: "مؤكدة",
+      statuses: ["CONFIRMED", "ACCEPTED"],
+    },
+    {
+      key: "preparing",
+      label: "قيد التجهيز",
+      statuses: ["PREPARING"],
+    },
+    {
+      key: "ready",
+      label: "جاهزة",
+      statuses: ["READY"],
+    },
+    {
+      key: "done",
+      label: "مكتملة",
+      statuses: ["SERVED", "COMPLETED"],
+    },
+    {
+      key: "all",
+      label: "الكل",
+      statuses: ["NEW", "CONFIRMED", "ACCEPTED", "PREPARING", "READY", "SERVED", "COMPLETED", "CANCELLED"],
+    },
   ];
 }
 
 export function nextCaptainAction(status: OrderStatus): { next: OrderStatus; label: string } | null {
   switch (status) {
-    case "NEW":
-      return { next: "ACCEPTED", label: "استلام الطلب" };
+    case "CONFIRMED":
     case "ACCEPTED":
       return { next: "PREPARING", label: "جاري التجهيز" };
     case "PREPARING":
       return { next: "READY", label: "جاهز" };
     case "READY":
       return { next: "SERVED", label: "تم التقديم" };
+    case "SERVED":
+      return { next: "COMPLETED", label: "إكمال" };
     default:
       return null;
   }

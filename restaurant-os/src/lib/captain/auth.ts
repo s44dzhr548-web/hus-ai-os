@@ -10,3 +10,10 @@ export async function requireCaptainAccess() {
 export function captainForbidden() {
   return NextResponse.json({ error: "صلاحيات كابتن الصالة فقط", code: "CAPTAIN_FORBIDDEN" }, { status: 403 });
 }
+
+export function orderLockedResponse() {
+  return NextResponse.json(
+    { error: "تم تأكيد الطلب ولا يمكن تعديل محتواه.", code: "ORDER_LOCKED" },
+    { status: 409 }
+  );
+}

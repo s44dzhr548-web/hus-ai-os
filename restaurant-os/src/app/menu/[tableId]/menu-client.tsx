@@ -312,7 +312,10 @@ export default function MenuClient() {
       setCartOpen(false);
       setOrderNotes("");
       setSubmitState("idle");
-      router.push(`/order-status/${data.order.id}?captain=1`);
+      const token = data.trackingToken || data.order?.publicAccessToken;
+      const qs = new URLSearchParams({ captain: "1" });
+      if (token) qs.set("token", token);
+      router.push(`/order-status/${data.order.id}?${qs.toString()}`);
     } catch (e) {
       setSubmitState("error");
       setSubmitError(e instanceof Error ? e.message : "تعذر إرسال الطلب، حاول مرة أخرى");

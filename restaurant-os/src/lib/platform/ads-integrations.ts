@@ -6,6 +6,7 @@ import {
   isValidMetaAppId,
 } from "@/lib/platform/meta-ads-env";
 import { getCanonicalGoogleRedirectUri, sanitizeGoogleRedirectOverride } from "@/lib/marketing/google-ads-oauth-service";
+import { isGoogleAdsDeveloperTokenConfigured } from "@/lib/marketing/google-ads-developer-token";
 import { fetchWithTimeout, isAbortError } from "@/lib/fetch-with-timeout";
 
 export const ADS_INTEGRATION_KEYS = [
@@ -234,9 +235,7 @@ export async function isAdsIntegrationReady(platformKey: AdsIntegrationKey): Pro
 
 /** OAuth may work without developer token; Ads API calls need the token. */
 export function googleAdsDeveloperTokenConfigured(): boolean {
-  return Boolean(
-    envOrNull("GOOGLE_ADS_DEVELOPER_TOKEN") || envOrNull("GOOGLE_DEVELOPER_TOKEN")
-  );
+  return isGoogleAdsDeveloperTokenConfigured();
 }
 
 export function googleAdsSetupHint(): string | null {

@@ -14,15 +14,38 @@ import { platformToIntegrationKey } from "@/lib/marketing/ads-oauth";
 import prisma from "@/lib/prisma";
 import type { MarketingPlatform } from "@prisma/client";
 import { logMarketingAudit } from "@/lib/marketing/security";
+import {
+  logGoogleAdsDeveloperTokenConfigured,
+} from "@/lib/marketing/google-ads-developer-token";
+import {
+  googleAdsEnvPayload,
+  readGoogleAdsDeveloperTokenConfiguredAtRuntime,
+} from "@/lib/marketing/google-ads-env-runtime";
+import {
+  getGoogleBusinessPlatformCard,
+  googleBusinessToMarketingCard,
+} from "@/lib/google-business/platform-card";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET() {
   const { error, restaurantId, canConnect, canEdit } = await requireAdsPlatformReadAccess();
   if (error) return error;
 
-  const platforms = await getOwnerPlatformCards(restaurantId!);
-  return NextResponse.json({ platforms, permissions: { canConnect, canEdit } });
+  const googleAdsEnv = await googleAdsEnvPayload();
+  logGoogleAdsDeveloperTokenConfigured("marketing_platforms_get", googleAdsEnv.developerTokenConfigured);
+  const platforms = await getOwnerPlatformCards(restaurantId!, {
+    googleAdsDeveloperTokenConfigured: googleAdsEnv.developerTokenConfigured,
+  });
+  const gbpCard = googleBusinessToMarketingCard(
+    await getGoogleBusinessPlatformCard(restaurantId!)
+  );
+  return NextResponse.json({
+    platforms: [...platforms, gbpCard],
+    permissions: { canConnect, canEdit },
+    googleAdsEnv,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -113,8 +136,31 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "sync") {
+    logGoogleAdsDeveloperTokenConfigured("marketing_platforms_sync");
+    const developerTokenConfigured = await readGoogleAdsDeveloperTokenConfiguredAtRuntime();
     const results = await syncRestaurantAds(restaurantId!, platform);
-    return NextResponse.json({ ok: true, results, platforms: await getOwnerPlatformCards(restaurantId!) });
+    const googleAdsEnv = { developerTokenConfigured };
+    const platformOpts = { googleAdsDeveloperTokenConfigured: developerTokenConfigured };
+    if (!results.length) {
+      return NextResponse.json({
+        ok: false,
+        message: "لا يوجد اتصال نشط لهذه المنصة — اربط Google Ads ثم Sync Now",
+        googleAdsEnv,
+        results,
+        platforms: await getOwnerPlatformCards(restaurantId!, platformOpts),
+      });
+    }
+    const failed = results.filter((r) => !r.ok);
+    const ok = failed.length === 0;
+    return NextResponse.json({
+      ok,
+      message: ok
+        ? "تمت المزامنة بنجاح"
+        : failed.map((f) => f.error).filter(Boolean).join(" · ") || "فشلت المزامنة",
+      googleAdsEnv,
+      results,
+      platforms: await getOwnerPlatformCards(restaurantId!, platformOpts),
+    });
   }
 
   return NextResponse.json({ error: "إجراء غير مدعوم" }, { status: 400 });

@@ -4,10 +4,22 @@ const ALGO = "aes-256-gcm";
 const IV_LEN = 16;
 const TAG_LEN = 16;
 
+export function integrationEncryptionSecret(): string | undefined {
+  const primary = process.env.INTEGRATION_ENCRYPTION_KEY?.trim();
+  if (primary && primary.length >= 32) return primary;
+  const legacy = process.env.MARKETING_TOKEN_SECRET?.trim();
+  if (legacy && legacy.length >= 32) return legacy;
+  return undefined;
+}
+
+export function integrationEncryptionEnvHint(): string {
+  return "INTEGRATION_ENCRYPTION_KEY (أو MARKETING_TOKEN_SECRET) — 32+ حرفًا في Vercel";
+}
+
 function getKey(): Buffer {
-  const secret = process.env.MARKETING_TOKEN_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("MARKETING_TOKEN_SECRET must be set (32+ chars) for ad token encryption");
+  const secret = integrationEncryptionSecret();
+  if (!secret) {
+    throw new Error(`${integrationEncryptionEnvHint()} — مطلوب لتشفير مفاتيح التكامل`);
   }
   return crypto.createHash("sha256").update(secret).digest();
 }
@@ -31,6 +43,5 @@ export function decryptToken(encoded: string): string {
 }
 
 export function canEncryptTokens(): boolean {
-  const secret = process.env.MARKETING_TOKEN_SECRET;
-  return Boolean(secret && secret.length >= 32);
+  return Boolean(integrationEncryptionSecret());
 }

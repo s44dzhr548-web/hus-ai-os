@@ -19,7 +19,10 @@ import {
   confirmArrivalWithTable,
   serializeCheckinResponse,
 } from "@/lib/reservation-checkin";
-import { fetchPresentGuests } from "@/lib/present-guests";
+import {
+  fetchPresentGuests,
+  completeReservationSession,
+} from "@/lib/present-guests";
 import { staffCanManageTableStructure } from "@/lib/reception-permissions";
 
 export const dynamic = "force-dynamic";
@@ -273,6 +276,24 @@ export async function PATCH(
       }
       updated = await assignReservationTable(id, restaurantId!, table, staff, minSpend);
 
+      if (body.seat !== false) {
+        const seatResult = await seatReservationFromBooking(
+          id,
+          restaurantId!,
+          table,
+          staff,
+          req,
+          minSpend,
+          body.guestCount != null ? parseInt(String(body.guestCount), 10) : undefined
+        );
+        return NextResponse.json({
+          ...(await withPresentGuests(seatResult.reservation, seatResult.session)),
+          message: seatResult.idempotent
+            ? "✓ العميل جالس على الطاولة مسبقاً"
+            : "✓ تم تأكيد الوصول — جالس على الطاولة",
+        });
+      }
+
       return NextResponse.json({
         ...(await withPresentGuests(updated)),
         message: "✓ تم تأكيد الوصول وتعيين الطاولة",
@@ -318,7 +339,7 @@ export async function PATCH(
         return NextResponse.json({ error: "الطاولة مطلوبة لتأكيد الوصول" }, { status: 400 });
       }
       const result = await confirmArrivalWithTable(id, restaurantId!, table, staff, {
-        startSession: Boolean(body.startSession),
+        startSession: body.startSession !== false,
         minimumSpendAmount:
           body.minimumSpendAmount != null && body.minimumSpendAmount !== ""
             ? parseFloat(String(body.minimumSpendAmount))
@@ -385,6 +406,25 @@ export async function PATCH(
       const msg = e instanceof Error ? e.message : "فشل التحويل";
       const status = msg.includes("مشغولة") ? 409 : 400;
       return NextResponse.json({ error: msg }, { status });
+    }
+  }
+
+  if (action === "complete_session" || action === "complete") {
+    try {
+      await completeReservationSession(id, restaurantId!, {
+        userId: staff.userId,
+        userName: staff.userName,
+      });
+      const updated = await prisma.reservation.findUnique({ where: { id } });
+      return NextResponse.json({
+        ...(await withPresentGuests(updated!)),
+        message: "✓ تم إنهاء الجلسة — الحجز مكتمل والطاولة متاحة",
+      });
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "فشل إنهاء الجلسة" },
+        { status: 400 }
+      );
     }
   }
 

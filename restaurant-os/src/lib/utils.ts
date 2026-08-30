@@ -24,6 +24,7 @@ export function formatDate(date: Date | string) {
 export const ORDER_STATUS_LABELS: Record<string, string> = {
   NEW: "جديد",
   ACCEPTED: "تم استلام الطلب",
+  CONFIRMED: "تم التأكيد",
   PREPARING: "جاري التجهيز",
   READY: "جاهز",
   SERVED: "تم التقديم",
@@ -37,6 +38,7 @@ export const ORDER_STATUS_VARIANTS: Record<
 > = {
   NEW: "info",
   ACCEPTED: "info",
+  CONFIRMED: "info",
   PREPARING: "warning",
   READY: "success",
   SERVED: "default",
@@ -50,8 +52,8 @@ export const STAFF_ROLE_LABELS: Record<string, string> = {
   RECEPTION: "استقبال",
   CASHIER: "كاشير",
   KITCHEN: "مطبخ",
-  WAITER: "نادل",
-  CAPTAIN: "كابتن الصالة",
+  WAITER: "ويتر / كابتن صالة",
+  CAPTAIN: "ويتر / كابتن صالة",
 };
 
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {

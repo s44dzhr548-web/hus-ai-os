@@ -210,13 +210,7 @@ export async function discoverAdAccount(
     }
   }
 
-  return {
-    accountId: "connected",
-    accountName: `${platform} Account`,
-    businessName: null,
-    currency: "SAR",
-    timezone: "Asia/Riyadh",
-  };
+  return null;
 }
 
 export async function refreshAccessTokenIfNeeded(

@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+/**
+ * Optional: run before deploy when new prisma/migrations exist (manual / CI).
+ * NOT invoked from Vercel build — avoids P1001 blocking next build.
+ *
+ *   node scripts/migrate-deploy-retry.mjs
+ */
 import { spawnSync } from "child_process";
 import { loadMigrateEnv } from "./lib/load-migrate-env.mjs";
 
@@ -6,6 +12,18 @@ const maxAttempts = 8;
 const delayMs = 20000;
 
 loadMigrateEnv();
+
+function isConnectionError(output) {
+  const text = String(output || "");
+  return (
+    text.includes("P1001") ||
+    text.includes("Can't reach database server") ||
+    text.includes("ECONNREFUSED") ||
+    text.includes("ETIMEDOUT") ||
+    text.includes("ENOTFOUND") ||
+    text.includes("Connection timed out")
+  );
+}
 
 function isAdvisoryLockError(output) {
   const text = String(output || "");
@@ -76,14 +94,26 @@ for (let attempt = 1; attempt <= maxAttempts; attempt++) {
   }
 
   if (isInvalidDbUrlError(output)) {
-    console.error("[migrate-deploy-retry] invalid DATABASE_URL/DIRECT_URL on build environment");
+    console.error("[migrate-deploy-retry] invalid DATABASE_URL/DIRECT_URL");
+    process.exit(1);
+  }
+
+  if (isConnectionError(output)) {
+    if (attempt < maxAttempts) {
+      console.warn(
+        `[migrate-deploy-retry] database unreachable (P1001/transient), waiting ${delayMs}ms...`
+      );
+      await new Promise((r) => setTimeout(r, delayMs));
+      continue;
+    }
+    console.error("[migrate-deploy-retry] database unreachable after all retries");
     process.exit(1);
   }
 
   if (isAdvisoryLockError(output)) {
     const status = run("npx", ["prisma", "migrate", "status"]);
     if (isDatabaseUpToDate(status.output)) {
-      console.warn("[migrate-deploy-retry] advisory lock but schema up to date — continuing build");
+      console.warn("[migrate-deploy-retry] advisory lock but schema up to date");
       process.exit(0);
     }
     if (attempt < maxAttempts) {

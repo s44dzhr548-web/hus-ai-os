@@ -23,6 +23,12 @@ export function normalizeDbUrl(value) {
 }
 
 export function loadMigrateEnv(envFileName = ".env.migrate.tmp") {
+  for (const key of DB_ENV_KEYS) {
+    if (process.env[key] && !isValidDbUrl(process.env[key])) {
+      delete process.env[key];
+    }
+  }
+
   const envFile = resolve(process.cwd(), process.env.MIGRATE_ENV_FILE || envFileName);
   if (existsSync(envFile)) {
     for (const line of readFileSync(envFile, "utf8").split("\n")) {
@@ -44,6 +50,9 @@ export function loadMigrateEnv(envFileName = ".env.migrate.tmp") {
   for (const key of DB_ENV_KEYS) {
     if (process.env[key]) {
       process.env[key] = normalizeDbUrl(process.env[key]);
+    }
+    if (process.env[key] && !isValidDbUrl(process.env[key])) {
+      delete process.env[key];
     }
   }
 
@@ -102,6 +111,7 @@ export function resolveDbEnv() {
 export function isValidDbUrl(url) {
   if (!url || url.length < 20) return false;
   if (url.includes("[YOUR-PASSWORD]") || url === "placeholder") return false;
+  if (/postgresql:\/\/x:x@localhost/i.test(url)) return false;
   try {
     const parsed = new URL(url);
     return parsed.protocol === "postgresql:" && Boolean(parsed.hostname);

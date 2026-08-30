@@ -15,8 +15,9 @@ export function buildReviewUrl(params: {
 
 export function resolveAppBaseUrl(): string {
   return (
+    process.env.APP_URL?.trim() ||
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.NEXTAUTH_URL ||
-    "https://restaurant-os-nine.vercel.app"
+    "https://www.menuhus.com"
   ).replace(/\/$/, "");
 }

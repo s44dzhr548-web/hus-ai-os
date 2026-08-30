@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { canEncryptTokens } from "@/lib/marketing/encryption";
+import { canEncryptTokens, integrationEncryptionEnvHint } from "@/lib/marketing/encryption";
 import {
   getProviderDef,
   getProvidersByCategory,
@@ -10,6 +10,11 @@ import {
 } from "@/lib/marketing/providers/catalog";
 import { encryptApiKey, testProviderConnection } from "@/lib/marketing/providers/test-connection";
 import { logProviderAudit } from "@/lib/marketing/providers/permissions";
+import {
+  isProviderConnectionUsable,
+  normalizeProviderKey,
+  providerKeyForApi,
+} from "@/lib/marketing/providers/connection-status";
 import type { MarketingPlatform, MarketingProviderCategory } from "@prisma/client";
 
 type ConnRow = {
@@ -74,6 +79,8 @@ function toPublicRow(
   developerReady: boolean
 ) {
   const status = row?.status ?? "DISCONNECTED";
+  const hasSecret = row?.hasSecret ?? false;
+  const connected = isProviderConnectionUsable(status, hasSecret);
   return {
     key: def.key,
     nameAr: def.nameAr,
@@ -88,7 +95,8 @@ function toPublicRow(
     meta: def.meta ?? {},
     developerReady,
     developerSetupRequired: def.developerSetupRequired && !developerReady,
-    status,
+    status: connected ? (status === "DISCONNECTED" ? "CONNECTED" : status) : status,
+    connected,
     connectionMethod: row?.connectionMethod ?? null,
     modelId: row?.modelId ?? def.models?.[0]?.id ?? null,
     orgId: row?.orgId ?? null,
@@ -104,10 +112,50 @@ function toPublicRow(
     lastError: row?.lastError ?? null,
     lastErrorAt: row?.lastErrorAt ?? null,
     lastSyncAt: row?.lastSyncAt ?? null,
-    hasSecret: row?.hasSecret ?? false,
+    hasSecret,
     costEstimate: def.costEstimate ?? null,
     usageEstimate: def.usageEstimate ?? null,
   };
+}
+
+export const STUDIO_VIDEO_PROVIDER_KEYS = [
+  "RUNWAY",
+  "GOOGLE_VEO",
+  "KLING",
+  "LUMA",
+  "PIKA",
+  "HAILUO",
+  "HEYGEN",
+] as const;
+
+export async function listConnectedVideoProvidersForStudio(restaurantId: string) {
+  const allowed = new Set<string>(STUDIO_VIDEO_PROVIDER_KEYS);
+  const providers = await listProvidersForCategory(restaurantId, "VIDEO");
+  return providers
+    .filter((p) => allowed.has(p.key) && p.connected)
+    .map((p) => ({
+      key: p.key,
+      nameAr: p.nameAr,
+      nameEn: p.nameEn,
+      modelId: p.modelId,
+      status: p.status,
+    }));
+}
+
+export async function listVideoProviderConnections(restaurantId: string) {
+  const allowed = new Set<string>(STUDIO_VIDEO_PROVIDER_KEYS);
+  const providers = await listProvidersForCategory(restaurantId, "VIDEO");
+  return providers
+    .filter((p) => allowed.has(p.key))
+    .map((p) => ({
+      provider: providerKeyForApi(p.key),
+      connected: p.connected,
+      status: p.connected ? "connected" : p.status.toLowerCase(),
+      usageType: p.taskAssignment ?? null,
+      lastTestedAt: p.lastSuccessAt ? new Date(p.lastSuccessAt).toISOString() : null,
+      isDefault: p.isDefault,
+      isFallback: p.isBackup,
+    }));
 }
 
 export async function listProvidersForCategory(restaurantId: string, category: ProviderCategory) {
@@ -137,9 +185,14 @@ export async function connectWithApiKey(
   const def = getProviderDef(category, providerKey);
   if (!def) throw new Error("Unknown provider");
   if (!def.apiKeySupported) throw new Error("API Key not supported for this provider");
-  if (!canEncryptTokens()) throw new Error("MARKETING_TOKEN_SECRET غير مُعدّ");
+  if (!canEncryptTokens()) {
+    throw new Error(`مفتاح التشفير غير مضاف في Vercel — ${integrationEncryptionEnvHint()}`);
+  }
 
-  const test = await testProviderConnection(providerKey, payload.apiKey, payload.endpointUrl);
+  const trimmedKey = payload.apiKey?.trim() ?? "";
+  if (!trimmedKey) throw new Error("الحقول المطلوبة ناقصة");
+
+  const test = await testProviderConnection(providerKey, trimmedKey, payload.endpointUrl);
   if (!test.ok) {
     await upsertConnection(restaurantId, category, providerKey, {
       status: "INVALID_KEY",
@@ -150,7 +203,7 @@ export async function connectWithApiKey(
     throw new Error(test.error ?? "Invalid key");
   }
 
-  const enc = encryptApiKey(payload.apiKey);
+  const enc = encryptApiKey(trimmedKey);
   await upsertConnection(restaurantId, category, providerKey, {
     connectionMethod: "API_KEY",
     apiKeyEnc: enc,
@@ -171,7 +224,20 @@ export async function connectWithApiKey(
     method: "API_KEY",
   });
 
-  return { ok: true, status: "HEALTHY" };
+  return { ok: true, status: "HEALTHY", lastTestedAt: new Date().toISOString() };
+}
+
+export async function connectRunwayVideoProvider(
+  restaurantId: string,
+  userId: string,
+  payload: { apiKey: string; usageType: string }
+) {
+  const usageType = payload.usageType?.trim();
+  if (!usageType) throw new Error("الحقول المطلوبة ناقصة — اختر نوع الاستخدام");
+  return connectWithApiKey(restaurantId, userId, "VIDEO", "RUNWAY", {
+    apiKey: payload.apiKey,
+    taskAssignment: usageType,
+  });
 }
 
 async function upsertConnection(
@@ -180,9 +246,8 @@ async function upsertConnection(
   providerKey: string,
   data: Record<string, unknown>
 ) {
-  const key = memKey(restaurantId, category, providerKey);
+  const dbCategory = toDbCategory(category);
   try {
-    const dbCategory = toDbCategory(category);
     await prisma.marketingAiProviderConnection.upsert({
       where: {
         restaurantId_category_providerKey: { restaurantId, category: dbCategory, providerKey },
@@ -195,35 +260,15 @@ async function upsertConnection(
       },
       update: data as object,
     });
-  } catch {
-    const existing = mem.get(key);
-    mem.set(key, {
-      id: existing?.id ?? `mem-${key}`,
-      providerKey,
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Database error";
+    console.error("[marketing-provider] upsert failed", {
+      restaurantId,
       category,
-      status: "DISCONNECTED",
-      connectionMethod: null,
-      modelId: null,
-      orgId: null,
-      projectId: null,
-      endpointUrl: null,
-      isDefault: false,
-      isBackup: false,
-      roleAssignment: null,
-      taskAssignment: null,
-      accountName: null,
-      accountIdMasked: null,
-      lastSuccessAt: null,
-      lastError: null,
-      lastErrorAt: null,
-      lastSyncAt: null,
-      permissionsJson: null,
-      usageEstimateJson: null,
-      costEstimateJson: null,
-      hasSecret: false,
-      ...existing,
-      ...data,
-    } as ConnRow & { apiKeyEnc?: string });
+      providerKey,
+      error: msg,
+    });
+    throw new Error(`فشل حفظ الاتصال في قاعدة البيانات — ${msg}`);
   }
 }
 

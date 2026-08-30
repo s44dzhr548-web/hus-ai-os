@@ -29,9 +29,9 @@ interface StaffRow {
 const ROLE_OPTIONS = [
   { id: "RECEPTION", label: "استقبال" },
   { id: "MANAGER", label: "مدير" },
-  { id: "WAITER", label: "نادل" },
+  { id: "WAITER", label: "ويتر / كابتن صالة" },
   { id: "KITCHEN", label: "مطبخ" },
-  { id: "CAPTAIN", label: "كابتن الصالة" },
+  { id: "CAPTAIN", label: "ويتر / كابتن صالة" },
 ];
 
 export default function StaffPage() {

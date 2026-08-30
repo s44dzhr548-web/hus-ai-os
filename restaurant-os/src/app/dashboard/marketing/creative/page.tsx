@@ -1,41 +1,59 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { MkBadge, MkCard, MkPageHeader } from "@/components/marketing/marketing-shell";
+import { MkCard, MkPageHeader } from "@/components/marketing/marketing-shell";
 import { CREATIVE_TABS } from "@/lib/marketing/nav";
 
-export default function CreativeStudioPage() {
-  const [tab, setTab] = useState(0);
-  const [provider, setProvider] = useState("");
+const STUDIO_LINKS = [
+  {
+    href: "/dashboard/marketing/creative/videos",
+    title: "استوديو الفيديو",
+    desc: "Runway · Veo · Kling · Luma · Pika · HeyGen · Hailuo",
+  },
+  {
+    href: "/dashboard/marketing/creative/images",
+    title: "استوديو الصور",
+    desc: "OpenAI · Imagen · Ideogram · Leonardo",
+  },
+  {
+    href: "/dashboard/marketing/creative/copy/providers",
+    title: "نصوص إبداعية",
+    desc: "OpenAI · Claude · Gemini",
+  },
+] as const;
 
+export default function CreativeStudioPage() {
   return (
-    <div>
-      <MkPageHeader title="Creative Studio" desc="Select provider before generate — Phase 2" />
-      <MkCard className="mb-4">
-        <label className="text-sm">مزود التوليد
-          <select className="mt-1 w-full rounded border bg-transparent px-2 py-1" value={provider} onChange={(e) => setProvider(e.target.value)}>
-            <option value="">— اختر المزود —</option>
-            <option value="image">Image provider</option>
-            <option value="video">Video provider</option>
-            <option value="copy">Copy provider</option>
-          </select>
-        </label>
-        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-          <Link href="/dashboard/marketing/creative/images/providers">صور</Link>
-          <Link href="/dashboard/marketing/creative/videos/providers">فيديو</Link>
-          <Link href="/dashboard/marketing/creative/copy/providers">نصوص</Link>
-        </div>
-      </MkCard>
-      <div className="mb-4 flex gap-1 overflow-x-auto pb-2">
-        {CREATIVE_TABS.map((t, i) => (
-          <button key={t} type="button" onClick={() => setTab(i)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs ${tab === i ? "bg-amber-600 text-white" : "bg-stone-800"}`}>{t}</button>
+    <div dir="rtl" className="text-stone-100">
+      <MkPageHeader
+        title="Creative Studio"
+        desc="اختر استوديو المحتوى — الفيديو يستخدم المزودين المتصلين من قاعدة البيانات"
+      />
+      <div className="mb-4 flex flex-wrap gap-2">
+        {CREATIVE_TABS.map((t) => (
+          <span key={t} className="rounded-full bg-stone-800 px-3 py-1.5 text-xs text-stone-300">
+            {t}
+          </span>
         ))}
       </div>
-      <MkCard className="py-16 text-center">
-        <MkBadge type="simulation" />
-        <p className="mt-2 text-sm opacity-60">{CREATIVE_TABS[tab]} — مسودة · {provider || "لم يُختر مزود"}</p>
-        <button type="button" disabled={!provider} className="mt-4 rounded bg-amber-600 px-4 py-2 text-sm text-white disabled:opacity-40">توليد (Phase 2)</button>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {STUDIO_LINKS.map((s) => (
+          <Link key={s.href} href={s.href}>
+            <MkCard className="h-full border-stone-700 bg-stone-950/80 transition hover:border-amber-600/50">
+              <h3 className="font-bold text-white">{s.title}</h3>
+              <p className="mt-2 text-sm text-stone-400">{s.desc}</p>
+              <p className="mt-3 text-xs text-amber-400">فتح الاستوديو →</p>
+            </MkCard>
+          </Link>
+        ))}
+      </div>
+      <MkCard className="mt-6 border-stone-700 bg-stone-950/80">
+        <p className="text-sm text-stone-300">
+          لربط Runway أو غيره:{" "}
+          <Link href="/dashboard/marketing/creative/videos/providers" className="text-amber-400 underline">
+            مزودو توليد الفيديو
+          </Link>
+        </p>
       </MkCard>
     </div>
   );

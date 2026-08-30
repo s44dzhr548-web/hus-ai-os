@@ -72,10 +72,14 @@ type PresentGuest = {
   status: string;
   statusLabel: string;
   displaySection: "arrived" | "checked_in" | "seated";
+  seatedLabel?: string | null;
   tableNumberSnapshot: string | null;
   tableLabel: string | null;
   arrivedAt: string | null;
   checkedInAt: string | null;
+  seatedAt?: string | null;
+  reservationNumber?: string | null;
+  sessionDurationMinutes?: number | null;
 };
 
 type EditModal = "edit" | "move" | "minSpend" | null;
@@ -685,7 +689,7 @@ export default function ReceptionPage() {
       {(arrivedGuests.length > 0 || checkedInGuests.length > 0 || seatedGuests.length > 0) && (
         <Card className="space-y-4 p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">العملاء الموجودون حالياً</h2>
+            <h2 className="text-lg font-bold">العملاء الجالسون حاليًا والواصلون</h2>
             <Link href="/dashboard/reservations" className="text-sm text-emerald-700 hover:underline">
               إدارة الحجوزات
             </Link>
@@ -694,10 +698,13 @@ export default function ReceptionPage() {
             {[
               { title: "وصل", guests: arrivedGuests, color: "bg-blue-50 border-blue-200" },
               { title: "تم الوصول", guests: checkedInGuests, color: "bg-amber-50 border-amber-200" },
-              { title: "على الطاولة", guests: seatedGuests, color: "bg-emerald-50 border-emerald-200" },
+              { title: "على الطاولة", guests: seatedGuests, color: "bg-emerald-50 border-emerald-200", heading: "العملاء الجالسون حاليًا" },
             ].map((section) => (
               <div key={section.title} className={`rounded-xl border p-3 ${section.color}`}>
-                <p className="mb-2 text-sm font-semibold">{section.title} ({section.guests.length})</p>
+                <p className="mb-2 text-sm font-semibold">
+                  {"heading" in section && section.heading ? section.heading : section.title} (
+                  {section.guests.length})
+                </p>
                 {section.guests.length === 0 ? (
                   <p className="text-xs text-gray-500">لا يوجد</p>
                 ) : (
@@ -705,10 +712,25 @@ export default function ReceptionPage() {
                     {section.guests.map((g) => (
                       <li key={g.id} className="rounded-lg bg-white/80 p-2 text-sm">
                         <p className="font-medium">{g.customerName}</p>
+                        {"seatedLabel" in g && g.seatedLabel ? (
+                          <p className="text-xs font-semibold text-emerald-800">{g.seatedLabel}</p>
+                        ) : null}
                         <p className="text-xs text-gray-600">
                           {g.guestCount} ضيف
-                          {g.tableNumberSnapshot ? ` · طاولة ${g.tableNumberSnapshot}` : ""}
+                          {g.tableNumberSnapshot && !("seatedLabel" in g && g.seatedLabel)
+                            ? ` · طاولة ${g.tableNumberSnapshot}`
+                            : ""}
+                          {"reservationNumber" in g && g.reservationNumber
+                            ? ` · حجز ${g.reservationNumber}`
+                            : ""}
                         </p>
+                        {"sessionDurationMinutes" in g &&
+                        g.sessionDurationMinutes != null &&
+                        g.sessionDurationMinutes >= 0 ? (
+                          <p className="text-xs text-gray-500">
+                            مدة الجلسة: {g.sessionDurationMinutes} د
+                          </p>
+                        ) : null}
                         <Badge className="mt-1">{g.statusLabel}</Badge>
                       </li>
                     ))}

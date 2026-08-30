@@ -1,12 +1,11 @@
-import { StudioShell } from "@/components/marketing/studio-shell";
+import { VideoStudioClient } from "@/components/marketing/video-studio-client";
 
 export default function VideoStudioPage() {
   return (
-    <StudioShell
+    <VideoStudioClient
       title="AI Video Studio"
-      desc="Runway · Kling · Veo · Pika · HeyGen · Hailuo"
+      desc="توليد فيديو حقيقي عبر المزودين المتصلين — Runway · Veo · Kling · Luma · Pika · HeyGen · Hailuo"
       providersHref="/dashboard/marketing/creative/videos/providers"
-      formats={["TikTok", "Reel", "Snap Story", "YouTube Short", "Intro", "Product", "Offer", "Menu"]}
     />
   );
 }

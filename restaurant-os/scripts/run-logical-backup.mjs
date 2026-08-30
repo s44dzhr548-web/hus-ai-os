@@ -7,6 +7,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { loadEnvFile } from "./load-env-file.mjs";
+import { loadMigrateEnv } from "./lib/load-migrate-env.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
@@ -14,7 +15,9 @@ const root = path.join(__dirname, "..");
 const envArg = process.argv.find((a) => a.startsWith("--env-file="));
 const envFile = envArg ? envArg.split("=")[1] : "../.env";
 loadEnvFile(path.resolve(root, envFile));
-
+if (!process.env.DATABASE_URL) {
+  loadMigrateEnv();
+}
 if (!process.env.DATABASE_URL) {
   console.error(JSON.stringify({ ok: false, error: "DATABASE_URL missing" }));
   process.exit(1);

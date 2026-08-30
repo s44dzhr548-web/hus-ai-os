@@ -1,7 +1,20 @@
 import prisma from "@/lib/prisma";
 import type { MarketingPlatform } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { decryptToken, encryptToken, canEncryptTokens } from "@/lib/marketing/encryption";
-import { refreshAccessTokenIfNeeded, discoverAdAccount } from "@/lib/marketing/ads-oauth";
+import { refreshAccessTokenIfNeeded } from "@/lib/marketing/ads-oauth";
+import {
+  GoogleAdsApiError,
+  isPlaceholderGoogleAccountId,
+  logGoogleAdsSyncFailure,
+  syncGoogleAdsEntities,
+} from "@/lib/marketing/google-ads-api-service";
+import { getGoogleAdsManagerCustomerId } from "@/lib/marketing/google-ads-oauth-service";
+import {
+  isGoogleAdsDeveloperTokenConfigured,
+  logGoogleAdsDeveloperTokenConfigured,
+  resolveGoogleAdsSetupHintForCard,
+} from "@/lib/marketing/google-ads-developer-token";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -118,10 +131,28 @@ async function syncMetaEntities(restaurantId: string, platform: MarketingPlatfor
       });
     }
   } catch {
-    /* partial sync ok */
+    throw new Error("Meta Ads sync failed");
   }
 
   return { campaigns, spend: totalSpend };
+}
+
+function metadataWithSyncError(
+  existing: unknown,
+  error: string | null
+): Prisma.InputJsonValue {
+  const base =
+    existing && typeof existing === "object" && !Array.isArray(existing)
+      ? { ...(existing as Record<string, unknown>) }
+      : {};
+  if (error) {
+    base.lastSyncError = error;
+    base.lastSyncErrorAt = new Date().toISOString();
+  } else {
+    delete base.lastSyncError;
+    delete base.lastSyncErrorAt;
+  }
+  return base as Prisma.InputJsonValue;
 }
 
 export async function syncRestaurantAds(restaurantId: string, platform?: MarketingPlatform) {
@@ -147,28 +178,54 @@ export async function syncRestaurantAds(restaurantId: string, platform?: Marketi
 
     try {
       let summary = { campaigns: 0, spend: 0 };
+
       if (["META", "FACEBOOK", "INSTAGRAM"].includes(conn.platform)) {
         summary = await syncMetaEntities(restaurantId, conn.platform, token);
-      } else {
-        const acct = await discoverAdAccount(conn.platform, token);
-        if (acct) {
-          await prisma.marketingAdConnection.update({
-            where: { id: conn.id },
-            data: {
-              accountId: acct.accountId,
-              accountName: acct.accountName,
-              businessName: acct.businessName,
-              currency: acct.currency,
-              timezone: acct.timezone,
-            },
-          });
-        }
-      }
+        await prisma.marketingAdConnection.update({
+          where: { id: conn.id },
+          data: {
+            lastSyncAt: new Date(),
+            syncStatus: "SYNCED",
+            metadataJson: metadataWithSyncError(conn.metadataJson, null),
+          },
+        });
+      } else if (conn.platform === "GOOGLE" || conn.platform === "YOUTUBE") {
+        const meta =
+          conn.metadataJson && typeof conn.metadataJson === "object"
+            ? (conn.metadataJson as Record<string, unknown>)
+            : {};
+        const google = await syncGoogleAdsEntities({
+          restaurantId,
+          accessToken: token,
+          storedAccountId: conn.accountId,
+          loginCustomerId:
+            (meta.managerCustomerId as string | undefined) || getGoogleAdsManagerCustomerId(),
+        });
 
-      await prisma.marketingAdConnection.update({
-        where: { id: conn.id },
-        data: { lastSyncAt: new Date(), syncStatus: "SYNCED" },
-      });
+        summary = { campaigns: google.campaigns, spend: google.spend };
+
+        await prisma.marketingAdConnection.update({
+          where: { id: conn.id },
+          data: {
+            accountId: google.customerId,
+            accountName: google.accountName,
+            businessName: google.accountName,
+            currency: google.currency,
+            lastSyncAt: new Date(),
+            syncStatus: "SYNCED",
+            metadataJson: metadataWithSyncError(
+              {
+                ...meta,
+                googleCustomerId: google.customerId,
+                lastSuccessfulSyncAt: new Date().toISOString(),
+              },
+              null
+            ),
+          },
+        });
+      } else {
+        throw new Error(`Sync not implemented for ${conn.platform}`);
+      }
 
       await prisma.marketingAdSyncLog.create({
         data: {
@@ -182,10 +239,33 @@ export async function syncRestaurantAds(restaurantId: string, platform?: Marketi
 
       results.push({ platform: conn.platform, ok: true, ...summary });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Sync failed";
+      const msg =
+        e instanceof GoogleAdsApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "Sync failed";
+
+      if (e instanceof GoogleAdsApiError) {
+        logGoogleAdsSyncFailure({
+          restaurantId,
+          code: e.code,
+          message: e.message,
+          httpStatus: e.httpStatus,
+        });
+      }
+
       await prisma.marketingAdConnection.update({
         where: { id: conn.id },
-        data: { syncStatus: "ERROR" },
+        data: {
+          syncStatus:
+            e instanceof GoogleAdsApiError &&
+            (e.message.includes("Basic Access") ||
+              e.message.includes("بانتظار موافقة Google"))
+              ? "CONNECTED_PENDING_API_APPROVAL"
+              : "ERROR",
+          metadataJson: metadataWithSyncError(conn.metadataJson, msg),
+        },
       });
       await prisma.marketingAdSyncLog.create({
         data: { restaurantId, platform: conn.platform, kind: "DAILY_SYNC", ok: false, message: msg },
@@ -213,7 +293,10 @@ export async function syncAllRestaurantsAds() {
   return { restaurants: connections.length, ok, fail };
 }
 
-export async function getOwnerPlatformCards(restaurantId: string) {
+export async function getOwnerPlatformCards(
+  restaurantId: string,
+  opts?: { googleAdsDeveloperTokenConfigured?: boolean }
+) {
   const { OWNER_AD_PLATFORMS } = await import("@/lib/marketing/ads-platforms");
   const { isAdsIntegrationReady, googleAdsSetupHint } = await import("@/lib/platform/ads-integrations");
   const {
@@ -227,6 +310,8 @@ export async function getOwnerPlatformCards(restaurantId: string) {
   const connections = await prisma.marketingAdConnection.findMany({ where: { restaurantId } });
   const byPlatform = new Map(connections.map((c) => [c.platform, c]));
   const metaConfigured = await isMetaAdsConfigured();
+  const devTokenConfigured =
+    opts?.googleAdsDeveloperTokenConfigured ?? isGoogleAdsDeveloperTokenConfigured();
 
   return Promise.all(
     OWNER_AD_PLATFORMS.map(async (p) => {
@@ -240,6 +325,13 @@ export async function getOwnerPlatformCards(restaurantId: string) {
       let connectUrl: string | null = null;
       let showConnectButton = false;
       let setupHint: string | null = null;
+
+      const metaJson =
+        conn?.metadataJson && typeof conn.metadataJson === "object"
+          ? (conn.metadataJson as Record<string, unknown>)
+          : {};
+      const lastSyncError =
+        typeof metaJson.lastSyncError === "string" ? metaJson.lastSyncError : null;
 
       if (p.platform === "META") {
         const metaState = resolveMetaAdsConnectionState(
@@ -268,7 +360,16 @@ export async function getOwnerPlatformCards(restaurantId: string) {
       }
 
       if (p.platform === "GOOGLE" || p.platform === "YOUTUBE") {
-        setupHint = googleAdsSetupHint();
+        if (p.platform === "GOOGLE") {
+          logGoogleAdsDeveloperTokenConfigured("getOwnerPlatformCards");
+        }
+        const baseHint = googleAdsSetupHint();
+        setupHint = resolveGoogleAdsSetupHintForCard({
+          setupHint: baseHint,
+          lastSyncError,
+          syncStatus: conn?.syncStatus,
+          developerTokenConfigured: devTokenConfigured,
+        });
       }
 
       const legacyStatus = connected
@@ -276,6 +377,16 @@ export async function getOwnerPlatformCards(restaurantId: string) {
         : integrationReady
           ? "NOT_CONNECTED"
           : "PENDING_SETUP";
+
+      const rawAccountId = conn?.accountId;
+      const displayAccountId =
+        rawAccountId && !isPlaceholderGoogleAccountId(rawAccountId)
+          ? maskId(rawAccountId)
+          : null;
+
+      const rawAccountName = conn?.accountName;
+      const displayAccountName =
+        rawAccountName && !/account$/i.test(rawAccountName.trim()) ? rawAccountName : null;
 
       return {
         key: p.platform,
@@ -289,14 +400,15 @@ export async function getOwnerPlatformCards(restaurantId: string) {
         integrationReady,
         showConnectButton,
         connectUrl,
+        setupHint,
         businessName: conn?.businessName ?? null,
-        accountName: conn?.accountName ?? null,
-        accountId: conn?.accountId ? maskId(conn.accountId) : null,
+        accountName: displayAccountName ?? conn?.businessName ?? null,
+        accountId: displayAccountId,
         currency: conn?.currency ?? null,
         timezone: conn?.timezone ?? null,
         lastSync: conn?.lastSyncAt?.toISOString() ?? null,
         syncStatus: conn?.syncStatus ?? null,
-        setupHint,
+        lastSyncError,
       };
     })
   );
@@ -309,6 +421,7 @@ function statusLabelFromLegacy(status: string): string {
 }
 
 function maskId(id: string): string {
-  if (id.length <= 6) return "••••";
-  return `${id.slice(0, 2)}••••${id.slice(-4)}`;
+  const digits = id.replace(/-/g, "");
+  if (digits.length <= 6) return digits;
+  return `${digits.slice(0, 3)}••••${digits.slice(-4)}`;
 }

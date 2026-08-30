@@ -65,7 +65,10 @@ export const RECEPTION_STAFF_ROUTES = [
 ];
 
 /** Captain (floor) staff — orders only */
-export const CAPTAIN_STAFF_ROUTES = ["/dashboard/captain"];
+export const CAPTAIN_STAFF_ROUTES = ["/dashboard/captain", "/dashboard/waiter"];
+
+/** Waiter staff — same order flow as captain */
+export const WAITER_STAFF_ROUTES = ["/dashboard/captain", "/dashboard/waiter"];
 
 export const platformNavItems: NavItem[] = [
   { href: "/dashboard/platform", label: "إدارة المنصة", icon: Shield },
@@ -99,10 +102,11 @@ export const restaurantNavItems: NavItem[] = [
   { href: "/dashboard/branding", label: "Landing Page Builder", icon: Palette, roles: ["OWNER", "ADMIN"] },
   { href: "/dashboard/media", label: "مركز الوسائط", icon: Images, roles: ["OWNER", "ADMIN", "MANAGER"] },
   { href: "/dashboard/marketing", label: "التسويق الذكي", icon: Megaphone, roles: ["OWNER", "ADMIN", "MARKETING", "MANAGER"] },
+  { href: "/dashboard/google-reviews", label: "مراجعات Google", icon: Megaphone, roles: ["OWNER", "ADMIN", "MANAGER", "MARKETING", "RECEPTION"] },
   { href: "/dashboard/whatsapp/inbox", label: "WhatsApp Inbox", icon: MessageCircle, roles: ["OWNER", "ADMIN", "MARKETING", "MANAGER", "RECEPTION"] },
   { href: "/dashboard/menu/options", label: "الخيارات والإضافات", icon: ListTree, roles: ["OWNER", "ADMIN", "MANAGER"] },
   { href: "/dashboard/orders", label: "الطلبات", icon: ClipboardList, roles: ["OWNER", "ADMIN", "MANAGER", "CASHIER", "KITCHEN", "WAITER"] },
-  { href: "/dashboard/captain", label: "كابتن الصالة", icon: ConciergeBell, roles: ["OWNER", "ADMIN", "MANAGER", "CAPTAIN", "WAITER"] },
+  { href: "/dashboard/captain", label: "ويتر / كابتن الصالة", icon: ConciergeBell, roles: ["OWNER", "ADMIN", "MANAGER", "CAPTAIN", "WAITER"] },
   { href: "/dashboard/kitchen", label: "المطبخ", icon: ChefHat, roles: ["OWNER", "ADMIN", "MANAGER", "KITCHEN"] },
   { href: "/dashboard/waiter-calls", label: "طلبات الخدمة", icon: Bell, roles: ["OWNER", "ADMIN", "MANAGER", "WAITER"] },
   { href: "/dashboard/reports", label: "التحليلات", icon: BarChart3, roles: ["OWNER", "ADMIN", "MANAGER", "CASHIER"] },
@@ -151,7 +155,7 @@ function receptionRouteAllowed(pathname: string): boolean {
 }
 
 function isCaptainStaff(role?: DashboardRole) {
-  return role === "CAPTAIN";
+  return role === "CAPTAIN" || role === "WAITER";
 }
 
 function captainRouteAllowed(pathname: string): boolean {
@@ -248,10 +252,9 @@ export function defaultDashboardPath(opts: {
 }): string {
   if (isPlatformAdminUser(opts)) return "/dashboard/platform";
   if (opts.role === "RECEPTION") return "/dashboard/reception";
-  if (opts.role === "CAPTAIN") return "/dashboard/captain";
+  if (opts.role === "CAPTAIN" || opts.role === "WAITER") return "/dashboard/captain";
   if (opts.role === "MARKETING") return "/dashboard/marketing/command-center";
   if (opts.role === "KITCHEN") return "/dashboard/kitchen";
-  if (opts.role === "WAITER") return "/dashboard/waiter-calls";
   if (opts.role === "CASHIER") return "/dashboard/payments";
   return "/dashboard";
 }

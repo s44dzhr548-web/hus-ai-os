@@ -1,11 +1,8 @@
 import { tableCodeFor, menuUrlForTable } from "./table-code";
+import { safePublicBaseUrl } from "./safe-public-url";
 
 export function appBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    "http://localhost:3005"
-  ).replace(/\/$/, "");
+  return safePublicBaseUrl();
 }
 
 interface LinkInput {

@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LandingSubPage } from "@/components/customer/landing-sub-page";
+import { GoogleMapsEmbedSection } from "@/components/customer/google-maps-embed-section";
 import { buildWhatsAppOrderLink } from "@/lib/whatsapp";
 
 export default function ContactPage() {
@@ -17,6 +18,7 @@ export default function ContactPage() {
     addressAr?: string;
     logoUrl?: string;
     primaryColor?: string;
+    googleMapsEmbedSrc?: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -44,6 +46,9 @@ export default function ContactPage() {
       primaryColor={info?.primaryColor || "#d4af37"}
     >
       <div className="space-y-4">
+        {info?.googleMapsEmbedSrc && (
+          <GoogleMapsEmbedSection embedSrc={info.googleMapsEmbedSrc} />
+        )}
         {(info?.addressAr || info?.address) && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-sm opacity-70">العنوان</p>

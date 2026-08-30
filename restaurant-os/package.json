@@ -8,9 +8,11 @@
     "build": "prisma generate && next build",
     "start": "next start -p 3005",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:migrate:deploy": "node scripts/migrate-deploy.mjs",
+    "db:migrate:deploy": "node scripts/migrate-deploy-retry.mjs",
+    "db:repair:checkin": "node scripts/repair-reservation-checkin-state.mjs",
     "db:baseline": "node scripts/baseline-migrations.mjs",
     "db:inspect": "node scripts/inspect-migrations.mjs",
     "db:push": "prisma db push",
@@ -20,6 +22,7 @@
     "db:seed:100tables": "tsx scripts/seed-100-tables.ts",
     "db:fix:qr": "tsx scripts/fix-qr-urls.ts",
     "test:smoke": "node scripts/production-smoke-test.mjs",
+    "test": "node scripts/fabrika-menuhus-production-qa.mjs && node scripts/fabrika-four-fixes-qa.mjs",
     "test:audit": "tsx scripts/production-audit.ts",
     "test:phase1": "tsx scripts/phase1-qa-audit.ts",
     "test:r2": "tsx scripts/r2-upload-test.ts",
@@ -53,7 +56,7 @@
     "test:phase1:prod": "node scripts/production-verify.mjs && npm run test:smoke && npm run test:reception && npm run test:customers && npm run test:staff && npm run test:permissions",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && node scripts/migrate-deploy-retry.mjs && next build"
+    "vercel-build": "prisma generate && next build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.9.1",
@@ -62,6 +65,7 @@
     "@prisma/client": "^6.9.0",
     "bcryptjs": "^3.0.2",
     "clsx": "^2.1.1",
+    "ffmpeg-static": "^5.3.0",
     "lucide-react": "^0.511.0",
     "next": "^15.3.3",
     "next-auth": "^4.24.11",

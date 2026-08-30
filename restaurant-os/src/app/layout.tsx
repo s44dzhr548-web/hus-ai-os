@@ -2,10 +2,14 @@ import type { Metadata } from "next";
 import { Providers } from "./providers";
 import "./globals.css";
 
+import { safePublicOrigin } from "@/lib/safe-public-url";
+
+function resolveMetadataBase(): URL {
+  return new URL(safePublicOrigin());
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3005"
-  ),
+  metadataBase: resolveMetadataBase(),
   title: {
     default: "Menu OS — نظام القائمة الرقمية للمطاعm",
     template: "%s | Menu OS",

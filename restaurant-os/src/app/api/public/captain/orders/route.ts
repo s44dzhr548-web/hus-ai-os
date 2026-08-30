@@ -21,11 +21,18 @@ export async function POST(req: NextRequest) {
         notes: i.notes ? String(i.notes) : undefined,
       })),
       notes: body.notes ? String(body.notes) : undefined,
+      customerName: body.customerName ? String(body.customerName) : undefined,
+      customerPhone: body.customerPhone ? String(body.customerPhone) : undefined,
       idempotencyKey,
       guestToken: body.guestToken ? String(body.guestToken) : undefined,
     });
 
-    return NextResponse.json({ ok: true, order });
+    return NextResponse.json({
+      ok: true,
+      order,
+      message: "تم إرسال طلبك إلى كابتن الصالة",
+      trackingToken: order.publicAccessToken,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "فشل إنشاء الطلب";
     return NextResponse.json({ error: message }, { status: 400 });

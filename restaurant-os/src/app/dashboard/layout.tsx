@@ -1,6 +1,8 @@
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { PermanentStorageBanner } from "@/components/media/permanent-storage-banner";
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardLayout({
   children,
 }: {

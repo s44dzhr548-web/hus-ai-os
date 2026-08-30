@@ -3,8 +3,8 @@ import type { Prisma } from "@prisma/client";
 import type { Session } from "next-auth";
 import { isPlatformAdminUser } from "@/lib/permissions";
 
-export function canManageProviderSecrets(session: Session | null): boolean {
-  if (!session?.user) return false;
+export function canManageProviderSecrets(session: Session | null): boolean {  if (!session?.user) return false;
+  if (isPlatformAdminUser(session.user)) return true;
   const role = session.user.role;
   return role === "OWNER" || role === "ADMIN";
 }

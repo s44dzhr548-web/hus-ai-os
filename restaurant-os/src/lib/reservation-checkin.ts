@@ -431,13 +431,13 @@ export async function confirmArrivalWithTable(
     /* optional */
   }
 
-  if (opts?.startSession) {
+  if (opts?.startSession !== false) {
     return seatReservationFromBooking(
       reservationId,
       restaurantId,
       table,
       staff,
-      opts.req,
+      opts?.req,
       opts?.minimumSpendAmount,
       opts?.actualGuestCount
     );
