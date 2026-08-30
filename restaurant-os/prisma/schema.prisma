@@ -1177,6 +1177,9 @@ model Reservation {
   occasion          String?
   notes             String?
   preferredArea     String?           @map("preferred_area")
+  sessionType       String?           @map("session_type")
+  publicAccessToken String?           @unique @map("public_access_token")
+  idempotencyKey    String?           @unique @map("idempotency_key")
   source            String?           @default("dashboard")
   tableId           String?           @map("table_id")
   tableNumber       Int?              @map("table_number")

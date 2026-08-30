@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRestaurantRole } from "@/lib/api-auth";
+import { requireRestaurantRole, restaurantIdFromRequest } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { assertFeature } from "@/lib/permissions-engine";
 import {
@@ -30,11 +30,14 @@ export const dynamic = "force-dynamic";
 const RECEPTION_ROLES = ["OWNER", "ADMIN", "MANAGER", "RECEPTION", "CASHIER", "WAITER"];
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const { restaurantId, error } = await requireRestaurantRole(RECEPTION_ROLES);
+  const { restaurantId, error } = await requireRestaurantRole(
+    RECEPTION_ROLES,
+    restaurantIdFromRequest(req)
+  );
   if (error) return error;
 
   const featureErr = await assertFeature(restaurantId!, "reception");
@@ -120,7 +123,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const { restaurantId, session, error, isPlatformAdmin } = await requireRestaurantRole(RECEPTION_ROLES);
+  const { restaurantId, session, error, isPlatformAdmin } = await requireRestaurantRole(
+    RECEPTION_ROLES,
+    restaurantIdFromRequest(req)
+  );
   if (error) return error;
 
   const featureErr = await assertFeature(restaurantId!, "reception");

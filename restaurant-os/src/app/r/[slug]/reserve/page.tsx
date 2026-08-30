@@ -1,9 +1,9 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { LandingSubPage } from "@/components/customer/landing-sub-page";
-import { Button, Input } from "@/components/ui";
+import { PublicReservationForm } from "@/components/customer/public-reservation-form";
 
 export default function ReservePage() {
   return (
@@ -17,105 +17,48 @@ function ReserveForm() {
   const params = useParams();
   const slug = params.slug as string;
 
-  const [restaurantName, setRestaurantName] = useState("");
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [primaryColor, setPrimaryColor] = useState("#d4af37");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [guests, setGuests] = useState("2");
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState("");
+  const [restaurant, setRestaurant] = useState<{
+    name: string;
+    nameAr?: string | null;
+    logoUrl?: string | null;
+    primaryColor?: string;
+    workingHours?: unknown;
+    landingPageConfig?: unknown;
+    receptionDepositAmount?: number | null;
+    timezone?: string;
+  } | null>(null);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     fetch(`/api/public/restaurants/${slug}`)
       .then((r) => r.json())
       .then((data) => {
-        setRestaurantName(data.nameAr || data.name || "");
-        setLogoUrl(data.logoUrl);
-        if (data.primaryColor) setPrimaryColor(data.primaryColor);
+        if (data.error) {
+          setLoadError(data.error);
+          return;
+        }
+        setRestaurant(data);
       })
-      .catch(() => {});
+      .catch(() => setLoadError("تعذر تحميل بيانات المطعم"));
   }, [slug]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    const res = await fetch("/api/public/reservations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        slug,
-        customerName: name,
-        customerPhone: phone,
-        guestCount: guests,
-        date,
-        time,
-      }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) {
-      setError(data.error || "فشل إرسال الحجز");
-      return;
-    }
-    setDone(true);
-  }
+  const primaryColor = restaurant?.primaryColor || "#d4af37";
+  const restaurantName = restaurant?.nameAr || restaurant?.name || "...";
 
   return (
     <LandingSubPage
       slug={slug}
       title="حجز طاولة"
-      restaurantName={restaurantName || "..."}
-      logoUrl={logoUrl}
+      restaurantName={restaurantName}
+      logoUrl={restaurant?.logoUrl}
       primaryColor={primaryColor}
     >
-      {done ? (
-        <div className="py-12 text-center">
-          <p className="text-4xl">🪑</p>
-          <p className="mt-4 text-lg font-semibold">تم إرسال طلب الحجز!</p>
-          <p className="mt-2 text-sm opacity-70">سنتواصل معك قريباً</p>
-        </div>
+      {loadError ? (
+        <p className="py-8 text-center text-red-300">{loadError}</p>
+      ) : !restaurant ? (
+        <p className="py-8 text-center opacity-60">جاري التحميل...</p>
       ) : (
-        <form onSubmit={submit} className="space-y-4">
-          <Input label="الاسم" value={name} onChange={(e) => setName(e.target.value)} required />
-          <Input
-            label="الجوال"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            dir="ltr"
-            required
-          />
-          <Input
-            label="التاريخ"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-          />
-          <Input
-            label="الوقت"
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            required
-          />
-          <Input
-            label="عدد الضيوف"
-            type="number"
-            min={1}
-            value={guests}
-            onChange={(e) => setGuests(e.target.value)}
-            required
-          />
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          <Button type="submit" loading={loading} className="w-full">
-            إرسال طلب الحجز
-          </Button>
-        </form>
+        <PublicReservationForm slug={slug} restaurant={restaurant} />
       )}
     </LandingSubPage>
   );

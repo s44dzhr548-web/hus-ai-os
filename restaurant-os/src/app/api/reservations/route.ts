@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRestaurantRole } from "@/lib/api-auth";
+import { requireRestaurantRole, restaurantIdFromRequest } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import { assertFeature } from "@/lib/permissions-engine";
 import { upsertCustomerProfile, suggestBestTable } from "@/lib/reception";
@@ -51,7 +51,10 @@ function parseQuery(req: NextRequest, restaurantId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const { restaurantId, error } = await requireRestaurantRole(RECEPTION_ROLES);
+  const { restaurantId, error } = await requireRestaurantRole(
+    RECEPTION_ROLES,
+    restaurantIdFromRequest(req)
+  );
   if (error) return error;
 
   const featureErr = await assertFeature(restaurantId!, "reception");
@@ -102,7 +105,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { restaurantId, session, error } = await requireRestaurantRole(RECEPTION_ROLES);
+  const { restaurantId, session, error } = await requireRestaurantRole(
+    RECEPTION_ROLES,
+    restaurantIdFromRequest(req)
+  );
   if (error) return error;
 
   const featureErr = await assertFeature(restaurantId!, "reception");

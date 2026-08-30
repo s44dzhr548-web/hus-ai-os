@@ -17,6 +17,7 @@ export async function GET(
       name: true,
       nameAr: true,
       nameEn: true,
+      slug: true,
       logoUrl: true,
       phone: true,
       whatsappNumber: true,
@@ -24,6 +25,10 @@ export async function GET(
       addressAr: true,
       googleMapsEmbedSrc: true,
       primaryColor: true,
+      workingHours: true,
+      landingPageConfig: true,
+      timezone: true,
+      receptionDepositAmount: true,
       isActive: true,
     },
   });

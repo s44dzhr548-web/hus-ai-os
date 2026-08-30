@@ -1,68 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { upsertCustomerProfile } from "@/lib/reception";
+import {
+  createPublicReservation,
+} from "@/lib/reservation-booking-service";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const {
-    slug,
-    customerName,
-    customerPhone,
-    guestCount = 2,
-    date,
-    time,
-    occasion,
-    notes,
-    gender,
-    preferredArea,
-  } = body;
+  try {
+    const body = await req.json();
+    const idempotencyKey =
+      req.headers.get("x-idempotency-key")?.trim() ||
+      String(body.idempotencyKey || body.requestId || "").trim() ||
+      null;
 
-  if (!slug || !customerName?.trim() || !customerPhone?.trim() || !date || !time) {
+    const result = await createPublicReservation({
+      slug: String(body.slug || ""),
+      customerName: String(body.customerName || body.name || ""),
+      customerPhone: String(body.customerPhone || body.phone || ""),
+      date: String(body.date || ""),
+      time: String(body.time || ""),
+      guestCount: Number(body.guestCount ?? body.guests ?? 2),
+      sessionType: body.sessionType ? String(body.sessionType) : null,
+      occasion: body.occasion ? String(body.occasion) : null,
+      notes: body.notes ? String(body.notes) : null,
+      idempotencyKey,
+    });
+
     return NextResponse.json(
-      { error: "جميع الحقول المطلوبة غير مكتملة" },
-      { status: 400 }
+      {
+        ok: true,
+        id: result.reservation.id,
+        status: result.reservation.status,
+        reservationNumber: result.reservation.reservationNumber,
+        publicToken: result.reservation.publicAccessToken,
+        publicUrl: result.publicUrl,
+        reservation: result.view,
+        duplicate: result.duplicate,
+        message: "تم استلام طلب الحجز",
+      },
+      { status: result.duplicate ? 200 : 201 }
     );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "فشل إرسال الحجز";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
-
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { slug },
-    select: { id: true, isActive: true },
-  });
-
-  if (!restaurant || !restaurant.isActive) {
-    return NextResponse.json({ error: "المطعم غير موجود" }, { status: 404 });
-  }
-
-  const profile = await upsertCustomerProfile(
-    restaurant.id,
-    customerName.trim(),
-    customerPhone.trim()
-  );
-
-  const reservation = await prisma.reservation.create({
-    data: {
-      restaurantId: restaurant.id,
-      customerProfileId: profile.id,
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      guestCount: parseInt(String(guestCount)) || 2,
-      date: new Date(date),
-      time: String(time),
-      occasion: occasion?.trim() || null,
-      notes: notes?.trim() || null,
-      preferredArea: preferredArea || null,
-      status: "PENDING",
-    },
-  });
-
-  return NextResponse.json(
-    {
-      id: reservation.id,
-      status: reservation.status,
-      message: "تم إرسال طلب الحجز بنجاح",
-    },
-    { status: 201 }
-  );
 }
