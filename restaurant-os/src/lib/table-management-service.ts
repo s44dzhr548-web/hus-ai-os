@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
-import { tableCodeFor, menuUrlForTable } from "@/lib/table-code";
+import { tableCodeFor } from "@/lib/table-code";
+import { ensureTablePublicQrToken, permanentQrUrl } from "@/lib/permanent-qr";
 import { logTableAudit, tableSnapshot } from "@/lib/table-audit";
 import {
   displayTableNumber,
@@ -103,8 +104,9 @@ export async function regenerateTableQr(
   number: number,
   customCode?: string | null
 ) {
+  const publicQrToken = await ensureTablePublicQrToken(tableId);
   const code = customCode?.trim() || tableCodeFor(slug, number);
-  const qrCode = menuUrlForTable(tableId, slug, code);
+  const qrCode = permanentQrUrl(publicQrToken);
   return prisma.diningTable.update({
     where: { id: tableId },
     data: { tableCode: code, qrCode },
@@ -339,12 +341,13 @@ export async function renumberBranchTables(
     changes.push({ id: table.id, from: table.number, to: newNumber });
 
     const code = tableCodeFor(slug, newNumber);
+    const publicQrToken = table.publicQrToken || (await ensureTablePublicQrToken(table.id));
     await prisma.diningTable.update({
       where: { id: table.id },
       data: {
         number: newNumber,
         tableCode: code,
-        qrCode: menuUrlForTable(table.id, slug, code),
+        qrCode: permanentQrUrl(publicQrToken),
         sortOrder: i,
       },
     });
@@ -410,20 +413,25 @@ export function exportTablesCsv(
     floorZone?: string | null;
     isActive: boolean;
     qrCode?: string | null;
+    publicQrToken?: string | null;
   }>
 ) {
-  const header = "number,label,tableCode,capacity,area,isActive,qrUrl";
-  const rows = tables.map((t) =>
-    [
+  const header = "number,label,tableCode,capacity,area,isActive,qrUrl,publicQrToken";
+  const rows = tables.map((t) => {
+    const qrUrl =
+      t.qrCode ||
+      (t.publicQrToken ? permanentQrUrl(t.publicQrToken) : "");
+    return [
       t.number,
       JSON.stringify(t.label ?? ""),
       t.tableCode ?? "",
       t.capacity,
       t.floorZone ?? "",
       t.isActive,
-      t.qrCode ?? "",
-    ].join(",")
-  );
+      qrUrl,
+      t.publicQrToken ?? "",
+    ].join(",");
+  });
   return [header, ...rows].join("\n");
 }
 

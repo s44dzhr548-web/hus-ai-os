@@ -1,6 +1,7 @@
 import type { TableIcon, DiningTable } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { tableCodeFor, menuUrlForTable } from "@/lib/table-code";
+import { tableCodeFor } from "@/lib/table-code";
+import { ensureTablePublicQrToken, permanentQrUrl } from "@/lib/permanent-qr";
 import {
   displayTableNumber,
   normalizeTableNumber,
@@ -166,9 +167,10 @@ export async function upsertManualTable(
   const table = await prisma.diningTable.create({
     data: { branchId, number: tableNumber, tableCode: code, ...data },
   });
+  const publicQrToken = await ensureTablePublicQrToken(table.id);
   return prisma.diningTable.update({
     where: { id: table.id },
-    data: { qrCode: menuUrlForTable(table.id, slug, code) },
+    data: { qrCode: permanentQrUrl(publicQrToken) },
   });
 }
 

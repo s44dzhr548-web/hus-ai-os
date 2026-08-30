@@ -12,18 +12,25 @@ export default async function MenuPage({
   const { tableId } = await params;
   const sp = await searchParams;
 
-  if (sp?.direct !== "1") {
-    const table = await prisma.diningTable.findUnique({
-      where: { id: tableId, isActive: true },
-      select: {
-        tableCode: true,
-        branch: { select: { restaurant: { select: { slug: true } } } },
-      },
-    });
+  const table = await prisma.diningTable.findUnique({
+    where: { id: tableId, isActive: true },
+    select: {
+      publicQrToken: true,
+      tableCode: true,
+      branch: { select: { restaurant: { select: { slug: true } } } },
+    },
+  });
 
-    if (table?.tableCode && table.branch.restaurant.slug) {
-      redirect(`/r/${table.branch.restaurant.slug}/table/${table.tableCode}`);
-    }
+  if (!table) {
+    return <MenuClient />;
+  }
+
+  if (table.publicQrToken && sp?.direct !== "1") {
+    redirect(`/q/${table.publicQrToken}`);
+  }
+
+  if (sp?.direct !== "1" && table.tableCode && table.branch.restaurant.slug) {
+    redirect(`/r/${table.branch.restaurant.slug}/table/${table.tableCode}`);
   }
 
   return <MenuClient />;

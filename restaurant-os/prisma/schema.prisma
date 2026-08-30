@@ -524,6 +524,7 @@ model DiningTable {
   sortOrder          Int                    @default(0) @map("sort_order")
   notes              String?
   qrCode             String?                @map("qr_code")
+  publicQrToken      String?                @unique @map("public_qr_token")
   isActive           Boolean                @default(true) @map("is_active")
   operationalStatus  TableOperationalStatus @default(AVAILABLE) @map("operational_status")
   floorMapX          Int?                   @map("floor_map_x")

@@ -3,24 +3,9 @@ import { requireRestaurant } from "@/lib/api-auth";
 import prisma from "@/lib/prisma";
 import QRCode from "qrcode";
 import { menuUrlForTable } from "@/lib/table-code";
+import { ensureTablePublicQrToken } from "@/lib/permanent-qr";
 
 export const dynamic = "force-dynamic";
-
-const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3005";
-
-function resolveTableMenuUrl(table: {
-  id: string;
-  qrCode: string | null;
-  tableCode: string | null;
-  branch: { restaurant: { slug: string } };
-}) {
-  if (table.qrCode) return table.qrCode;
-  return menuUrlForTable(
-    table.id,
-    table.branch.restaurant.slug,
-    table.tableCode
-  );
-}
 
 async function generateQr(url: string, width = 300) {
   return QRCode.toDataURL(url, {
@@ -28,6 +13,17 @@ async function generateQr(url: string, width = 300) {
     margin: 2,
     color: { dark: "#047857", light: "#ffffff" },
   });
+}
+
+async function resolveTableMenuUrl(table: {
+  id: string;
+  qrCode: string | null;
+  tableCode: string | null;
+  publicQrToken: string | null;
+  branch: { restaurant: { slug: string } };
+}) {
+  const token = table.publicQrToken || (await ensureTablePublicQrToken(table.id));
+  return menuUrlForTable(table.id, table.branch.restaurant.slug, table.tableCode, token);
 }
 
 export async function GET(req: NextRequest) {
@@ -58,7 +54,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "الطاولة غير موجودة" }, { status: 404 });
     }
 
-    const menuUrl = resolveTableMenuUrl(table);
+    const menuUrl = await resolveTableMenuUrl(table);
     const qrDataUrl = await generateQr(menuUrl);
 
     return NextResponse.json({ type: "table", table, menuUrl, qrDataUrl });
@@ -73,7 +69,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "الفرع غير موجود" }, { status: 404 });
     }
 
-    const menuUrl = `${appUrl()}/menu?branch=${branch.id}`;
+    const menuUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.menuhus.com"}/menu?branch=${branch.id}`;
     const qrDataUrl = await generateQr(menuUrl);
 
     return NextResponse.json({ type: "branch", branch, menuUrl, qrDataUrl });
@@ -85,7 +81,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "المطعم غير موجود" }, { status: 404 });
     }
 
-    const menuUrl = `${appUrl()}/menu?restaurant=${restaurant.id}`;
+    const menuUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.menuhus.com"}/menu?restaurant=${restaurant.id}`;
     const qrDataUrl = await generateQr(menuUrl);
 
     return NextResponse.json({ type: "restaurant", restaurant, menuUrl, qrDataUrl });
@@ -120,19 +116,19 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
-  const restaurantUrl = `${appUrl()}/menu?restaurant=${restaurantId}`;
+  const restaurantUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.menuhus.com"}/menu?restaurant=${restaurantId}`;
   const restaurantQr = await generateQr(restaurantUrl, 200);
 
   const branchesWithQr = await Promise.all(
     branches.map(async (b) => {
-      const url = `${appUrl()}/menu?branch=${b.id}`;
+      const url = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.menuhus.com"}/menu?branch=${b.id}`;
       return { ...b, menuUrl: url, qrDataUrl: await generateQr(url, 200) };
     })
   );
 
   const tablesWithQr = await Promise.all(
     tables.map(async (table) => {
-      const menuUrl = resolveTableMenuUrl(table);
+      const menuUrl = await resolveTableMenuUrl(table);
       return { ...table, menuUrl, qrDataUrl: await generateQr(menuUrl, 200) };
     })
   );

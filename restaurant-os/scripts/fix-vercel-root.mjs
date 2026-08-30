@@ -15,7 +15,7 @@ const res = await fetch(
       Authorization: `Bearer ${match[1]}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ rootDirectory: null }),
+    body: JSON.stringify({ rootDirectory: "restaurant-os" }),
   }
 );
 const data = await res.json();

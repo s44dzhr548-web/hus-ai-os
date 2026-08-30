@@ -100,10 +100,35 @@ async function main() {
   pass(3, captainPage.status === 307 || captainPage.status === 200 ? "captain route ok" : `HTTP ${captainPage.status}`);
 
   const idempotencyKey = `waiter-qa-${Date.now()}`;
+  let qrCookie = "";
+  try {
+    let token = (
+      await prisma.diningTable.findUnique({
+        where: { id: table.id },
+        select: { publicQrToken: true },
+      })
+    )?.publicQrToken;
+    if (!token) {
+      const { ensureTablePublicQrToken } = await import("../src/lib/permanent-qr.ts");
+      token = await ensureTablePublicQrToken(table.id);
+    }
+    const qrRes = await fetch(`${BASE}/q/${token}`, { redirect: "manual" });
+    const setCookies = qrRes.headers.getSetCookie?.() || [];
+    qrCookie = setCookies.map((c) => c.split(";")[0]).join("; ");
+    if (!qrCookie) throw new Error("missing QR session cookie");
+  } catch (e) {
+    fail(4, `QR session: ${e}`);
+  }
+
   try {
     const createRes = await fetch(`${BASE}/api/public/captain/orders`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Idempotency-Key": idempotencyKey },
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": idempotencyKey,
+        ...(qrCookie ? { Cookie: qrCookie } : {}),
+      },
       body: JSON.stringify({
         tableId: table.id,
         notes: "Waiter QA test order",
@@ -119,7 +144,12 @@ async function main() {
 
     const dupRes = await fetch(`${BASE}/api/public/captain/orders`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Idempotency-Key": idempotencyKey },
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": idempotencyKey,
+        ...(qrCookie ? { Cookie: qrCookie } : {}),
+      },
       body: JSON.stringify({
         tableId: table.id,
         items: [{ menuItemId: menuItem.id, quantity: 2 }],

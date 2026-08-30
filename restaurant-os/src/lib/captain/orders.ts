@@ -18,6 +18,7 @@ export type CaptainOrderItemInput = {
 
 export type CreateCaptainOrderInput = {
   tableId: string;
+  restaurantId?: string;
   items: CaptainOrderItemInput[];
   notes?: string;
   customerName?: string;
@@ -195,6 +196,10 @@ export async function createCaptainOrder(input: CreateCaptainOrderInput) {
 
   if (!table || !table.isActive) {
     throw new Error("الطاولة غير موجودة");
+  }
+
+  if (input.restaurantId && table.branch.restaurantId !== input.restaurantId) {
+    throw new Error("الطاولة لا تطابق المطعم");
   }
 
   const { subtotal, orderItemsData } = await buildOrderItemsData(

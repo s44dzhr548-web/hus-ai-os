@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { CustomerHomepage } from "@/components/customer/customer-homepage";
 import { BRANDING_SELECT, resolveCustomerBranding } from "@/lib/restaurant-branding";
@@ -30,6 +30,10 @@ export default async function SlugTableHomePage({
   });
 
   if (!table) notFound();
+
+  if (table.publicQrToken) {
+    redirect(`/q/${table.publicQrToken}`);
+  }
 
   const restaurant = table.branch.restaurant;
   const activeSession = await getActiveSessionForTable(table.id);

@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import QRCode from "qrcode";
 import { menuUrlForTable, sortTablesByNumber } from "@/lib/table-code";
 import { displayTableNumber } from "@/lib/table-number-normalize";
+import { ensureTablePublicQrToken, PERMANENT_QR_BASE_URL } from "@/lib/permanent-qr";
 
 export const dynamic = "force-dynamic";
 
@@ -40,17 +41,20 @@ export async function GET(req: NextRequest) {
       branchName: branch.nameAr || branch.name,
       exportedAt,
       count: tables.length,
+      qrBaseUrl: PERMANENT_QR_BASE_URL,
       tables: tables.map((t) => ({
         id: t.id,
         number: t.number,
         displayNumber: displayTableNumber(t.displayNumber || t.label || String(t.number)),
+        publicQrToken: t.publicQrToken,
       })),
     });
   }
 
   const cards = await Promise.all(
     tables.map(async (table) => {
-      const menuUrl = menuUrlForTable(table.id, branch.restaurant.slug);
+      const publicQrToken = table.publicQrToken || (await ensureTablePublicQrToken(table.id));
+      const menuUrl = menuUrlForTable(table.id, branch.restaurant.slug, table.tableCode, publicQrToken);
       const displayNum = displayTableNumber(
         table.displayNumber || table.label || String(table.number)
       );
@@ -59,7 +63,7 @@ export async function GET(req: NextRequest) {
         margin: 1,
         color: { dark: "#047857", light: "#ffffff" },
       });
-      return { table, menuUrl, qrDataUrl, displayNum };
+      return { table, menuUrl, qrDataUrl, displayNum, publicQrToken };
     })
   );
 
@@ -70,7 +74,7 @@ export async function GET(req: NextRequest) {
 
   const cardsHtml = cards
     .map(
-      ({ table, menuUrl, qrDataUrl, displayNum }) => `
+      ({ menuUrl, qrDataUrl, displayNum }) => `
     <div class="card">
       ${logo ? `<img class="logo" src="${logo}" alt="" />` : ""}
       <h1>${restaurantName}</h1>

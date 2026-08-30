@@ -287,6 +287,7 @@ export default function MenuClient() {
     try {
       const res = await fetch("/api/public/captain/orders", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           "X-Idempotency-Key": requestId,
